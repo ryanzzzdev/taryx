@@ -9,8 +9,8 @@ Task sections own status; index icons mirror them. See the [documentation guide]
 - ✅ [TAR-001 — Establish project-management standards](#tar-001)
 - ✅ [TAR-002 — Establish the planning baseline](#tar-002)
 - ✅ [TAR-003 — Bootstrap the development workspace](#tar-003)
-- 📋 [TAR-004 — Freeze domain and measurement profiles](#tar-004)
-- 📋 [TAR-005 — Implement versioned meter ingestion and fixtures](#tar-005)
+- ✅ [TAR-004 — Freeze domain and measurement profiles](#tar-004)
+- 🟢 [TAR-005 — Implement versioned meter ingestion and fixtures](#tar-005)
 - 📋 [TAR-006 — Implement deterministic itemised rating](#tar-006)
 - 📋 [TAR-007 — Implement durable issuance and balanced posting](#tar-007)
 - 📋 [TAR-008 — Implement successive corrections and adjustments](#tar-008)
@@ -27,7 +27,7 @@ Task sections own status; index icons mirror them. See the [documentation guide]
 
 ## Delivery notes
 
-Next action: TAR-003. TAR-004 source research may proceed alongside bootstrap, but its measurement acceptance depends on the running skeleton. Later tasks remain Backlog until their dependencies and detailed contracts are ready. Portal/API slices can develop alongside their backend tasks; TAR-009 and TAR-012 own integrated acceptance. Observability hooks and correctness tests accompany implementation; TAR-016 owns the full cross-service campaign, not the first tests.
+Next action: TAR-005 — versioned meter ingestion and deterministic fixtures against the frozen profile. Later tasks remain Backlog until their dependencies and detailed contracts are ready. Portal/API slices can develop alongside their backend tasks; TAR-009 and TAR-012 own integrated acceptance. Observability hooks and correctness tests accompany implementation; TAR-016 owns the full cross-service campaign, not the first tests.
 
 The architecture and functional scope are the planning baseline; exact schemas, dependency versions and open profiles are refined in their named tasks. Split large tasks into new IDs before starting if necessary; preserve existing history. Next unused ID: TAR-019. No application work has started.
 
@@ -135,7 +135,7 @@ Celery remote control disabled (`worker_enable_remote_control=False`): kombu pid
 - Area: verification
 - Milestone: M1
 - Priority: High
-- Status: Backlog 📋
+- Status: Done ✅
 - Depends on: TAR-003
 - References: [Contract](features/metering-and-rating.md)
 
@@ -151,11 +151,14 @@ Resolve the supported meter/tariff/time profile and independent reference cases 
 
 ### Completion evidence
 
-Not started; no implementation or verification evidence.
+- BLK-001/BLK-003 resolved 2026-10-25 in blockers.md; frozen profile appended to features/metering-and-rating.md with linked AEMO sources (MDFF v2.7, Metrology Part B, EMMS DM v5.4, EDGE Part A).
+- Independent hand-computed reference cases in features/rating-reference-cases.md (RC-01..RC-09) covering flat/TOU/export/boundary/leap/DST/revision/invalid/adjustment.
+- Baseline measured on running bootstrap: 14c/30Gi host, ~1.2 GiB idle stack, /healthz ~18 ms, ping ~5.5 ms; R1 workload and budgets frozen; R2 labelled optional.
+- Documentation-only task; no application verification applies beyond doc link/UTF-8 checks.
 
 ### Notes
 
-Refine and mark Ready once dependencies pass; record relevant gate resolutions before dependent implementation.
+Next action: TAR-005 implementation against the frozen profile.
 
 <a id="tar-005"></a>
 
@@ -165,7 +168,7 @@ Refine and mark Ready once dependencies pass; record relevant gate resolutions b
 - Area: metering
 - Milestone: M1
 - Priority: High
-- Status: Backlog 📋
+- Status: Ready 🟢
 - Depends on: TAR-003, TAR-004
 - References: [Contract](features/metering-and-rating.md)
 
