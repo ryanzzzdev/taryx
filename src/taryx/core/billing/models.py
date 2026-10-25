@@ -28,6 +28,9 @@ class BillingOperation(models.Model):
     invoice = models.ForeignKey(
         "Invoice", null=True, blank=True, on_delete=models.PROTECT, related_name="+"
     )
+    adjustment = models.ForeignKey(
+        "Adjustment", null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
     detail = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True)
@@ -74,11 +77,47 @@ class Invoice(models.Model):
         ]
 
 
+class Adjustment(models.Model):
+    """Immutable correction appended to an issued invoice.
+
+    Deltas reconcile revised liability against the net liability already
+    recognised by the invoice and all prior adjustments — never against
+    the original total alone. A zero-delta adjustment is audit evidence
+    only and carries no journal."""
+
+    number = models.CharField(max_length=20, unique=True)
+    invoice = models.ForeignKey(Invoice, on_delete=models.PROTECT, related_name="adjustments")
+    rating_run = models.ForeignKey(RatingRun, on_delete=models.PROTECT)
+    input_digest = models.CharField(max_length=64)
+    generation = models.PositiveIntegerField()
+    delta_charge = models.DecimalField(max_digits=14, decimal_places=2)
+    delta_export = models.DecimalField(max_digits=14, decimal_places=2)
+    delta_gst = models.DecimalField(max_digits=14, decimal_places=2)
+    delta_total = models.DecimalField(max_digits=14, decimal_places=2)
+    issued_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["invoice", "generation"], name="uniq_adjustment_generation"
+            ),
+            models.UniqueConstraint(
+                fields=["invoice", "input_digest"], name="uniq_adjustment_digest"
+            ),
+        ]
+
+
 class JournalEntry(models.Model):
     """Immutable journal header; balance across its postings is enforced by
     a deferred database constraint trigger at commit."""
 
     invoice = models.ForeignKey(Invoice, on_delete=models.PROTECT, related_name="journal_entries")
+    adjustment = models.ForeignKey(
+        Adjustment, null=True, blank=True, on_delete=models.PROTECT, related_name="journal_entries"
+    )
+    operation = models.ForeignKey(
+        BillingOperation, on_delete=models.PROTECT, related_name="journal_entries"
+    )
     posted_at = models.DateTimeField(auto_now_add=True)
     memo = models.CharField(max_length=200)
 

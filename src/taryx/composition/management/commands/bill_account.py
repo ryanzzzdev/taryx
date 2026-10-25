@@ -9,7 +9,11 @@ from taryx.core.pricing.models import RatingRun
 
 
 class Command(BaseCommand):
-    help = "Admit a billing operation (idempotent) and enqueue issuance."
+    help = (
+        "Admit a billing operation (idempotent) and enqueue issuance — "
+        "issues the first invoice for a period or appends an adjustment "
+        "when the pinned inputs differ from the recognised generation."
+    )
 
     def add_arguments(self, parser):
         parser.add_argument("reference")

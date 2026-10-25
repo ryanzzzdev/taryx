@@ -13,8 +13,8 @@ Task sections own status; index icons mirror them. See the [documentation guide]
 - ✅ [TAR-005 — Implement versioned meter ingestion and fixtures](#tar-005)
 - ✅ [TAR-006 — Implement deterministic itemised rating](#tar-006)
 - ✅ [TAR-007 — Implement durable issuance and balanced posting](#tar-007)
-- 🟢 [TAR-008 — Implement successive corrections and adjustments](#tar-008)
-- 📋 [TAR-009 — Deliver the core operator journey](#tar-009)
+- ✅ [TAR-008 — Implement successive corrections and adjustments](#tar-008)
+- 🟢 [TAR-009 — Deliver the core operator journey](#tar-009)
 - 📋 [TAR-010 — Build independent legacy characterisation](#tar-010)
 - 📋 [TAR-011 — Implement isolated shadow comparison and gates](#tar-011)
 - 📋 [TAR-012 — Deliver operator migration and cutover](#tar-012)
@@ -27,7 +27,7 @@ Task sections own status; index icons mirror them. See the [documentation guide]
 
 ## Delivery notes
 
-Next action: TAR-008 — successive corrections and adjustments against recognised liability (M2). TAR-006 and TAR-007 are implemented and verified; TAR-008's dependencies pass. Later tasks remain Backlog until their dependencies and detailed contracts are ready. Portal/API slices can develop alongside their backend tasks; TAR-009 and TAR-012 own integrated acceptance. Observability hooks and correctness tests accompany implementation; TAR-016 owns the full cross-service campaign, not the first tests.
+Next action: TAR-009 — the core operator journey over the verified rating/issuance/correction pipeline (M2). TAR-006 through TAR-008 are implemented and verified; TAR-009's dependencies pass. Later tasks remain Backlog until their dependencies and detailed contracts are ready. Portal/API slices can develop alongside their backend tasks; TAR-009 and TAR-012 own integrated acceptance. Observability hooks and correctness tests accompany implementation; TAR-016 owns the full cross-service campaign, not the first tests.
 
 The architecture and functional scope are the planning baseline; exact schemas, dependency versions and open profiles are refined in their named tasks. Split large tasks into new IDs before starting if necessary; preserve existing history. Next unused ID: TAR-019. M1 implementation remediated and re-verified.
 
@@ -264,7 +264,7 @@ Runtime permission boundary is Postgres triggers plus transaction-scoped issuanc
 - Area: billing
 - Milestone: M2
 - Priority: High
-- Status: Ready 🟢
+- Status: Done ✅
 - Depends on: TAR-007
 - References: [Contract](features/billing-and-ledger.md)
 
@@ -280,11 +280,11 @@ Reconcile revised liability against all previously recognised liability without 
 
 ### Completion evidence
 
-Not started; no implementation or verification evidence.
+Implemented: immutable Adjustment documents (number sequence, per-invoice generation, digest uniqueness) appended under the invoice row lock; deltas reconcile the revised run against recognised liability derived from the journal ledger (revenue/GST credit-positive, receivable/export debit-positive) — never re-subtracting the original total. Signed legs post only for nonzero deltas; zero-delta corrections persist the adjustment without a journal. Repeated corrections return the recognised document; runs pinned to a superseded selection go stale; journals trace to the posting operation and adjustment. Migration 0003 backfills journal.operation with the immutability trigger suspended for that statement only (required on populated databases). 8 tests in tests/test_corrections.py cover the RC-09 chain (+0.10 then -0.07 vs recognised), repeated/zero-delta/stale/racing corrections, revert-to-original, database immutability and a real-subprocess worker kill mid-correction. make check green (85 tests). Verified live in Compose: invoice 8.75 -> ADJ-000001 -0.07 -> ADJ-000002 -0.03 restoring 8.65 via the real worker.
 
 ### Notes
 
-Refine and mark Ready once dependencies pass; record relevant gate resolutions before dependent implementation.
+Correction triggering is operator-driven (ingest revision -> rate -> bill_account routes to the adjustment path). Next action: TAR-009.
 
 <a id="tar-009"></a>
 
@@ -294,7 +294,7 @@ Refine and mark Ready once dependencies pass; record relevant gate resolutions b
 - Area: portal
 - Milestone: M2
 - Priority: High
-- Status: Backlog 📋
+- Status: Ready 🟢
 - Depends on: TAR-008
 - References: [Contract](features/operator-and-clients.md)
 

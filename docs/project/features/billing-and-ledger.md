@@ -1,7 +1,7 @@
 # Billing, corrections and ledger
 
 Date: 2026-10-25
-Status: TAR-007 slice implemented and verified (admission, outbox, atomic issuance, trigger-enforced balance and immutability). Corrections (TAR-008) and the operator journey (TAR-009) remain planning contract. [Decision 003](../decisions/003-financial-and-migration-integrity.md) records the selected integrity model.
+Status: TAR-007 and TAR-008 slices implemented and verified (admission, outbox, atomic issuance, trigger-enforced balance/immutability, linked adjustments reconciled against recognised liability). The operator journey (TAR-009) remains planning contract. [Decision 003](../decisions/003-financial-and-migration-integrity.md) records the selected integrity model.
 Tasks: [TAR-007](../backlog.md#tar-007), [TAR-008](../backlog.md#tar-008), [TAR-009](../backlog.md#tar-009).
 
 ## Bill lifecycle
