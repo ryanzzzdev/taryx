@@ -58,7 +58,19 @@ DATABASES = {
         "PASSWORD": os.environ.get("POSTGRES_PASSWORD", "taryx"),
         "HOST": os.environ.get("POSTGRES_HOST", "localhost"),
         "PORT": os.environ.get("POSTGRES_PORT", "55432"),
-    }
+    },
+    # Restricted credential for shadow/comparison evidence paths: the
+    # database itself denies this role writes to financial and
+    # evidence-of-record tables (see migration 0001 grants).
+    "shadow": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": os.environ.get("POSTGRES_DB", "taryx"),
+        "USER": os.environ.get("POSTGRES_SHADOW_USER", "taryx_shadow"),
+        "PASSWORD": os.environ.get("POSTGRES_SHADOW_PASSWORD", "taryx_shadow"),
+        "HOST": os.environ.get("POSTGRES_HOST", "localhost"),
+        "PORT": os.environ.get("POSTGRES_PORT", "55432"),
+        "TEST": {"MIRROR": "default"},
+    },
 }
 
 LANGUAGE_CODE = "en-au"

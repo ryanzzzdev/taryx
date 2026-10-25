@@ -16,7 +16,7 @@ Task sections own status; index icons mirror them. See the [documentation guide]
 - ✅ [TAR-008 — Implement successive corrections and adjustments](#tar-008)
 - ✅ [TAR-009 — Deliver the core operator journey](#tar-009)
 - ✅ [TAR-010 — Build independent legacy characterisation](#tar-010)
-- 📋 [TAR-011 — Implement isolated shadow comparison and gates](#tar-011)
+- ✅ [TAR-011 — Implement isolated shadow comparison and gates](#tar-011)
 - 📋 [TAR-012 — Deliver operator migration and cutover](#tar-012)
 - 📋 [TAR-013 — Demonstrate two isolated client instances](#tar-013)
 - 📋 [TAR-014 — Freeze the bounded market workflow](#tar-014)
@@ -379,7 +379,7 @@ Refine and mark Ready once dependencies pass; record relevant gate resolutions b
 - Area: migration
 - Milestone: M3
 - Priority: High
-- Status: Backlog 📋
+- Status: Done ✅
 - Depends on: TAR-010
 - References: [Contract](features/legacy-migration.md)
 
@@ -396,7 +396,7 @@ Persist detailed comparison evidence with scoped discrepancy decisions and cutov
 
 ### Completion evidence
 
-Not started; no implementation or verification evidence.
+Implemented 2026-10-25. `taryx.core.migration` holds Cohort (routing mode + optimistic revision), LegacyCalculation (verbatim response, unique per snapshot+versions), ComparisonRun (per-snapshot itemised evidence), DiscrepancyDecision (fingerprint+version-scoped approvals) and CohortEvent. The `shadow` DB alias maps to role `taryx_shadow` (migration 0001): SELECT everywhere, writes only on the two evidence tables, financial/evidence-of-record writes REVOKEd — exercised in tests via actual denied INSERT/DELETE plus allowed evidence writes. `comparison.diff_lines` pairs lines by identity and reports quantity/rate/amount/gst and totals diffs; offsetting differences still report DIFFERENCE; timeout/malformed/unavailable persist INCONCLUSIVE rows that block gates. `evaluation_blockers` freezes the rules: evidence must postdate eval_frozen_at, pin the current input digest and engine/policy versions, be conclusive, and every diff fingerprint needs a still-valid decision. `transition_cohort` enforces optimistic revision, rejects in-flight member billing ops, restricts mode edges, gates NEW_ONLY on the frozen evaluation, and audits every transition. tests/test_migration.py: 11 tests. Live: real ACC-001 comparison detected the FIT-TRUNC defect (quantity 9.6→9) with itemised diffs; gate reported unresolved differences and missing ACC-003 evidence.
 
 ### Notes
 

@@ -1,6 +1,7 @@
 from django.core.management.base import BaseCommand
 
 from taryx.core.accounts.seed import seed_demo_data, seed_operator_identities
+from taryx.core.migration.seed import seed_migration_cohort
 
 
 class Command(BaseCommand):
@@ -20,3 +21,7 @@ class Command(BaseCommand):
         for user in seed_operator_identities():
             role = user.groups.first()
             self.stdout.write(f"user {user.username}: role {role.name if role else '?'}")
+        cohort = seed_migration_cohort()
+        self.stdout.write(
+            f"cohort {cohort.name}: {cohort.routing_mode} ({cohort.members.count()} accounts)"
+        )

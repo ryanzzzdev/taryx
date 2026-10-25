@@ -1,7 +1,7 @@
 # Legacy comparison and cohort migration
 
 Date: 2026-10-25
-Status: TAR-010 slice implemented — independent `legacy-sim` service (own sqlite schema, protocol `taryx-legacy/1`, catalogue `L-2003.4`) with characterised heritage GST-exempt policy and FIT-TRUNC-2003 defect; comparison/cutover remain planning contract. Fictional policies and legacy defects are test scenarios, not Australian regulations.
+Status: TAR-010 slice implemented — independent `legacy-sim` service (own sqlite schema, protocol `taryx-legacy/1`, catalogue `L-2003.4`) with characterised heritage GST-exempt policy and FIT-TRUNC-2003 defect; comparison evidence, scoped decisions and the frozen cutover gate implemented (TAR-011); operator cutover remains planning contract. Fictional policies and legacy defects are test scenarios, not Australian regulations.
 Tasks: [TAR-010](../backlog.md#tar-010), [TAR-011](../backlog.md#tar-011), [TAR-012](../backlog.md#tar-012).
 
 ## Scope and authority
@@ -20,7 +20,7 @@ Classify discrepancies as unresolved, preserve-client-policy or approved-legacy-
 
 ## Cutover control
 
-An authorised approver can cut over only when the declared cohort evaluation set is complete, no required comparison is inconclusive or unresolved, approved differences are still applicable and routing/version preconditions match. The evaluation set and freshness rules are frozen in TAR-011 and visible to the operator; passing sample accounts cannot imply all accounts were compared.
+An authorised approver can cut over only when the declared cohort evaluation set is complete, no required comparison is inconclusive or unresolved, approved differences are still applicable and routing/version preconditions match. The evaluation set and freshness rules are frozen in TAR-011 (implemented in `evaluation_blockers`) and visible to the operator; passing sample accounts cannot imply all accounts were compared. Frozen rules: every member account needs comparison evidence for the declared period that postdates `eval_frozen_at`, is conclusive, pins the current input digest and current engine/policy versions, and has a still-valid scoped `DiscrepancyDecision` per difference fingerprint.
 
 Changes are audited and use optimistic concurrency to reject stale requests. Routing rollback stops future use of the new calculator; it cannot undo financial documents. Existing bills require the normal adjustment path. Do not advertise arbitrary state rollback or migration of historical debt/account data.
 
