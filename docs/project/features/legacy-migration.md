@@ -1,0 +1,34 @@
+# Legacy comparison and cohort migration
+
+Date: 2026-10-25
+Status: Planning contract; fictional policies and legacy defects are defined as test scenarios, not Australian regulations.
+Tasks: [TAR-010](../backlog.md#tar-010), [TAR-011](../backlog.md#tar-011), [TAR-012](../backlog.md#tar-012).
+
+## Scope and authority
+
+The independently deployed legacy calculator owns a separate legacy schema and exposes versioned calculation responses. It does not post Taryx invoices. Both engines consume an equivalent immutable snapshot; the core is the only authoritative financial writer. Document the adapter mapping explicitly so comparing engines does not also compare different data.
+
+Cohort modes: `LEGACY_ONLY` uses the legacy result; `SHADOW` still uses the legacy result and compares the new result without side effects; `NEW_ONLY` uses the new result. Routing changes affect future admitted work. Pin mode and routing revision on each operation; block or drain in-flight issuance before a cohort changes modes.
+
+## Characterisation and comparison
+
+A documented grandfathered client policy and a deliberately seeded legacy arithmetic defect provide distinct scenarios. Characterisation tests preserve observed behaviour without automatically declaring it correct. Tests must expose the two defects independently and must not merely call the same shared calculation from both engines.
+
+Compare component identities, quantities, rates, tariff/policy versions, rounding and final amounts. Reports retain both engine versions, snapshot hash, cohort revision, timestamps and field-level differences. A timeout, missing result or malformed legacy response is inconclusive and blocks migration evidence; it is not a successful comparison.
+
+Classify discrepancies as unresolved, preserve-client-policy or approved-legacy-defect-correction. Record actor, reason, evidence and affected versions. Approval of a defect is scoped to that specific difference and version, not a blanket tolerance for later mismatches. Changed inputs, policies or engines invalidate stale approvals/evidence for cutover.
+
+## Cutover control
+
+An authorised approver can cut over only when the declared cohort evaluation set is complete, no required comparison is inconclusive or unresolved, approved differences are still applicable and routing/version preconditions match. The evaluation set and freshness rules are frozen in TAR-011 and visible to the operator; passing sample accounts cannot imply all accounts were compared.
+
+Changes are audited and use optimistic concurrency to reject stale requests. Routing rollback stops future use of the new calculator; it cannot undo financial documents. Existing bills require the normal adjustment path. Do not advertise arbitrary state rollback or migration of historical debt/account data.
+
+## Acceptance
+
+- Shadow credentials and code paths cannot issue invoices or modify ledger tables; test attempted writes, not just UI visibility.
+- Two offsetting line differences are detected even when final totals match.
+- The historical client policy is preserved and the known legacy bug is explicitly corrected with scoped evidence.
+- Legacy timeout and malformed output block cutover; restart/retry preserves comparison identity.
+- Concurrent cutover, stale evidence and in-flight billing cannot produce mixed authoritative generation decisions.
+- A cohort can move from legacy to shadow to new, while another remains legacy, with an auditable history.
