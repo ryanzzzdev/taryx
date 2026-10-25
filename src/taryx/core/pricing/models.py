@@ -7,8 +7,10 @@ class RatingRun(models.Model):
     """Immutable persisted result of one deterministic rating calculation.
 
     input_digest pins the exact interval selections, agreements, tariff
-    identity, GST rate and engine/policy versions consumed; replaying the
-    same snapshot reproduces the same lines and digest.
+    identity, GST rate and engine/policy versions consumed; input_snapshot
+    retains that payload verbatim so a historical calculation can be
+    reconstructed without trusting mutable referenced metadata. Both the
+    run and its lines are immutable at the database boundary (migration).
     """
 
     account = models.ForeignKey(Account, on_delete=models.CASCADE, related_name="rating_runs")
@@ -17,6 +19,7 @@ class RatingRun(models.Model):
     engine_version = models.CharField(max_length=16)
     policy_identity = models.CharField(max_length=80)
     input_digest = models.CharField(max_length=64)
+    input_snapshot = models.JSONField(default=dict)
     net = models.DecimalField(max_digits=14, decimal_places=2)
     gst = models.DecimalField(max_digits=14, decimal_places=2)
     total = models.DecimalField(max_digits=14, decimal_places=2)

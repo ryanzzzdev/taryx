@@ -27,6 +27,7 @@ from taryx.core.billing.models import (
     Posting,
 )
 from taryx.core.pricing.models import RatingRun
+from taryx.core.pricing.services import lock_inputs
 
 # Minimal fictional-retailer chart of accounts (billing subledger).
 ACC_RECEIVABLE = "1100"
@@ -65,25 +66,27 @@ def admit_issue(
     event is recovered by drain_outbox.
     """
     payload = _payload_sha(account, period_start, period_end, rating_run)
-    existing = BillingOperation.objects.filter(operation_id=operation_id).first()
-    if existing is not None:
+    try:
+        with transaction.atomic():
+            op = BillingOperation.objects.create(
+                operation_id=operation_id,
+                account=account,
+                period_start=period_start,
+                period_end=period_end,
+                rating_run=rating_run,
+                payload_sha256=payload,
+            )
+            OutboxEvent.objects.create(operation=op, topic=TOPIC_ISSUE)
+        return op
+    except IntegrityError:
+        # Loser of a concurrent same-key admission: resolve the winner.
+        existing = BillingOperation.objects.get(operation_id=operation_id)
         if existing.payload_sha256 != payload:
             raise AdmissionError(
                 "operation_conflict",
                 f"operation {operation_id!r} already admitted with a different payload",
-            )
+            ) from None
         return existing
-    with transaction.atomic():
-        op = BillingOperation.objects.create(
-            operation_id=operation_id,
-            account=account,
-            period_start=period_start,
-            period_end=period_end,
-            rating_run=rating_run,
-            payload_sha256=payload,
-        )
-        OutboxEvent.objects.create(operation=op, topic=TOPIC_ISSUE)
-    return op
 
 
 def _next_number(sequence: str, prefix: str) -> str:
@@ -136,6 +139,12 @@ def _leg(journal: JournalEntry, code: str, debit, credit, memo: str) -> Posting 
     return Posting(journal=journal, account_code=code, debit=debit, credit=credit, memo=memo)
 
 
+def _signed_leg(journal: JournalEntry, code: str, delta: Decimal, memo: str) -> Posting | None:
+    """One leg per element; a negative amount swaps the side so net-credit
+    bills (export exceeding charges) post to the correct ledger side."""
+    return _leg(journal, code, max(delta, 0), max(-delta, 0), memo)
+
+
 def _issue(op: BillingOperation) -> Invoice:
     run = op.rating_run
     amounts = _run_amounts(run)
@@ -156,10 +165,14 @@ def _issue(op: BillingOperation) -> Invoice:
         memo=f"{invoice.number} {op.account.reference} {op.period_start}..{op.period_end}",
     )
     postings = [
-        _leg(journal, ACC_RECEIVABLE, invoice.total, 0, f"receivable {invoice.number}"),
-        _leg(journal, ACC_ENERGY_REVENUE, 0, amounts["charge"], f"energy+supply {invoice.number}"),
-        _leg(journal, ACC_EXPORT_CREDIT, amounts["export"], 0, f"feed-in credit {invoice.number}"),
-        _leg(journal, ACC_GST_LIABILITY, 0, invoice.gst, f"gst {invoice.number}"),
+        _signed_leg(journal, ACC_RECEIVABLE, amounts["total"], f"receivable {invoice.number}"),
+        _signed_leg(
+            journal, ACC_ENERGY_REVENUE, -amounts["charge"], f"energy+supply {invoice.number}"
+        ),
+        _signed_leg(
+            journal, ACC_EXPORT_CREDIT, amounts["export"], f"feed-in credit {invoice.number}"
+        ),
+        _signed_leg(journal, ACC_GST_LIABILITY, -amounts["gst"], f"gst {invoice.number}"),
     ]
     Posting.objects.bulk_create(p for p in postings if p is not None)
     return invoice
@@ -191,15 +204,11 @@ def _post_correction(op: BillingOperation, invoice: Invoice, generation: int) ->
             memo=f"{adjustment.number} correction for {invoice.number}",
         )
 
-        def signed(code: str, delta_dr, memo: str):
-            """One leg per element; a negative delta swaps the side."""
-            return _leg(journal, code, max(delta_dr, 0), max(-delta_dr, 0), memo)
-
         postings = [
-            signed(ACC_RECEIVABLE, delta["total"], "receivable"),
-            signed(ACC_ENERGY_REVENUE, -delta["charge"], "energy+supply"),
-            signed(ACC_EXPORT_CREDIT, delta["export"], "feed-in credit"),
-            signed(ACC_GST_LIABILITY, -delta["gst"], "gst"),
+            _signed_leg(journal, ACC_RECEIVABLE, delta["total"], "receivable"),
+            _signed_leg(journal, ACC_ENERGY_REVENUE, -delta["charge"], "energy+supply"),
+            _signed_leg(journal, ACC_EXPORT_CREDIT, delta["export"], "feed-in credit"),
+            _signed_leg(journal, ACC_GST_LIABILITY, -delta["gst"], "gst"),
         ]
         Posting.objects.bulk_create(p for p in postings if p is not None)
     return adjustment
@@ -230,12 +239,30 @@ def process_operation(
         if op.status != BillingOperation.Status.PENDING:
             return op  # duplicate delivery is a no-op
 
-        current_digest = digest_resolver(op.account, op.period_start, op.period_end)
-        if current_digest != op.rating_run.input_digest:
+        if digest_resolver(op.account, op.period_start, op.period_end) != (
+            op.rating_run.input_digest
+        ):
             return _finish(
                 op,
                 BillingOperation.Status.STALE,
                 "input selection changed since the pinned rating run",
+            )
+
+        # Commit-safe revalidation: lock the account and every row feeding
+        # the digest, then recompute under those locks. Any input change
+        # committed meanwhile is now visible (stale); a change still in
+        # flight either already holds these locks (we wait, then see it) or
+        # blocks on the account lock it must take before mutating, so it
+        # can only land after this transaction commits. The digest also
+        # covers open quarantines, which input locks alone cannot pin.
+        lock_inputs(op.account, op.period_start, op.period_end)
+        if digest_resolver(op.account, op.period_start, op.period_end) != (
+            op.rating_run.input_digest
+        ):
+            return _finish(
+                op,
+                BillingOperation.Status.STALE,
+                "inputs changed during issuance validation",
             )
 
         invoice = (
@@ -252,8 +279,12 @@ def process_operation(
             try:
                 with transaction.atomic():
                     invoice = _issue(op)
-            except IntegrityError:
-                # A racing operation already issued this generation.
+            except IntegrityError as exc:
+                # Only the generation-key uniqueness violation means a
+                # racing issuance already posted; anything else is a real
+                # failure and must surface rather than hang the operation.
+                if "uniq_bill_generation" not in str(exc):
+                    raise
                 invoice = Invoice.objects.get(
                     account=op.account,
                     period_start=op.period_start,

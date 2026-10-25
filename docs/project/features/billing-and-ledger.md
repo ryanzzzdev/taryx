@@ -1,7 +1,7 @@
 # Billing, corrections and ledger
 
 Date: 2026-10-25
-Status: Implemented M2 slices reopened by the [independent review](../evidence/m2-independent-review.md); prior verification does not establish the failing integrity and browser/recovery requirements. Remaining future slices are planning contracts.
+Status: TAR-007/TAR-008 slices implemented and re-verified after independent-review remediation — commit-safe locked input revalidation, quarantine-aware digests, net-credit posting, transaction-scoped journal sealing, immutable rating snapshots. [Decision 003](../decisions/003-financial-and-migration-integrity.md) records the integrity model. The operator journey (TAR-009) is implemented; client isolation and remaining slices remain planning contracts.
 Tasks: [TAR-007](../backlog.md#tar-007), [TAR-008](../backlog.md#tar-008), [TAR-009](../backlog.md#tar-009).
 
 ## Bill lifecycle

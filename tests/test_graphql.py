@@ -295,3 +295,124 @@ def test_rejected_ingest_reports_stable_code(seeded):
     )
     batch = result["data"]["ingestNem12"]["batch"]
     assert batch["status"] == "REJECTED" and batch["errorCode"]
+
+
+@pytest.mark.django_db
+def test_retry_same_request_after_rerating_returns_original_operation(seeded):
+    """A retry of an identical request after re-rating must resolve the
+    already-admitted operation, not conflict on the newer hidden payload."""
+    client = Client()
+    login(client, "operator")
+    gql(
+        client,
+        "mutation($f:String!,$c:String!){ingestNem12(filename:$f,content:$c){ok}}",
+        f="day1_base.nem12",
+        c=load("day1_base.nem12"),
+    )
+    bill = (
+        'mutation($o:String!){billAccount(reference:"ACC-001",'
+        'periodStart:"2026-03-02",periodEnd:"2026-03-03",'
+        "operationId:$o){ok code operation{operationId}}}"
+    )
+    gql(
+        client,
+        'mutation{rateAccount(reference:"ACC-001",'
+        'periodStart:"2026-03-02",periodEnd:"2026-03-03"){ok}}',
+    )
+    first = gql(client, bill, o="STABLE-1")["data"]["billAccount"]
+    assert first["ok"]
+    # A second rating run exists; the identical retry still resolves.
+    gql(
+        client,
+        'mutation{rateAccount(reference:"ACC-001",'
+        'periodStart:"2026-03-02",periodEnd:"2026-03-03"){ok}}',
+    )
+    retry = gql(client, bill, o="STABLE-1")["data"]["billAccount"]
+    assert retry["ok"], retry
+    assert retry["operation"]["operationId"] == first["operation"]["operationId"]
+    # The same key for a genuinely different request still conflicts.
+    conflict = gql(
+        client,
+        'mutation($o:String!){billAccount(reference:"ACC-002",'
+        'periodStart:"2026-03-02",periodEnd:"2026-03-03",'
+        "operationId:$o){ok code}}",
+        o="STABLE-1",
+    )["data"]["billAccount"]
+    assert conflict == {"ok": False, "code": "operation_conflict"}
+
+
+@pytest.mark.django_db
+def test_csrf_enforced_with_trusted_dev_origin(seeded):
+    """Fresh-browser behaviour: POST without a CSRF cookie/token is 403,
+    a safe GET bootstraps the cookie, and an untrusted Origin is refused."""
+    client = Client(enforce_csrf_checks=True)
+    origin = {"HTTP_ORIGIN": "http://localhost:5174"}
+
+    denied = client.post(
+        "/graphql",
+        data=json.dumps({"query": "{me{username}}"}),
+        content_type="application/json",
+        **origin,
+    )
+    assert denied.status_code == 403
+
+    # Safe request bootstraps the csrftoken cookie (ensure_csrf_cookie).
+    assert client.get("/graphql", {"query": "{__typename}"}).status_code == 200
+    token = client.cookies["csrftoken"].value
+
+    ok = client.post(
+        "/graphql",
+        data=json.dumps({"query": "{me{username}}"}),
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=token,
+        **origin,
+    )
+    assert ok.status_code == 200
+
+    bad_origin = client.post(
+        "/graphql",
+        data=json.dumps({"query": "{me{username}}"}),
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=token,
+        HTTP_ORIGIN="http://evil.example",
+    )
+    assert bad_origin.status_code == 403
+
+
+@pytest.mark.django_db
+def test_login_rotates_csrf_token(seeded):
+    """After login the old CSRF secret is invalid; the rotated cookie's
+    token must be echoed instead (the portal reads it fresh each call)."""
+    client = Client(enforce_csrf_checks=True)
+    origin = {"HTTP_ORIGIN": "http://localhost:5174"}
+    client.get("/graphql", {"query": "{__typename}"})
+    old_token = client.cookies["csrftoken"].value
+
+    login_query = 'mutation{login(username:"operator",password:"taryx-operator"){ok}}'
+    stale = client.post(
+        "/graphql",
+        data=json.dumps({"query": login_query}),
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=old_token,
+        **origin,
+    )
+    assert stale.status_code == 200  # login itself succeeds with pre-session token
+
+    new_token = client.cookies["csrftoken"].value
+    assert new_token != old_token
+    rejected = client.post(
+        "/graphql",
+        data=json.dumps({"query": "{me{username}}"}),
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=old_token,
+        **origin,
+    )
+    assert rejected.status_code == 403
+    accepted = client.post(
+        "/graphql",
+        data=json.dumps({"query": "{me{username}}"}),
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=new_token,
+        **origin,
+    )
+    assert accepted.status_code == 200

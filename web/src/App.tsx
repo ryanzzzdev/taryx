@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import {
+  clearPending,
+  newOperationId,
+  pendingFor,
+  savePending,
+} from "./operationStore";
+
 /* Operator portal — decision 004 contract.
  * Session auth + CSRF; mutations return {ok, code} payloads; billAccount
  * returns an operation ID polled via billingOperation. Retrying with the
@@ -41,14 +48,38 @@ function csrfToken(): string {
   return match?.[1] ?? "";
 }
 
-async function gql<T>(query: string, variables?: Record<string, unknown>): Promise<T> {
-  const res = await fetch("/graphql", {
-    method: "POST",
+/* CSRF bootstrap: the first request must be a safe GET — Django only
+ * issues the csrftoken cookie on non-mutating responses, and POSTs are
+ * rejected by CSRF middleware before the view runs. A 403 can also mean
+ * the token rotated (e.g. after login), so we re-bootstrap and retry once.
+ */
+async function bootstrapCsrf(): Promise<void> {
+  await fetch(`/graphql?query=${encodeURIComponent("{__typename}")}`, {
     credentials: "same-origin",
-    headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken() },
-    body: JSON.stringify({ query, variables }),
   });
-  const body = (await res.json()) as { data?: T; errors?: GqlError[] };
+}
+
+async function gql<T>(query: string, variables?: Record<string, unknown>): Promise<T> {
+  const post = () =>
+    fetch("/graphql", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken() },
+      body: JSON.stringify({ query, variables }),
+    });
+  if (!csrfToken()) await bootstrapCsrf();
+  let res = await post();
+  if (res.status === 403) {
+    await bootstrapCsrf();
+    res = await post();
+  }
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  let body: { data?: T; errors?: GqlError[] };
+  try {
+    body = (await res.json()) as { data?: T; errors?: GqlError[] };
+  } catch {
+    throw new Error(`non-JSON response (HTTP ${res.status})`);
+  }
   if (body.errors?.length) {
     const err = body.errors[0]!;
     throw new Error(err.extensions?.code ?? err.message);
@@ -192,8 +223,8 @@ function AccountPanel({
   const [op, setOp] = useState<Operation | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [busy, setBusy] = useState(false);
-  const opIdRef = useRef(0);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const polledRef = useRef<string | null>(null);
   const canOperate = role === "operator";
 
   const period = { s: "2026-03-02", e: "2026-03-03" };
@@ -205,26 +236,50 @@ function AccountPanel({
     ).then((d) => setInvoices(d.invoices));
   }, [account.reference]);
 
-  useEffect(refreshInvoices, [refreshInvoices]);
-  useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
+  const startPoll = useCallback(
+    (operationId: string) => {
+      if (pollRef.current) clearInterval(pollRef.current);
+      polledRef.current = operationId;
+      pollRef.current = setInterval(() => {
+        gql<{ billingOperation: Operation }>(
+          "query($o:String!){billingOperation(operationId:$o){operationId status detail invoice{number total journalEntries{postings{accountCode debit credit}} adjustments{number generation deltaTotal}} adjustment{number deltaTotal}}}",
+          { o: operationId },
+        )
+          .then((d) => {
+            // Stale-response guard: only apply results for the operation
+            // this panel is currently watching.
+            if (d.billingOperation.operationId !== polledRef.current) return;
+            setOp(d.billingOperation);
+            if (d.billingOperation.status !== "PENDING") {
+              if (pollRef.current) clearInterval(pollRef.current);
+              clearPending(localStorage);
+              refreshInvoices();
+            }
+          })
+          .catch(() => undefined);
+      }, 800);
+    },
+    [refreshInvoices],
+  );
 
-  const startPoll = (operationId: string) => {
-    if (pollRef.current) clearInterval(pollRef.current);
-    pollRef.current = setInterval(() => {
-      gql<{ billingOperation: Operation }>(
-        "query($o:String!){billingOperation(operationId:$o){operationId status detail invoice{number total journalEntries{postings{accountCode debit credit}} adjustments{number generation deltaTotal}} adjustment{number deltaTotal}}}",
-        { o: operationId },
-      )
-        .then((d) => {
-          setOp(d.billingOperation);
-          if (d.billingOperation.status !== "PENDING") {
-            if (pollRef.current) clearInterval(pollRef.current);
-            refreshInvoices();
-          }
-        })
-        .catch(() => undefined);
-    }, 800);
-  };
+  useEffect(refreshInvoices, [refreshInvoices]);
+  useEffect(
+    () => () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    },
+    [],
+  );
+  // Resume a persisted pending operation (reload recovery); reset display
+  // state whenever the account changes so stale results can't bleed over.
+  useEffect(() => {
+    setOp(null);
+    const pending = pendingFor(localStorage, account.reference, period.s, period.e);
+    if (pending) {
+      setOp({ operationId: pending.operationId, status: "PENDING", detail: null, invoice: null, adjustment: null });
+      startPoll(pending.operationId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [account.reference, startPoll]);
 
   const ingest = () => {
     setBusy(true);
@@ -260,19 +315,37 @@ function AccountPanel({
     )
       .then((d) => {
         const p = d.billAccount;
-        if (!p.ok) onError(`${p.code}: ${p.message}`);
-        else if (p.operation) {
+        if (!p.ok) {
+          clearPending(localStorage); // terminal server-side refusal
+          onError(`${p.code}: ${p.message}`);
+        } else if (p.operation) {
           setOp(p.operation);
           startPoll(operationId);
         }
       })
-      .catch((e: Error) => onError(e.message))
+      .catch((e: Error) => {
+        // Uncertain outcome: keep the persisted ID — retrying or reloading
+        // resumes the same operation rather than minting a fresh key.
+        onError(`${e.message} — retry resumes operation ${operationId}`);
+      })
       .finally(() => setBusy(false));
   };
 
   const newBill = () => {
-    opIdRef.current += 1;
-    bill(`web-${account.reference}-${opIdRef.current}`);
+    // Reuse the persisted intent when one exists: a lost response must be
+    // recovered under the same operation ID, never a fresh key.
+    const existing = pendingFor(localStorage, account.reference, period.s, period.e);
+    const operationId = existing?.operationId ?? newOperationId();
+    if (!existing) {
+      savePending(localStorage, {
+        operationId,
+        accountReference: account.reference,
+        periodStart: period.s,
+        periodEnd: period.e,
+        submittedAt: new Date().toISOString(),
+      });
+    }
+    bill(operationId);
   };
 
   return (

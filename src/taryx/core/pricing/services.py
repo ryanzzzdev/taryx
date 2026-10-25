@@ -15,7 +15,7 @@ from django.db import transaction
 
 from taryx.core.accounts.models import Account, MeterChannel
 from taryx.core.metering.ingestion import channel_coverage
-from taryx.core.metering.models import CurrentInterval
+from taryx.core.metering.models import CurrentInterval, QuarantinedInterval
 from taryx.core.metering.nem_time import nem_interval_end_utc, nem_local
 from taryx.core.pricing.engine import (
     ENGINE_VERSION,
@@ -29,7 +29,7 @@ from taryx.core.pricing.models import RatingLine, RatingRun
 from taryx.core.pricing.tariffs import TariffSpec
 
 
-def _input_digest(
+def _input_payload(
     *,
     account: Account,
     period_start: date,
@@ -37,10 +37,14 @@ def _input_digest(
     agreements: list[AgreementSpan],
     tariffs: dict[str, TariffSpec],
     channels: list[tuple[MeterChannel, list]],
+    quarantines: list[QuarantinedInterval],
     gst_rate: Decimal,
     policy_identity: str,
-) -> str:
-    payload = {
+) -> dict:
+    """The exact inputs a rating consumes — hashed into input_digest and
+    retained verbatim on the run so historical calculations stay
+    reconstructible even if referenced metadata rows later change."""
+    return {
         "account": account.reference,
         "period": [period_start.isoformat(), period_end.isoformat()],
         "engine_version": ENGINE_VERSION,
@@ -84,28 +88,60 @@ def _input_digest(
             }
             for channel, rows in sorted(channels, key=lambda c: c[0].id)
         ],
+        "quarantines": [
+            [q.id, q.channel_id, q.interval_end_utc.isoformat()]
+            for q in sorted(quarantines, key=lambda q: q.id)
+        ],
     }
+
+
+def _input_digest(payload: dict) -> str:
     return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
 
 
 def _gather_inputs(
-    account: Account, period_start: date, period_end: date
-) -> tuple[list[AgreementSpan], list[tuple[MeterChannel, list[CurrentInterval]]]]:
-    """Selected interval rows and agreement spans pinning a rating period."""
+    account: Account, period_start: date, period_end: date, *, lock: bool = False
+) -> tuple[
+    list[AgreementSpan],
+    list[tuple[MeterChannel, list[CurrentInterval]]],
+    list[QuarantinedInterval],
+]:
+    """Selected interval rows, open quarantines and agreement spans pinning
+    a rating period.
+
+    With lock=True every row feeding the digest is locked FOR UPDATE —
+    billing holds those locks from final validation through commit so no
+    input-changing writer can interleave. Mutating paths (interval
+    publication, quarantine resolution) take the account row lock first,
+    which is what prevents a concurrent *insert* of a new quarantine from
+    slipping between validation and commit.
+    """
     channel_rows: list[tuple[MeterChannel, list[CurrentInterval]]] = []
+    quarantines: list[QuarantinedInterval] = []
     for channel in MeterChannel.objects.filter(supply_point__account=account).order_by("id"):
         start_utc = nem_interval_end_utc(period_start, 0, channel.interval_minutes)
         end_utc = nem_interval_end_utc(period_end, 0, channel.interval_minutes)
-        rows = list(
-            CurrentInterval.objects.filter(
-                channel=channel,
-                interval_end_utc__gt=start_utc,
-                interval_end_utc__lte=end_utc,
-            )
-            .select_related("source_record")
-            .order_by("interval_end_utc")
-        )
+        interval_qs = CurrentInterval.objects.filter(
+            channel=channel,
+            interval_end_utc__gt=start_utc,
+            interval_end_utc__lte=end_utc,
+        ).select_related("source_record")
+        if lock:
+            interval_qs = interval_qs.select_for_update(of=("self",))
+        rows = list(interval_qs.order_by("interval_end_utc"))
         channel_rows.append((channel, rows))
+        quarantine_qs = QuarantinedInterval.objects.filter(
+            channel=channel,
+            interval_end_utc__gt=start_utc,
+            interval_end_utc__lte=end_utc,
+            status=QuarantinedInterval.Status.OPEN,
+        )
+        if lock:
+            quarantine_qs = quarantine_qs.select_for_update()
+        quarantines.extend(quarantine_qs.order_by("id"))
+    agreement_qs = account.tariff_agreements.all()
+    if lock:
+        agreement_qs = agreement_qs.select_for_update()
     agreements = [
         AgreementSpan(
             agreement_id=a.id,
@@ -114,9 +150,23 @@ def _gather_inputs(
             effective_from=a.effective_from,
             effective_to=a.effective_to,
         )
-        for a in account.tariff_agreements.all()
+        for a in agreement_qs
     ]
-    return agreements, channel_rows
+    return agreements, channel_rows, quarantines
+
+
+def lock_inputs(account: Account, period_start: date, period_end: date) -> None:
+    """Shared revision protocol for input-changing writers.
+
+    Acquires, in order, the account row lock then every row feeding this
+    period's input digest. Callers must hold these locks from the final
+    digest validation through transaction commit; publishers and
+    quarantine resolution acquire the same account lock first so any
+    input change either lands before (and is re-validated) or waits
+    until the financial transaction commits.
+    """
+    Account.objects.select_for_update().filter(pk=account.pk).exists()
+    _gather_inputs(account, period_start, period_end, lock=True)
 
 
 def compute_input_digest(
@@ -129,16 +179,19 @@ def compute_input_digest(
     policy_identity: str,
 ) -> str:
     """Digest of the inputs a rating over this period would consume now."""
-    agreements, channel_rows = _gather_inputs(account, period_start, period_end)
+    agreements, channel_rows, quarantines = _gather_inputs(account, period_start, period_end)
     return _input_digest(
-        account=account,
-        period_start=period_start,
-        period_end=period_end,
-        agreements=agreements,
-        tariffs=tariffs,
-        channels=channel_rows,
-        gst_rate=gst_rate,
-        policy_identity=policy_identity,
+        _input_payload(
+            account=account,
+            period_start=period_start,
+            period_end=period_end,
+            agreements=agreements,
+            tariffs=tariffs,
+            channels=channel_rows,
+            quarantines=quarantines,
+            gst_rate=gst_rate,
+            policy_identity=policy_identity,
+        )
     )
 
 
@@ -156,7 +209,7 @@ def rate_account(
     if not days:
         raise RatingError("empty_period", "period must cover at least one day")
 
-    agreements, channel_rows = _gather_inputs(account, period_start, period_end)
+    agreements, channel_rows, quarantines = _gather_inputs(account, period_start, period_end)
 
     slices: list[ChannelSlice] = []
     for channel, rows in channel_rows:
@@ -191,13 +244,14 @@ def rate_account(
         gst_rate=gst_rate,
     )
 
-    digest = _input_digest(
+    payload = _input_payload(
         account=account,
         period_start=period_start,
         period_end=period_end,
         agreements=agreements,
         tariffs=tariffs,
         channels=channel_rows,
+        quarantines=quarantines,
         gst_rate=gst_rate,
         policy_identity=policy_identity,
     )
@@ -209,7 +263,8 @@ def rate_account(
             period_end=period_end,
             engine_version=ENGINE_VERSION,
             policy_identity=policy_identity,
-            input_digest=digest,
+            input_digest=_input_digest(payload),
+            input_snapshot=payload,
             net=calc.net,
             gst=calc.gst,
             total=calc.total,

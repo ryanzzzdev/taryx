@@ -4,11 +4,15 @@ Expected amounts are hand-computed in docs/project/features/rating-reference-cas
 — never derived from the engine.
 """
 
+import hashlib
+import json
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
 import pytest
+from django.db import Error as DbError
+from django.db import transaction
 
 from taryx.core.accounts.models import (
     Account,
@@ -18,8 +22,10 @@ from taryx.core.accounts.models import (
 )
 from taryx.core.accounts.seed import seed_demo_data
 from taryx.core.metering.ingestion import ingest_nem12_content
+from taryx.core.metering.models import IntervalRecord
 from taryx.core.pricing.engine import RatingError
-from taryx.core.pricing.services import rate_account
+from taryx.core.pricing.models import RatingLine, RatingRun
+from taryx.core.pricing.services import compute_input_digest, rate_account
 from taryx.territories.au_nem.tariffs import GST_RATE, POLICY_IDENTITY, TARIFFS
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures" / "nem12"
@@ -271,3 +277,40 @@ def test_replay_is_deterministic():
         )
         for item in run2.lines.all()
     ]
+
+
+@pytest.mark.django_db
+def test_published_rating_evidence_is_immutable():
+    """Rating runs, lines and their source records are calculation
+    evidence — the database rejects mutation, not just convention."""
+    account = make_account([("E1", "import")], [("T-FLAT", date(2026, 1, 1), None)])
+    ingest_nem12_content(load("e1_flat.nem12"), "e1_flat.nem12")
+    run = rate_account(account, date(2026, 3, 2), date(2026, 3, 3), **KWARGS)
+    with pytest.raises(DbError), transaction.atomic():
+        RatingLine.objects.filter(run=run, element="import").update(quantity=999, amount=999)
+    with pytest.raises(DbError), transaction.atomic():
+        RatingRun.objects.filter(pk=run.pk).update(total=0)
+    with pytest.raises(DbError), transaction.atomic():
+        IntervalRecord.objects.filter(channel__supply_point__account=account).update(value=0)
+
+
+@pytest.mark.django_db
+def test_input_snapshot_reconstructs_historical_run():
+    """After newer inputs exist, the stored snapshot still pins the run's
+    exact selections and hashes back to its digest."""
+    account = make_account([("E1", "import")], [("T-FLAT", date(2026, 1, 1), None)])
+    ingest_nem12_content(load("e1_flat.nem12"), "e1_flat.nem12")
+    run = rate_account(account, date(2026, 3, 2), date(2026, 3, 3), **KWARGS)
+    pinned = [row[3] for ch in run.input_snapshot["channels"] for row in ch["records"]]
+
+    # A revision with newer timestamps changes the current selection;
+    # the run's snapshot must not.
+    revised = load("e1_flat.nem12").decode().replace("20260301120000", "20260310120000")
+    ingest_nem12_content(revised.encode(), "e1_flat_rev.nem12")
+    current = compute_input_digest(account, date(2026, 3, 2), date(2026, 3, 3), **KWARGS)
+    assert current != run.input_digest
+    assert [row[3] for ch in run.input_snapshot["channels"] for row in ch["records"]] == pinned
+    assert (
+        hashlib.sha256(json.dumps(run.input_snapshot, sort_keys=True).encode()).hexdigest()
+        == run.input_digest
+    )

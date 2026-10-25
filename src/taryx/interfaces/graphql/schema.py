@@ -503,6 +503,24 @@ class BillAccount(graphene.Mutation):
         account = Account.objects.filter(reference=reference).first()
         if account is None:
             return BillPayload(ok=False, code="not_found", message="unknown account")
+        existing = BillingOperation.objects.filter(operation_id=operation_id).first()
+        if existing is not None:
+            # Retry recovery: the public request (account/period) is what
+            # the caller committed to; a newer rating run must not turn an
+            # identical retry into a payload conflict.
+            if (
+                existing.account_id != account.id
+                or existing.period_start != period_start
+                or existing.period_end != period_end
+            ):
+                return BillPayload(
+                    ok=False,
+                    code="operation_conflict",
+                    message=(
+                        f"operation {operation_id!r} was admitted for a different account or period"
+                    ),
+                )
+            return BillPayload(ok=True, operation=existing)
         run = (
             RatingRun.objects.filter(
                 account=account, period_start=period_start, period_end=period_end

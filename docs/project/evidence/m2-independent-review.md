@@ -74,3 +74,41 @@ Generate collision-resistant IDs, persist each pending intent before submission,
 M1 remains Complete. Reopen TAR-006–009 and M2; TAR-006 is Ready for snapshot remediation, dependent tasks return to Backlog pending that contract. Preserve earlier passing evidence as history. Do not start TAR-010 as the next milestone until the M2 correctness/portal gates pass.
 
 The previous exit review's listed limitations do not waive accepted requirements on immutable history, stale-input issuance or browser recovery. Further readiness gaps (full itemised portal explanation, real broker fault testing, after-commit/ack failure and bounded query behaviour) should be mapped explicitly at re-review; this pass did not establish their completion.
+
+## Remediation addendum — 2026-10-25
+
+All seven findings remediated at the follow-up commit; the six preserved
+probes pass and their coverage is folded into `tests/`:
+
+- **R1**: `DJANGO_CSRF_TRUSTED_ORIGINS` covers the dev portal origin; the
+  portal bootstraps CSRF via a safe GET, re-bootstraps + retries once on
+  403, and surfaces non-JSON/HTTP failures. `enforce_csrf_checks` tests
+  cover origin rejection, GET bootstrap and login rotation; the live
+  browser-equivalent path was verified through the Vite proxy
+  (403 → bootstrap → login → rotation → bill → polled COMPLETE).
+- **R2**: open quarantines join the input digest; a locked final
+  revalidation (account row + all digest inputs under a shared-revision
+  lock — ingestion publish and quarantine resolution take the same
+  account lock first) re-verifies inputs before issuance/correction
+  commits.
+- **R3**: sign-aware issuance legs post net-credit receivables to the
+  credit side; the racing-issuance catch only covers the
+  `uniq_bill_generation` uniqueness violation.
+- **R4**: a transaction-local open-journal flag (set by the journal's
+  insert trigger, dying with the transaction) seals posted journals
+  against appended legs, including balanced pairs.
+- **R5**: `RatingRun.input_snapshot` retains the exact digest payload for
+  reconstruction; rating runs/lines and interval records are immutable
+  at the database boundary.
+- **R6**: `billAccount` resolves an existing operation by key against the
+  public request before selecting a run; admission resolves concurrent
+  same-key inserts via savepoint.
+- **R7**: portal operation IDs are `crypto.randomUUID()` persisted to
+  localStorage before submission — lost responses retry under the same
+  identity, reload resumes polling, account/period scoping prevents
+  replay, terminal states clear the intent. Store tests via vitest.
+
+Verification: `make check` green (102 tests), all six probes pass, live
+Compose verification of the seal trigger and the full CSRF/journey flow.
+The residual readiness gaps listed in the milestone decision remain open
+evidence work for the re-review.

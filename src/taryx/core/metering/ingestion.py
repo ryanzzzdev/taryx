@@ -18,7 +18,7 @@ from django.db import transaction
 from django.db.utils import IntegrityError
 from django.utils import timezone
 
-from taryx.core.accounts.models import MeterChannel
+from taryx.core.accounts.models import Account, MeterChannel
 from taryx.core.metering.models import (
     CurrentInterval,
     IngestionBatch,
@@ -193,12 +193,20 @@ def _apply_selection(batch: IngestionBatch, affected: list[tuple[int, datetime]]
             )
         )
 
+    accounts = {
+        channel_id: account_id
+        for channel_id, account_id in MeterChannel.objects.filter(
+            pk__in={channel_id for channel_id, _ in affected}
+        ).values_list("pk", "supply_point__account_id")
+    }
     accepted = 0
     for channel_id, interval_end in affected:
         for attempt in range(3):
             try:
                 with transaction.atomic():
-                    accepted += _publish_interval(batch, channel_id, interval_end)
+                    accepted += _publish_interval(
+                        batch, channel_id, interval_end, accounts[channel_id]
+                    )
                 break
             except IntegrityError:
                 if attempt == 2:
@@ -206,7 +214,13 @@ def _apply_selection(batch: IngestionBatch, affected: list[tuple[int, datetime]]
     return accepted
 
 
-def _publish_interval(batch: IngestionBatch, channel_id: int, interval_end: datetime) -> int:
+def _publish_interval(
+    batch: IngestionBatch, channel_id: int, interval_end: datetime, account_id: int
+) -> int:
+    # Shared input-revision protocol: take the account row lock before any
+    # mutation so billing's locked input validation serializes with this
+    # publication — including quarantine inserts, which lock nothing else.
+    Account.objects.select_for_update().filter(pk=account_id).exists()
     current = (
         CurrentInterval.objects.select_for_update()
         .filter(channel_id=channel_id, interval_end_utc=interval_end)
@@ -267,12 +281,21 @@ def resolve_quarantine(
     Its value is published as the current interval and the quarantine is
     closed with the actor and reason retained."""
     with transaction.atomic():
-        quarantine = (
-            QuarantinedInterval.objects.select_for_update()
-            .filter(pk=quarantine_id, status=QuarantinedInterval.Status.OPEN)
-            .first()
-        )
+        quarantine = QuarantinedInterval.objects.filter(
+            pk=quarantine_id, status=QuarantinedInterval.Status.OPEN
+        ).first()
         if quarantine is None:
+            raise ResolutionError("not_found", "quarantine not found or already resolved")
+        # Shared input-revision protocol (see _publish_interval): the
+        # account lock must precede the quarantine/interval mutations.
+        account_id = (
+            MeterChannel.objects.filter(pk=quarantine.channel_id)
+            .values_list("supply_point__account_id", flat=True)
+            .get()
+        )
+        Account.objects.select_for_update().filter(pk=account_id).exists()
+        quarantine = QuarantinedInterval.objects.select_for_update().get(pk=quarantine_id)
+        if quarantine.status != QuarantinedInterval.Status.OPEN:
             raise ResolutionError("not_found", "quarantine not found or already resolved")
         record = quarantine.candidate_records.filter(pk=record_id).first()
         if record is None:

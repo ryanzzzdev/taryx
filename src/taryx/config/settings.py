@@ -6,6 +6,16 @@ BASE_DIR = Path(__file__).resolve().parents[3]
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "taryx-development-only-secret-key")
 DEBUG = os.environ.get("DJANGO_DEBUG", "false").lower() in {"1", "true", "yes"}
 ALLOWED_HOSTS = [h for h in os.environ.get("DJANGO_ALLOWED_HOSTS", "*").split(",") if h]
+# Session-authenticated GraphQL stays CSRF-enforced; the dev portal origin
+# must be explicitly trusted because the Vite proxy forwards the browser's
+# Origin header while rewriting Host (decision 004).
+CSRF_TRUSTED_ORIGINS = [
+    o
+    for o in os.environ.get(
+        "DJANGO_CSRF_TRUSTED_ORIGINS", "http://localhost:5174,http://127.0.0.1:5174"
+    ).split(",")
+    if o
+]
 
 INSTALLED_APPS = [
     "django.contrib.contenttypes",

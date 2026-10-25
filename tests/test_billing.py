@@ -171,11 +171,13 @@ def test_racing_operations_cannot_double_issue():
     run = rate_account(account, DAY, NEXT, **KWARGS)
     ops = [admit(account, run, f"OP-R{i}") for i in range(2)]
     barrier = Barrier(2)
-    original = billing_services._issue
+    original = billing_services.lock_inputs
 
-    def issue(op):
+    def gated_lock(*args):
+        # Both operations pass validation together, then race for the
+        # account lock that serialises input validation through commit.
         barrier.wait(timeout=10)
-        return original(op)
+        return original(*args)
 
     def go(op):
         close_old_connections()
@@ -185,7 +187,7 @@ def test_racing_operations_cannot_double_issue():
             close_old_connections()
 
     with (
-        patch.object(billing_services, "_issue", issue),
+        patch.object(billing_services, "lock_inputs", gated_lock),
         ThreadPoolExecutor(max_workers=2) as pool,
     ):
         futures = [pool.submit(go, op) for op in ops]
@@ -223,15 +225,39 @@ def test_financial_documents_are_immutable():
 
 
 @pytest.mark.django_db(transaction=True)
-def test_unbalanced_journal_rejected_at_commit():
+def test_posted_journal_is_sealed_against_new_legs():
+    """A balanced or unbalanced append in a later transaction must fail:
+    the journal sealed when its creating transaction committed."""
     seed_demo_data()
     ingest_nem12_content(load("day1_base.nem12"), "day1_base.nem12")
     account = Account.objects.get(reference="ACC-001")
     run = rate_account(account, DAY, NEXT, **KWARGS)
     invoice = process(admit(account, run)).invoice
     journal = invoice.journal_entries.get()
-    with pytest.raises(IntegrityError, match="not balanced"), transaction.atomic():
+    with pytest.raises(IntegrityError, match="sealed"), transaction.atomic():
         Posting.objects.create(journal=journal, account_code="1100", debit=Decimal("1.00"))
+    with pytest.raises(IntegrityError, match="sealed"), transaction.atomic():
+        Posting.objects.create(journal=journal, account_code="1100", debit=Decimal("1.00"))
+        Posting.objects.create(journal=journal, account_code="4000", credit=Decimal("1.00"))
+
+
+@pytest.mark.django_db(transaction=True)
+def test_unbalanced_journal_rejected_at_commit():
+    """Postings for a new journal are admitted in its creating transaction,
+    but the deferred balance check still rejects an unbalanced set."""
+    seed_demo_data()
+    ingest_nem12_content(load("day1_base.nem12"), "day1_base.nem12")
+    account = Account.objects.get(reference="ACC-001")
+    run = rate_account(account, DAY, NEXT, **KWARGS)
+    op = admit(account, run)
+    invoice = process(op).invoice
+    # The deferred balance trigger fires at commit — inside atomic's exit.
+    with pytest.raises(IntegrityError, match="not balanced"), transaction.atomic():
+        journal = JournalEntry.objects.create(
+            invoice=invoice, operation=op, memo="unbalanced probe"
+        )
+        Posting.objects.create(journal=journal, account_code="1100", debit=Decimal("5.00"))
+        Posting.objects.create(journal=journal, account_code="4000", debit=Decimal("3.00"))
 
 
 @pytest.mark.django_db(transaction=True)
@@ -270,3 +296,96 @@ def test_worker_killed_before_commit_leaves_no_effect(tmp_path):
     # Redelivery after commit is harmless.
     drain_outbox(digest_resolver=digest_resolver)
     assert Invoice.objects.count() == 1
+
+
+@pytest.mark.django_db(transaction=True)
+def test_open_quarantine_blocks_issuance():
+    """Open quarantines are part of the pinned inputs: a conflict arriving
+    after rating changes the digest even when selected records stand."""
+    seed_demo_data()
+    ingest_nem12_content(load("day1_base.nem12"), "day1_base.nem12")
+    ingest_nem12_content(load("day1_rev2.nem12"), "day1_rev2.nem12")
+    account = Account.objects.get(reference="ACC-001")
+    run = rate_account(account, DAY, NEXT, **KWARGS)
+    op = admit(account, run)
+    ingest_nem12_content(load("day1_conflict.nem12"), "day1_conflict.nem12")
+    result = process(op)
+    assert result.status == "stale"
+    assert Invoice.objects.count() == 0
+
+
+@pytest.mark.django_db(transaction=True)
+def test_revision_committed_during_issuance_goes_stale():
+    """A revision committing between the digest check and issuance is
+    caught by locked revalidation — never issued on superseded inputs."""
+    seed_demo_data()
+    ingest_nem12_content(load("day1_base.nem12"), "day1_base.nem12")
+    account = Account.objects.get(reference="ACC-001")
+    run = rate_account(account, DAY, NEXT, **KWARGS)
+    op = admit(account, run)
+
+    def resolver(*args):
+        digest = digest_resolver(*args)
+
+        def change():
+            close_old_connections()
+            try:
+                ingest_nem12_content(load("day1_rev1.nem12"), "day1_rev1.nem12")
+            finally:
+                close_old_connections()
+
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            pool.submit(change).result(timeout=15)
+        return digest
+
+    result = process_operation(op.operation_id, digest_resolver=resolver)
+    assert result.status == "stale"
+    assert Invoice.objects.count() == 0
+
+
+@pytest.mark.django_db(transaction=True)
+def test_net_credit_invoice_posts_to_correct_sides():
+    """High-export days rate negative; the receivable leg must post to the
+    credit side rather than a negative debit."""
+    seed_demo_data()
+    lines = load("day1_base.nem12").decode().splitlines()
+    export = False
+    for i, line in enumerate(lines):
+        if line.startswith("200,"):
+            export = line.split(",")[4] == "B1"
+        if line.startswith("300,") and export:
+            row = line.split(",")
+            row[2:50] = ["10"] * 48
+            lines[i] = ",".join(row)
+    ingest_nem12_content("\n".join(lines).encode(), "high-export.nem12")
+    account = Account.objects.get(reference="ACC-001")
+    run = rate_account(account, DAY, NEXT, **KWARGS)
+    assert run.total < 0
+    op = process(admit(account, run))
+    assert op.status == "complete"
+    legs = {
+        p.account_code: (p.debit, p.credit) for p in op.invoice.journal_entries.get().postings.all()
+    }
+    assert legs[ACC_RECEIVABLE] == (Decimal("0.00"), abs(run.total))
+
+
+@pytest.mark.django_db(transaction=True)
+def test_concurrent_same_key_admission_resolves_one_winner():
+    """Racing identical admissions share one durable operation and outbox."""
+    seed_demo_data()
+    ingest_nem12_content(load("day1_base.nem12"), "day1_base.nem12")
+    account = Account.objects.get(reference="ACC-001")
+    run = rate_account(account, DAY, NEXT, **KWARGS)
+
+    def go():
+        close_old_connections()
+        try:
+            return admit_issue(account, DAY, NEXT, run, "OP-SAME")
+        finally:
+            close_old_connections()
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = [f.result(timeout=20) for f in [pool.submit(go) for _ in range(2)]]
+    assert {r.operation_id for r in results} == {"OP-SAME"}
+    assert BillingOperation.objects.count() == 1
+    assert OutboxEvent.objects.count() == 1
