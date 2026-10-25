@@ -8,7 +8,7 @@ Task sections own status; index icons mirror them. See the [documentation guide]
 
 - ✅ [TAR-001 — Establish project-management standards](#tar-001)
 - ✅ [TAR-002 — Establish the planning baseline](#tar-002)
-- 🟢 [TAR-003 — Bootstrap the development workspace](#tar-003)
+- ✅ [TAR-003 — Bootstrap the development workspace](#tar-003)
 - 📋 [TAR-004 — Freeze domain and measurement profiles](#tar-004)
 - 📋 [TAR-005 — Implement versioned meter ingestion and fixtures](#tar-005)
 - 📋 [TAR-006 — Implement deterministic itemised rating](#tar-006)
@@ -98,7 +98,7 @@ Next action: TAR-003; domain profile research can begin alongside bootstrap.
 - Area: workspace
 - Milestone: M1
 - Priority: High
-- Status: Ready 🟢
+- Status: Done ✅
 - Depends on: TAR-002
 - References: [Contract](architecture.md)
 
@@ -116,11 +116,16 @@ Create a minimal reproducible API, worker and portal skeleton with real PostgreS
 
 ### Completion evidence
 
-Not started; no implementation or verification evidence.
+- Pinned Python 3.14 / Django 6.1.2 / graphene-django 3.2.3 / Celery 5.6.3 / psycopg 3.3.6 via uv.lock; React 19.3.1 / Vite 8.3.5 / TypeScript 7.0.2 via package-lock.json.
+- `make check` green locally: ruff lint+format, mypy (django-stubs), 5 pytest tests against real PostgreSQL 18.6, import-contract check, web typecheck+build.
+- `scripts/check-import-boundaries.sh`: 3 contracts KEPT; deliberate core→interfaces probe rejected.
+- Compose stack verified running: `/healthz` ok, GraphQL `ping`/`version` via API and via portal Vite proxy, `taryx.smoke.ping` task executed on worker through RabbitMQ 4.3.7.
+- Host ports offset (db 55432, amqp 5673, mgmt 15673, api 8001, web 5174) to coexist with sibling stacks; PG18 volume layout fix applied.
+- `.github/workflows/ci.yml` added; hosted run not yet executed.
 
 ### Notes
 
-Begin with dependency compatibility research and the smallest runnable workspace.
+Celery remote control disabled (`worker_enable_remote_control=False`): kombu pidbox declares transient non-exclusive queues, removed in RabbitMQ 4. Revisit if M5 ops scenarios need inspect/revoke broadcasts.
 
 <a id="tar-004"></a>
 

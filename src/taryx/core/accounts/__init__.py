@@ -1,0 +1,1 @@
+"""Taryx core accounts domain."""

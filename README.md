@@ -95,6 +95,22 @@ Historical commitments in the demo are clearly labelled fictional client policie
 
 Framework choices for the surrounding services, deployment tooling and detailed contracts remain open for bootstrap and design work. The architectural objective is a system whose bills can be explained, whose changes can be audited and whose recovery behaviour can be demonstrated.
 
+## Development setup
+
+Requires Docker with Compose, `uv` and Node 22 on the host.
+
+```text
+make install    # uv sync (locked Python deps) + npm ci for the portal
+make up         # build and start PostgreSQL, RabbitMQ, API, worker and portal
+make check      # ruff lint/format, mypy, import contracts, pytest, web typecheck/build
+make down       # stop the stack
+make reset      # stop and drop the taryx-pgdata / taryx-broker volumes
+```
+
+Endpoints once running: API `http://localhost:8001` (`/healthz`, `/graphql`), portal `http://localhost:5174`, RabbitMQ management `http://localhost:15673`, PostgreSQL `localhost:55432`, AMQP `localhost:5673`. Host ports are offset from the defaults so sibling project stacks can coexist; container-internal ports are unchanged.
+
+Host-side commands (`uv run pytest`, `uv run python manage.py ...`) target these published ports by default. Celery worker remote control (inspect/revoke broadcasts) is disabled: kombu's pidbox mailbox declares transient non-exclusive queues that RabbitMQ 4 rejects.
+
 ## Project documentation
 
 - [Agent workflow](AGENTS.md) and [documentation guide](docs/project/documentation-guide.md)
@@ -102,4 +118,4 @@ Framework choices for the surrounding services, deployment tooling and detailed 
 - Feature contracts: [metering and rating](docs/project/features/metering-and-rating.md), [billing and ledger](docs/project/features/billing-and-ledger.md), [legacy migration](docs/project/features/legacy-migration.md), [operator and clients](docs/project/features/operator-and-clients.md), [market integration](docs/project/features/market-integration.md), [verification](docs/project/features/verification.md)
 - [Open questions](docs/project/blockers.md) and [work journal](docs/project/journal/2026-10.md)
 
-Start implementation with TAR-003 in the backlog. Setup commands will be added after bootstrap has been verified.
+TAR-003 bootstrap is complete and verified. Next implementation task: TAR-004 in the backlog.

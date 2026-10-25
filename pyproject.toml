@@ -1,0 +1,98 @@
+[project]
+name = "taryx"
+version = "0.1.0"
+description = "Australian retail energy billing, financial ledger and safe migration platform"
+requires-python = ">=3.12"
+dependencies = [
+    "django==6.1.2",
+    "graphene-django==3.2.3",
+    "celery==5.6.3",
+    "psycopg[binary]==3.3.6",
+]
+
+[dependency-groups]
+dev = [
+    "pytest==9.1.1",
+    "pytest-django==4.14.0",
+    "ruff==0.17.2",
+    "mypy==2.4.0",
+    "django-stubs==6.1.2",
+    "import-linter==2.15",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/taryx"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "taryx.config.settings"
+testpaths = ["tests"]
+addopts = "--strict-markers"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF100"]
+ignore = []
+
+[tool.mypy]
+mypy_path = "src"
+python_version = "3.14"
+plugins = ["mypy_django_plugin.main"]
+warn_unused_ignores = true
+warn_redundant_casts = true
+check_untyped_defs = true
+
+[tool.django-stubs]
+django_settings_module = "taryx.config.settings"
+
+[[tool.mypy.overrides]]
+module = [
+    "celery.*",
+    "graphene.*",
+    "graphene_django.*",
+    "graphql.*",
+    "graphql_relay.*",
+    "kombu.*",
+    "billiard.*",
+    "vine.*",
+    "promise.*",
+]
+ignore_missing_imports = true
+
+[tool.importlinter]
+root_package = "taryx"
+include_external_packages = false
+
+[[tool.importlinter.contracts]]
+name = "Domain layers: clients over territories over core"
+type = "layers"
+layers = [
+    "taryx.clients",
+    "taryx.territories",
+    "taryx.core",
+]
+
+[[tool.importlinter.contracts]]
+name = "Client packages are independent"
+type = "independence"
+modules = [
+    "taryx.clients.aurora_energy",
+    "taryx.clients.southgrid_retail",
+]
+
+[[tool.importlinter.contracts]]
+name = "Core cannot import outer wiring"
+type = "forbidden"
+source_modules = ["taryx.core"]
+forbidden_modules = [
+    "taryx.interfaces",
+    "taryx.composition",
+    "taryx.config",
+]

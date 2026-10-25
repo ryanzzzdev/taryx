@@ -1,0 +1,81 @@
+services:
+  db:
+    image: postgres:18.6
+    environment:
+      POSTGRES_DB: taryx
+      POSTGRES_USER: taryx
+      POSTGRES_PASSWORD: taryx
+    ports:
+      - "55432:5432"
+    volumes:
+      - taryx-pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U taryx -d taryx"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  broker:
+    image: rabbitmq:4.3.7-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: taryx
+      RABBITMQ_DEFAULT_PASS: taryx
+      RABBITMQ_DEFAULT_VHOST: taryx
+    ports:
+      - "5673:5672"
+      - "15673:15672"
+    volumes:
+      - taryx-broker:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+
+  api:
+    build: .
+    command: sh -c "python manage.py migrate --noinput && python manage.py runserver 0.0.0.0:8000"
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: taryx
+      POSTGRES_USER: taryx
+      POSTGRES_PASSWORD: taryx
+      CELERY_BROKER_URL: amqp://taryx:taryx@broker:5672/taryx
+      DJANGO_DEBUG: "true"
+    ports:
+      - "8001:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      broker:
+        condition: service_healthy
+
+  worker:
+    build: .
+    command: celery -A taryx.config.celery:app worker --loglevel=INFO --without-gossip --without-mingle --without-heartbeat
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: taryx
+      POSTGRES_USER: taryx
+      POSTGRES_PASSWORD: taryx
+      CELERY_BROKER_URL: amqp://taryx:taryx@broker:5672/taryx
+    depends_on:
+      db:
+        condition: service_healthy
+      broker:
+        condition: service_healthy
+
+  web:
+    build: ./web
+    environment:
+      VITE_PROXY_TARGET: http://api:8000
+    ports:
+      - "5174:5173"
+    depends_on:
+      - api
+
+volumes:
+  taryx-pgdata:
+  taryx-broker:
