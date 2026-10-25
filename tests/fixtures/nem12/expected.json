@@ -1,0 +1,51 @@
+{
+  "day1_base": {
+    "status": "published",
+    "records": 96,
+    "e1": {
+      "count": 48,
+      "value": "0.500000",
+      "quality": "A"
+    },
+    "b1": {
+      "count": 48,
+      "value": "0.200000",
+      "quality": "A"
+    }
+  },
+  "day2_est_then_act": {
+    "e1_value": "0.500000",
+    "e1_quality": "A",
+    "note": "A outranks E regardless of arrival order"
+  },
+  "day1_revisions": {
+    "after_rev1_interval20": "0.800000",
+    "after_rev2_interval20": "0.600000",
+    "flat_intervals": "0.500000"
+  },
+  "day1_conflict": {
+    "open_quarantines": 1,
+    "current_value_unchanged": "0.600000"
+  },
+  "day3_sub_then_final": {
+    "e1_value": "0.550000",
+    "e1_quality": "F"
+  },
+  "day5_var": {
+    "status": "published",
+    "qualities": {
+      "A": 12,
+      "S": 12,
+      "E": 12,
+      "F": 12
+    }
+  },
+  "rejections": {
+    "bad_uom": "unsupported_uom",
+    "bad_interval": "unsupported_interval",
+    "nem13": "unsupported_version",
+    "unknown_nmi": "unknown_nmi",
+    "out_of_order": "out_of_order",
+    "v_missing_400": "missing_400"
+  }
+}

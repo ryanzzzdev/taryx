@@ -10,7 +10,7 @@ Task sections own status; index icons mirror them. See the [documentation guide]
 - ✅ [TAR-002 — Establish the planning baseline](#tar-002)
 - ✅ [TAR-003 — Bootstrap the development workspace](#tar-003)
 - ✅ [TAR-004 — Freeze domain and measurement profiles](#tar-004)
-- 🟢 [TAR-005 — Implement versioned meter ingestion and fixtures](#tar-005)
+- ✅ [TAR-005 — Implement versioned meter ingestion and fixtures](#tar-005)
 - 📋 [TAR-006 — Implement deterministic itemised rating](#tar-006)
 - 📋 [TAR-007 — Implement durable issuance and balanced posting](#tar-007)
 - 📋 [TAR-008 — Implement successive corrections and adjustments](#tar-008)
@@ -27,7 +27,7 @@ Task sections own status; index icons mirror them. See the [documentation guide]
 
 ## Delivery notes
 
-Next action: TAR-005 — versioned meter ingestion and deterministic fixtures against the frozen profile. Later tasks remain Backlog until their dependencies and detailed contracts are ready. Portal/API slices can develop alongside their backend tasks; TAR-009 and TAR-012 own integrated acceptance. Observability hooks and correctness tests accompany implementation; TAR-016 owns the full cross-service campaign, not the first tests.
+Next action: TAR-006 — deterministic itemised rating against the frozen profile and reference cases (M2). Later tasks remain Backlog until their dependencies and detailed contracts are ready. Portal/API slices can develop alongside their backend tasks; TAR-009 and TAR-012 own integrated acceptance. Observability hooks and correctness tests accompany implementation; TAR-016 owns the full cross-service campaign, not the first tests.
 
 The architecture and functional scope are the planning baseline; exact schemas, dependency versions and open profiles are refined in their named tasks. Split large tasks into new IDs before starting if necessary; preserve existing history. Next unused ID: TAR-019. No application work has started.
 
@@ -168,7 +168,7 @@ Next action: TAR-005 implementation against the frozen profile.
 - Area: metering
 - Milestone: M1
 - Priority: High
-- Status: Ready 🟢
+- Status: Done ✅
 - Depends on: TAR-003, TAR-004
 - References: [Contract](features/metering-and-rating.md)
 
@@ -185,11 +185,15 @@ Ingest reproducible synthetic batches into versioned PostgreSQL metering history
 
 ### Completion evidence
 
-Not started; no implementation or verification evidence.
+- accounts + metering models with migrations: IngestionBatch (hash dedupe, DUPLICATE inspectability via partial unique), IntervalRecord (raw revisions retained), CurrentInterval (deterministic winner), QuarantinedInterval (equal-precedence conflicts).
+- NEM12 parser enforces frozen subset: 100/200/300/400/900 records, NEM12 only, kWh, 5/30-min, E*/B1, A/S/E/F + V-method 400s, ascending dates; stable error codes.
+- Selection = quality A>F>S>E then MSATS/Update timestamps; ties with different values quarantine; batch atomic stage+publish.
+- 15 deterministic fixtures + hand-derived expected.json; 16 new tests against real PostgreSQL 18.6 — 21 total passing; verified again via `docker compose exec api manage.py seed_demo/ingest_nem12` (96 intervals published, revision applied).
+- `channel_coverage` reports expected/selected/quarantined and blocks completeness on gaps or open quarantine.
 
 ### Notes
 
-Refine and mark Ready once dependencies pass; record relevant gate resolutions before dependent implementation.
+M1 exit review passed; next action TAR-006 (rating engine) against the frozen profile and reference cases.
 
 <a id="tar-006"></a>
 
