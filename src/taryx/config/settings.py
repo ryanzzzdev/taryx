@@ -72,6 +72,10 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 GRAPHENE = {"SCHEMA": "taryx.interfaces.graphql.schema.schema"}
 
 CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "amqp://taryx:taryx@localhost:5673/taryx")
+
+# Independently deployed legacy calculator (satellite service, own schema).
+LEGACY_BASE_URL = os.environ.get("LEGACY_BASE_URL", "http://localhost:18090")
+LEGACY_TIMEOUT_SECONDS = float(os.environ.get("LEGACY_TIMEOUT_SECONDS", "5"))
 CELERY_IMPORTS = ["taryx.interfaces.tasks"]
 CELERY_TASK_TRACK_STARTED = True
 CELERY_WORKER_ENABLE_REMOTE_CONTROL = False

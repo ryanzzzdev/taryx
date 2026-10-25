@@ -43,6 +43,7 @@ services:
       POSTGRES_PASSWORD: taryx
       CELERY_BROKER_URL: amqp://taryx:taryx@broker:5672/taryx
       DJANGO_DEBUG: "true"
+      LEGACY_BASE_URL: http://legacy:8090
     ports:
       - "8001:8000"
     depends_on:
@@ -61,11 +62,26 @@ services:
       POSTGRES_USER: taryx
       POSTGRES_PASSWORD: taryx
       CELERY_BROKER_URL: amqp://taryx:taryx@broker:5672/taryx
+      LEGACY_BASE_URL: http://legacy:8090
     depends_on:
       db:
         condition: service_healthy
       broker:
         condition: service_healthy
+
+  legacy:
+    build: ./legacy-sim
+    environment:
+      LEGACY_DB: /data/legacy_calc.db
+    ports:
+      - "18090:8090"
+    volumes:
+      - taryx-legacy:/data
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request;urllib.request.urlopen(\"http://localhost:8090/healthz\")'"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
 
   web:
     build: ./web
@@ -79,3 +95,4 @@ services:
 volumes:
   taryx-pgdata:
   taryx-broker:
+  taryx-legacy:

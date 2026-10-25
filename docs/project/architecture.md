@@ -26,7 +26,7 @@ src/taryx/
   interfaces/           GraphQL and task entry points
   composition/          Select configured client and inject policies
 services/
-  legacy_biller/        Independent legacy calculator and database
+  legacy-sim/           Independent legacy calculator and database (separate image)
   market_adapter/       Durable external workflow and reconciliation
   market_simulator/     Controlled external counterparty
 web/                    React/TypeScript operator portal

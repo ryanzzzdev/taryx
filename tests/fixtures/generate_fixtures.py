@@ -33,12 +33,12 @@ def nem12(channel_lines: list[str], nmi: str = NMI, config: str = "E1B1") -> str
     return "\n".join(lines) + "\n"
 
 
-def nem12_two_channels(e1_lines: list[str], b1_lines: list[str]) -> str:
+def nem12_two_channels(e1_lines: list[str], b1_lines: list[str], nmi: str = NMI) -> str:
     lines = [
         "100,NEM12,20260306120000,TARYX,TARYX",
-        f"200,{NMI},E1B1,,E1,NEM100,1000001,kWh,30,",
+        f"200,{nmi},E1B1,,E1,NEM100,1000001,kWh,30,",
         *e1_lines,
-        f"200,{NMI},E1B1,,B1,NEM100,1000001,kWh,30,",
+        f"200,{nmi},E1B1,,B1,NEM100,1000001,kWh,30,",
         *b1_lines,
         "900",
     ]
@@ -149,6 +149,14 @@ def main() -> None:
     files["bad_value.nem12"] = nem12([day_300("20260302", bad_values, "A", TS0)])
     files["truncated_300.nem12"] = nem12(["300"])
     files["s_missing_reason.nem12"] = nem12([day_300("20260302", flat_e1, "S", TS0)])
+
+    # M3 characterisation: ACC-003 (heritage agreement) — non-integral
+    # export total exercises the seeded FIT-TRUNC-2003 legacy defect.
+    files["acc3_heritage_day.nem12"] = nem12_two_channels(
+        [day_300("20260302", ["0.4"] * 48, "A", TS0)],
+        [day_300("20260302", ["0.23"] * 48, "A", TS0)],
+        nmi="4102000003",
+    )
 
     for name, text in files.items():
         (OUT / name).write_text(text, encoding="utf-8")

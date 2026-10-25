@@ -1,7 +1,7 @@
 # Legacy comparison and cohort migration
 
 Date: 2026-10-25
-Status: Planning contract; fictional policies and legacy defects are defined as test scenarios, not Australian regulations.
+Status: TAR-010 slice implemented — independent `legacy-sim` service (own sqlite schema, protocol `taryx-legacy/1`, catalogue `L-2003.4`) with characterised heritage GST-exempt policy and FIT-TRUNC-2003 defect; comparison/cutover remain planning contract. Fictional policies and legacy defects are test scenarios, not Australian regulations.
 Tasks: [TAR-010](../backlog.md#tar-010), [TAR-011](../backlog.md#tar-011), [TAR-012](../backlog.md#tar-012).
 
 ## Scope and authority

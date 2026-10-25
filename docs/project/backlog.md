@@ -15,7 +15,7 @@ Task sections own status; index icons mirror them. See the [documentation guide]
 - ✅ [TAR-007 — Implement durable issuance and balanced posting](#tar-007)
 - ✅ [TAR-008 — Implement successive corrections and adjustments](#tar-008)
 - ✅ [TAR-009 — Deliver the core operator journey](#tar-009)
-- 📋 [TAR-010 — Build independent legacy characterisation](#tar-010)
+- ✅ [TAR-010 — Build independent legacy characterisation](#tar-010)
 - 📋 [TAR-011 — Implement isolated shadow comparison and gates](#tar-011)
 - 📋 [TAR-012 — Deliver operator migration and cutover](#tar-012)
 - 📋 [TAR-013 — Demonstrate two isolated client instances](#tar-013)
@@ -349,7 +349,7 @@ Re-remediated 2026-10-25: AccountPanel is keyed by account.reference so switchin
 - Area: migration
 - Milestone: M3
 - Priority: High
-- Status: Backlog 📋
+- Status: Done ✅
 - Depends on: TAR-009
 - References: [Contract](features/legacy-migration.md)
 
@@ -365,7 +365,7 @@ Provide a standalone legacy calculator with an independent schema and reproducib
 
 ### Completion evidence
 
-Not started; no implementation or verification evidence.
+Implemented 2026-10-25. `legacy-sim/` is a separate image (stdlib HTTP, own sqlite calc-log schema, no core code or database credentials) serving protocol `taryx-legacy/1`. `taryx.core.migration.legacy_adapter` maps a stored `RatingRun.input_snapshot` to the versioned request — tariff specs deliberately omitted so the legacy engine resolves its own catalogue `L-2003.4`; snapshot rows gained the NEM12 trading date since interval 48's end timestamp cannot derive it (also improving snapshot reconstructibility). Scenarios: heritage `T-FLAT-FIT-HERITAGE` (legacy honours pre-GST exemption; new catalogue prices it normally) and seeded defect FIT-TRUNC-2003 (export quantity truncated to whole kWh per line). Fault injection covers timeout/malformed/unavailable/wrong_protocol; a stable failure taxonomy marks all as inconclusive. tests/test_legacy_characterisation.py: 10 subprocess-driven tests record observed behaviour independently per defect, verify restart clears faults while the sqlite log persists, and verify restart/retry preserves comparison identity by snapshot hash. Verified live in Compose (api → http://legacy:8090).
 
 ### Notes
 

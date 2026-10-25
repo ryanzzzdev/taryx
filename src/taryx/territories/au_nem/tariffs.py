@@ -10,7 +10,7 @@ from decimal import Decimal
 
 from taryx.core.pricing.tariffs import RateBand, TariffSpec
 
-CATALOGUE_VERSION = "2026-10-25"
+CATALOGUE_VERSION = "2026-10-25.2"
 POLICY_IDENTITY = f"au_nem-retail-catalogue/{CATALOGUE_VERSION}"
 GST_RATE = Decimal("0.10")
 
@@ -47,6 +47,16 @@ TARIFFS: dict[str, TariffSpec] = {
     ),
     "T-FLAT-FIT-V2": TariffSpec(
         code="T-FLAT-FIT-V2",
+        version=CATALOGUE_VERSION,
+        supply_per_day=Decimal("1.10"),
+        import_bands=(RateBand("flat", Decimal("0.35")),),
+        export_credit_per_kwh=Decimal("0.05"),
+    ),
+    # Same code exists in the legacy catalogue as a pre-GST heritage
+    # contract (GST-exempt there); the new catalogue prices it normally,
+    # which produces the deliberate preserve-client-policy divergence.
+    "T-FLAT-FIT-HERITAGE": TariffSpec(
+        code="T-FLAT-FIT-HERITAGE",
         version=CATALOGUE_VERSION,
         supply_per_day=Decimal("1.10"),
         import_bands=(RateBand("flat", Decimal("0.35")),),

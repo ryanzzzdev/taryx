@@ -43,7 +43,7 @@ def seed_demo_data() -> list[Account]:
             [("E1", "import"), ("B1", "export")],
             [
                 ("T-FLAT-FIT", date(2026, 1, 1), date(2026, 1, 15)),
-                ("T-FLAT-FIT-V2", date(2026, 1, 15), None),
+                ("T-FLAT-FIT-HERITAGE", date(2026, 1, 15), None),
             ],
         ),
     ]

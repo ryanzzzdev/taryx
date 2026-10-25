@@ -89,6 +89,7 @@ def _input_payload(
                         str(row.value),
                         row.quality,
                         row.source_record_id,
+                        row.source_record.interval_date.isoformat(),
                     ]
                     for row in rows
                 ],
