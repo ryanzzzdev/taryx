@@ -1,7 +1,7 @@
 # Taryx architecture
 
 Date: 2026-10-25
-Status: Planning baseline. Concept choices are accepted through the user's agreement with the reviewed project direction. Detailed contracts below are design selections within the requested planning work, subject to the named verification gates. No application is implemented or verified.
+Status: Planning baseline. Concept choices are accepted through the user's agreement with the reviewed project direction. Detailed contracts below are design selections within the requested planning work, subject to the named verification gates. M1 implementation is verified against the original review findings. M2 implementation exists but has reopened correctness findings; see [independent review](evidence/m2-independent-review.md). Unimplemented sections remain design intent.
 
 See [overview and Kraken sources](../../README.md), [scope decision](decisions/002-scope-and-architecture.md), [roadmap](roadmap.md) and [backlog](backlog.md).
 

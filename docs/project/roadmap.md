@@ -9,7 +9,7 @@ This is the initial delivery sequence, not a calendar commitment. The earlier 6�
 | Documentation setup | Portable Cateniq-style workflow | Complete | None |
 | Planning baseline | Architecture, feature contracts and evidence-driven backlog | Complete | Documentation setup |
 | M1 — Foundation and domain profile | Reproducible workspace, sourced profile and metering history | Complete | Planning baseline |
-| M2 — Explainable bills and corrections | End-to-end operator billing with financial integrity | Complete | M1 |
+| M2 — Explainable bills and corrections | End-to-end operator billing with financial integrity | In progress | M1 |
 | M3 — Safe legacy migration | Characterisation, shadow comparison and controlled cohort cutover | Planned | M2 |
 | M4 — Client variation and market boundary | Second isolated client and bounded integration | Planned | M3 |
 | M5 — Operational portfolio delivery | Recovery evidence, Kubernetes and reproducible demonstration | Planned | M4 |
@@ -34,6 +34,8 @@ Exit criteria:
 Excludes issuance, ledger, migration and Kubernetes. Gates: [BLK-001](blockers.md#blk-001), [BLK-003](blockers.md#blk-003).
 
 ## M2 — Explainable bills and corrections
+
+Independent review at `2a46650` reopened TAR-006–009 for financial/input integrity and browser/retry failures. See [reproductions and findings](evidence/m2-independent-review.md). Existing tests pass, but the M2 exit criteria are not satisfied.
 
 Scope: TAR-006–009. Rating engine, durable admission/outbox, atomic invoice/ledger issuance, successive revision adjustments and an authenticated operator journey.
 

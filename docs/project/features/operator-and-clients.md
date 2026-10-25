@@ -1,7 +1,7 @@
 # Operator portal and client isolation
 
 Date: 2026-10-25
-Status: TAR-009 slice implemented and verified (decision 004 contract: session auth, roles, bounded GraphQL, operation polling, audit, portal journey). Client isolation remains planning contract.
+Status: Implemented M2 slices reopened by the [independent review](../evidence/m2-independent-review.md); prior verification does not establish the failing integrity and browser/recovery requirements. Remaining future slices are planning contracts.
 Tasks: [TAR-009](../backlog.md#tar-009), [TAR-012](../backlog.md#tar-012), [TAR-013](../backlog.md#tar-013).
 
 ## Operator journeys

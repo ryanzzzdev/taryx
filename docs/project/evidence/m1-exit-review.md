@@ -72,3 +72,7 @@ All five findings remediated in the checkpoint following this review; the preser
 - R5: an unambiguous newer winner resolves the open quarantine (resolved status + timestamp, all top-precedence rivals retained on the record); open quarantines still block coverage.
 
 Verification: `uv run pytest docs/project/evidence/m1_review_probes.py` → 10 passed; `pytest` → 54 passed on real PostgreSQL; ruff/mypy/import contracts clean; live Compose ingest verified for ranged 400s, encoding, value and range rejections. The remaining 400-filed `ReasonDescription` is parsed but not yet stored (metadata is recorded at flag/method/reason level only).
+
+## Independent confirmation at 2a46650
+
+2026-10-25: Saved M1 probes pass 10/10 and the full documented suite passes 92 tests plus lint/types/import/frontend checks. The five original M1 findings are resolved; M1 remains Complete. M2 has separate findings in [the independent review](m2-independent-review.md). No new M1 performance or clean-install claim is made.
