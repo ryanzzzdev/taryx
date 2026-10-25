@@ -1,7 +1,7 @@
 # Metering and rating
 
 Date: 2026-10-25
-Status: Planning contract. Supported subset, time conventions and numeric profile frozen by TAR-004 on 2026-10-25 ([BLK-001](../blockers.md#blk-001) resolved). Reference cases live in [rating-reference-cases.md](rating-reference-cases.md).
+Status: Supported subset, time conventions and numeric profile frozen by TAR-004 on 2026-10-25; quality-method and 400-record semantics corrected the same day after the [independent M1 review](../evidence/m1-exit-review.md) against MDFF v2.7. [BLK-001](../blockers.md#blk-001) resolved. Reference cases live in [rating-reference-cases.md](rating-reference-cases.md).
 Tasks: [TAR-004](../backlog.md#tar-004), [TAR-005](../backlog.md#tar-005), [TAR-006](../backlog.md#tar-006).
 
 ## User outcome
@@ -51,10 +51,13 @@ Australian regulatory/tax claims require linked authoritative sources in the fro
 | IntervalLength | 30 or 5 minutes only |
 | Unit of measure | `kWh` only |
 | Channels | `E*` registers (grid-delivered import) and `B1` (site generation export); other suffix letters rejected |
-| QualityMethod | `A`, `S`, `E`, `F`; `V` on a 300 record requires 400 record(s) resolving per-interval quality |
-| ReasonCode | Required on `S`/`F` intervals (per MDFF 3.3.5); retained as evidence, not interpreted |
+| Encoding | UTF-8 text; undecodable bytes are rejected at the byte boundary |
+| IntervalValue | Plain non-negative decimal, `^\d{1,9}(\.\d{1,6})?$`; signs, exponents and non-finite values rejected |
+| QualityMethod | `QMM` form: one-letter flag `A`/`S`/`E`/`F` plus optional two-digit method code (e.g. `E52`, `S14`, `F12`); `A` carries no method; `V` is valid only on a 300 record. Method codes are retained as `method_code` metadata and not interpreted |
+| ReasonCode | Required on `S`/`F` intervals (per MDFF 3.3.5); optional on `A`/`E`/`V`-derived intervals; numeric ≤ 3 digits; retained as evidence, not interpreted |
+| 400 records | `400,StartInterval,EndInterval,QualityMethod,ReasonCode,ReasonDescription` applying to the immediately preceding 300 record. Ranges must tile the entire day in ascending order without gaps or overlaps; the ranged QualityMethod/ReasonCode applies to every interval in the range; `V` is not permitted in a 400 record; intervals inherit the parent 300's UpdateDateTime/MSATSLoadDateTime. Mandatory where the 300 QualityMethod is `V`; also valid to carry reason codes on other days |
 
-Rejected with explicit errors: NEM13 files, zipped archives, multiple header blocks, non-kWh UOM, interval lengths other than 5/30, non-E/B suffixes, unknown NMI references, out-of-order 300 records.
+Rejected with explicit errors: NEM13 files, zipped archives, multiple header blocks, non-kWh UOM, interval lengths other than 5/30, non-E/B suffixes, unknown NMI references, out-of-order 300 records, malformed/truncated records, invalid interval values, `S`/`F` flags without reason codes, and gapped/overlapping or missing 400 coverage.
 
 ### Time conventions
 
@@ -66,10 +69,12 @@ Rejected with explicit errors: NEM13 files, zipped archives, multiple header blo
 
 ### Revision selection and conflicts
 
-1. Quality precedence `A` > `F` > `S` > `E` selects the current value per interval (consistent with the metrology replacement rules: higher-ranked flags may replace lower-ranked ones).
+1. Quality precedence `A` > `F` > `S` > `E` selects the current value per interval (consistent with the metrology replacement rules: higher-ranked flags may replace lower-ranked ones). The method-code suffix does not participate in precedence.
 2. Within equal quality, the record with the latest `MSATSLoadDateTime`, then `UpdateDateTime`, wins; batch/record identity breaks remaining ties deterministically.
-3. Equal-precedence conflicting values are quarantined for operator review — never silently selected.
-4. A new effective revision marks dependent calculations stale; issued bills are never rewritten.
+3. Equal-precedence conflicting values are quarantined for operator review — never silently selected. All top-precedence rivals are retained on the quarantine record for investigation.
+4. Publication is optimistic under concurrency: candidates are evaluated once without locks, then every affected interval is re-evaluated and written under its per-interval row lock in deterministic order. A racing publisher therefore cannot regress the current selection with stale candidates.
+5. An unambiguous newer winner resolves an open quarantine (marked resolved with history retained); only open quarantines block billing coverage.
+6. A new effective revision marks dependent calculations stale; issued bills are never rewritten.
 
 ### Numeric and tax profile
 

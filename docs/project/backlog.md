@@ -27,9 +27,9 @@ Task sections own status; index icons mirror them. See the [documentation guide]
 
 ## Delivery notes
 
-Next action: TAR-006 — deterministic itemised rating against the frozen profile and reference cases (M2). Later tasks remain Backlog until their dependencies and detailed contracts are ready. Portal/API slices can develop alongside their backend tasks; TAR-009 and TAR-012 own integrated acceptance. Observability hooks and correctness tests accompany implementation; TAR-016 owns the full cross-service campaign, not the first tests.
+Next action: TAR-006 — deterministic itemised rating against the frozen profile and reference cases (M2). The independent review findings are remediated and M1 restored. Later tasks remain Backlog until their dependencies and detailed contracts are ready. Portal/API slices can develop alongside their backend tasks; TAR-009 and TAR-012 own integrated acceptance. Observability hooks and correctness tests accompany implementation; TAR-016 owns the full cross-service campaign, not the first tests.
 
-The architecture and functional scope are the planning baseline; exact schemas, dependency versions and open profiles are refined in their named tasks. Split large tasks into new IDs before starting if necessary; preserve existing history. Next unused ID: TAR-019. No application work has started.
+The architecture and functional scope are the planning baseline; exact schemas, dependency versions and open profiles are refined in their named tasks. Split large tasks into new IDs before starting if necessary; preserve existing history. Next unused ID: TAR-019. M1 implementation remediated and re-verified.
 
 <a id="tar-001"></a>
 
@@ -158,7 +158,7 @@ Resolve the supported meter/tariff/time profile and independent reference cases 
 
 ### Notes
 
-Next action: TAR-005 implementation against the frozen profile.
+Corrected after the [independent M1 review](evidence/m1-exit-review.md): QMM quality methods, ranged/tiling 400 records, lexical value and reason-code rules frozen per MDFF v2.7; fixtures regenerated to the real format. BLK-001 re-resolved.
 
 <a id="tar-005"></a>
 
@@ -193,7 +193,7 @@ Ingest reproducible synthetic batches into versioned PostgreSQL metering history
 
 ### Notes
 
-M1 exit review passed; next action TAR-006 (rating engine) against the frozen profile and reference cases.
+Remediated after the [independent M1 review](evidence/m1-exit-review.md): two-phase selection with per-interval locked re-evaluation, savepoint duplicate recovery (published and rejected), encoding/lexical/row-shape validation, and quarantine resolution by unambiguous newer winners. All ten review probes pass; regressions folded into tests/. Next action: TAR-006.
 
 <a id="tar-006"></a>
 

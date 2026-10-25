@@ -17,6 +17,8 @@ No obstacle prevents documentation or initial bootstrap. The following bounded d
 - Next action/owner: Implementing agent on TAR-004 selects authoritative AEMO format documentation and relevant sources for any claimed rules, declares a bounded supported subset, documents fictional policies and produces independent reference cases. Unsupported scenarios are rejected explicitly.
 - Resolution: Resolved 2026-10-25. Frozen profile in [metering-and-rating.md](features/metering-and-rating.md) (§Frozen profile): AEMO MDFF v2.7, Metrology Procedure Part B and EMMS Data Model v5.4 cited; supported subset (NEM12, kWh, 5/30-min, E*/B1, A/S/E/F+V), NEM-time interval-end conventions, quality precedence A>F>S>E, rounding/GST policy and exclusions declared. Independent expected cases in [rating-reference-cases.md](features/rating-reference-cases.md).
 
+Reopened 2026-10-25 by the [independent review](evidence/m1-exit-review.md): the implemented and frozen quality/400-record profile disagreed with the cited MDFF source. Re-resolved 2026-10-25: profile corrected to MDFF v2.7 (QMM quality methods, ranged/tiling 400 records, lexical interval values, encoding and reason-code rules); parser, fixtures and regressions updated; all ten review probes pass. Previous resolutions retained above as history.
+
 <a id="blk-002"></a>
 
 ## BLK-002 — Exact market interaction and protocol

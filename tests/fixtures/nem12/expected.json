@@ -16,7 +16,9 @@
   "day2_est_then_act": {
     "e1_value": "0.500000",
     "e1_quality": "A",
-    "note": "A outranks E regardless of arrival order"
+    "e1_method": null,
+    "e1_est_method": "52",
+    "note": "A outranks E regardless of arrival order; method codes are retained"
   },
   "day1_revisions": {
     "after_rev1_interval20": "0.800000",
@@ -29,7 +31,8 @@
   },
   "day3_sub_then_final": {
     "e1_value": "0.550000",
-    "e1_quality": "F"
+    "e1_quality": "F",
+    "e1_method": "12"
   },
   "day5_var": {
     "status": "published",
@@ -40,12 +43,25 @@
       "F": 12
     }
   },
+  "day6_a_reasons": {
+    "status": "published",
+    "reason_counts": {
+      "61": 5,
+      "89": 17
+    }
+  },
   "rejections": {
     "bad_uom": "unsupported_uom",
     "bad_interval": "unsupported_interval",
     "nem13": "unsupported_version",
     "unknown_nmi": "unknown_nmi",
     "out_of_order": "out_of_order",
-    "v_missing_400": "missing_400"
+    "v_missing_400": "missing_400",
+    "incomplete_400": "incomplete_400",
+    "overlap_400": "bad_400_range",
+    "bad_value": "bad_value",
+    "truncated_300": "malformed_300",
+    "s_missing_reason": "missing_reason",
+    "bad_encoding": "invalid_encoding"
   }
 }

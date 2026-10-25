@@ -2,19 +2,38 @@
 
 Pure parsing: returns structured records, performs format-level validation
 and raises Nem12Error with a stable error code on the first defect.
+
+Format rules implemented (AEMO MDFF Specification v2.7, sections 3.3 and 4):
+
+- QualityMethod is `QMM`: a one-letter quality flag optionally followed by a
+  two-digit substitution/estimation method code (e.g. ``E52``, ``S14``).
+  ``A`` carries no method; ``V`` is only valid on a 300 record.
+- ReasonCode is mandatory for ``S`` and ``F`` flags, optional otherwise.
+- IntervalValues are plain non-negative decimals (up to 9 integer and
+  6 fractional digits). Signs, exponents and non-finite values are rejected.
+- 400 records are ``400,StartInterval,EndInterval,QualityMethod,ReasonCode,
+  ReasonDescription`` and apply to the immediately preceding 300 record.
+  Their ranges must tile the entire day ascending, without gaps or overlaps.
+  The 400 QualityMethod/ReasonCode applies to every interval in the range;
+  interval timestamps are inherited from the parent 300 record.
 """
 
 import csv
 import io
+import re
 from dataclasses import dataclass, field
 from datetime import date, datetime
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 
 from taryx.core.metering.nem_time import NEM_TZ, nem_intervals_per_day
 
 SUPPORTED_INTERVAL_MINUTES = {5, 30}
 SUPPORTED_UOM = {"kwh"}
 QUALITY_FLAGS = {"A", "S", "E", "F"}
+
+_QUALITY_METHOD_RE = re.compile(r"^([SEF])(\d{2})?$")
+_INTERVAL_VALUE_RE = re.compile(r"^\d{1,9}(\.\d{1,6})?$")
+_REASON_CODE_RE = re.compile(r"^\d{1,3}$")
 
 
 class Nem12Error(ValueError):
@@ -28,6 +47,7 @@ class IntervalValue:
     interval_number: int
     value: Decimal
     quality: str | None
+    method_code: str | None
     reason_code: str | None
     update_dt: datetime | None
     msats_load_dt: datetime | None
@@ -38,6 +58,9 @@ class IntervalDay:
     interval_date: date
     values: list[IntervalValue]
     row_number: int
+    day_quality: str
+    update_dt: datetime | None
+    msats_load_dt: datetime | None
 
 
 @dataclass
@@ -68,6 +91,28 @@ def _parse_dt(raw: str) -> datetime | None:
     raise Nem12Error("invalid_datetime", f"cannot parse datetime {raw!r}")
 
 
+def _parse_quality_method(raw: str, *, allow_v: bool, row_number: int) -> tuple[str, str | None]:
+    qm = raw.strip().upper()
+    if allow_v and qm == "V":
+        return "V", None
+    if qm == "A":
+        return "A", None
+    match = _QUALITY_METHOD_RE.fullmatch(qm)
+    if match is None:
+        raise Nem12Error("bad_quality", f"row {row_number}: QualityMethod {qm!r}")
+    return match.group(1), match.group(2)
+
+
+def _check_reason(flag: str, reason: str | None, row_number: int, context: str) -> None:
+    if reason is not None and not _REASON_CODE_RE.fullmatch(reason):
+        raise Nem12Error("bad_reason", f"row {row_number}: ReasonCode {reason!r} on {context}")
+    if flag in {"S", "F"} and reason is None:
+        raise Nem12Error(
+            "missing_reason",
+            f"row {row_number}: ReasonCode required for flag {flag!r} on {context}",
+        )
+
+
 def parse_nem12(text: str) -> tuple[dict[tuple[str, str], ChannelMeta], list[ChannelData]]:
     """Parse NEM12 text into channel metadata and interval days.
 
@@ -96,17 +141,25 @@ def parse_nem12(text: str) -> tuple[dict[tuple[str, str], ChannelMeta], list[Cha
     last_date: date | None = None
     expected_per_day = 0
     pending_day: IntervalDay | None = None
-    pending_uncovered: set[int] = set()
+    covered_until = 0
 
     def finalize_pending() -> None:
-        nonlocal pending_day
-        if pending_day is not None and pending_uncovered:
-            raise Nem12Error(
-                "missing_400",
-                f"row {pending_day.row_number}: 'V' intervals "
-                f"{sorted(pending_uncovered)} lack 400 records",
-            )
+        nonlocal pending_day, covered_until
+        if pending_day is not None:
+            n = len(pending_day.values)
+            if pending_day.day_quality == "V" and covered_until == 0:
+                raise Nem12Error(
+                    "missing_400",
+                    f"row {pending_day.row_number}: 'V' day lacks 400 records",
+                )
+            if covered_until and covered_until != n:
+                raise Nem12Error(
+                    "incomplete_400",
+                    f"row {pending_day.row_number}: 400 ranges cover "
+                    f"{covered_until} of {n} intervals",
+                )
         pending_day = None
+        covered_until = 0
 
     for row_number, row in enumerate(rows[1:-1], start=2):
         kind = row[0]
@@ -124,6 +177,8 @@ def parse_nem12(text: str) -> tuple[dict[tuple[str, str], ChannelMeta], list[Cha
                 interval_minutes = int(row[8].strip())
             except ValueError:
                 raise Nem12Error("malformed_200", f"row {row_number}: bad IntervalLength") from None
+            if not nmi:
+                raise Nem12Error("malformed_200", f"row {row_number}: empty NMI")
             if uom.lower() not in SUPPORTED_UOM:
                 raise Nem12Error("unsupported_uom", f"row {row_number}: UOM {uom!r}")
             if interval_minutes not in SUPPORTED_INTERVAL_MINUTES:
@@ -149,6 +204,8 @@ def parse_nem12(text: str) -> tuple[dict[tuple[str, str], ChannelMeta], list[Cha
         elif kind == "300":
             if current_meta is None or current is None:
                 raise Nem12Error("orphan_300", f"row {row_number}: 300 before any 200")
+            if len(row) < 7:
+                raise Nem12Error("malformed_300", f"row {row_number}: 300 record too short")
             try:
                 interval_date = datetime.strptime(row[1].strip(), "%Y%m%d").date()
             except ValueError:
@@ -162,57 +219,74 @@ def parse_nem12(text: str) -> tuple[dict[tuple[str, str], ChannelMeta], list[Cha
                     "bad_interval_count",
                     f"row {row_number}: {n_values} values, expected {expected_per_day}",
                 )
-            day_quality = row[2 + n_values].strip().upper()
+            day_quality, day_method = _parse_quality_method(
+                row[2 + n_values], allow_v=True, row_number=row_number
+            )
             reason_code = row[3 + n_values].strip() or None
+            _check_reason(day_quality, reason_code, row_number, "300")
             update_dt = _parse_dt(row[5 + n_values])
             msats_load_dt = _parse_dt(row[6 + n_values])
-            if day_quality != "V" and day_quality not in QUALITY_FLAGS:
-                raise Nem12Error("bad_quality", f"row {row_number}: quality {day_quality!r}")
             values: list[IntervalValue] = []
-            day = IntervalDay(interval_date, values, row_number)
+            day = IntervalDay(
+                interval_date, values, row_number, day_quality, update_dt, msats_load_dt
+            )
             for idx, raw_value in enumerate(row[2 : 2 + n_values], start=1):
-                try:
-                    value = Decimal(raw_value.strip())
-                except InvalidOperation:
+                token = raw_value.strip()
+                if not _INTERVAL_VALUE_RE.fullmatch(token):
                     raise Nem12Error(
-                        "bad_value", f"row {row_number}: non-numeric interval value"
-                    ) from None
+                        "bad_value",
+                        f"row {row_number}: interval value {token!r} is not a "
+                        "supported non-negative decimal",
+                    )
+                value = Decimal(token)
                 if day_quality == "V":
-                    values.append(IntervalValue(idx, value, None, None, None, None))
-                    pending_uncovered.add(idx)
+                    values.append(IntervalValue(idx, value, None, None, None, None, None))
                 else:
                     values.append(
                         IntervalValue(
-                            idx, value, day_quality, reason_code, update_dt, msats_load_dt
+                            idx,
+                            value,
+                            day_quality,
+                            day_method,
+                            reason_code,
+                            update_dt,
+                            msats_load_dt,
                         )
                     )
             current.days.append(day)
-            if day_quality == "V":
-                pending_day = day
+            pending_day = day
 
         elif kind == "400":
             if pending_day is None:
-                raise Nem12Error("orphan_400", f"row {row_number}: 400 without a pending 'V' day")
-            if len(row) < 7:
-                raise Nem12Error("malformed_400", f"row {row_number}: 400 record too short")
-            try:
-                interval_number = int(row[1].strip())
-            except ValueError:
-                raise Nem12Error("malformed_400", f"row {row_number}: bad IntervalNumber") from None
-            quality = row[2].strip().upper()
-            if quality not in QUALITY_FLAGS:
-                raise Nem12Error("bad_quality", f"row {row_number}: 400 quality {quality!r}")
-            if not (1 <= interval_number <= len(pending_day.values)):
+                raise Nem12Error("orphan_400", f"row {row_number}: 400 without a preceding 300")
+            if len(row) != 6:
                 raise Nem12Error(
-                    "bad_400_interval",
-                    f"row {row_number}: interval {interval_number} out of range",
+                    "malformed_400",
+                    f"row {row_number}: 400 record has {len(row) - 1} fields, expected 5",
                 )
-            target = pending_day.values[interval_number - 1]
-            target.quality = quality
-            target.reason_code = row[3].strip() or None
-            target.update_dt = _parse_dt(row[5]) if len(row) > 5 else None
-            target.msats_load_dt = _parse_dt(row[6]) if len(row) > 6 else None
-            pending_uncovered.discard(interval_number)
+            try:
+                start = int(row[1].strip())
+                end = int(row[2].strip())
+            except ValueError:
+                raise Nem12Error("malformed_400", f"row {row_number}: bad interval range") from None
+            n = len(pending_day.values)
+            if not (1 <= start <= end <= n) or start != covered_until + 1:
+                raise Nem12Error(
+                    "bad_400_range",
+                    f"row {row_number}: range {start}-{end} invalid or "
+                    f"overlapping (expected start {covered_until + 1} of {n})",
+                )
+            flag, method = _parse_quality_method(row[3], allow_v=False, row_number=row_number)
+            reason_code = row[4].strip() or None
+            _check_reason(flag, reason_code, row_number, "400")
+            for idx in range(start, end + 1):
+                target = pending_day.values[idx - 1]
+                target.quality = flag
+                target.method_code = method
+                target.reason_code = reason_code
+                target.update_dt = pending_day.update_dt
+                target.msats_load_dt = pending_day.msats_load_dt
+            covered_until = end
 
         elif kind == "500":
             continue

@@ -2,7 +2,7 @@
 
 Date: 2026-10-25
 
-This is the initial delivery sequence, not a calendar commitment. The earlier 6–10 week ambition is a sizing hypothesis; reassess after M1 and M3. [Backlog](backlog.md) owns task status; [architecture](architecture.md) owns design. No runtime milestone is complete.
+This is the initial delivery sequence, not a calendar commitment. The earlier 6–10 week ambition is a sizing hypothesis; reassess after M1 and M3. [Backlog](backlog.md) owns task status; [architecture](architecture.md) owns design. M1 is complete after remediation of the independent exit review findings.
 
 | Milestone | Outcome | Status | Depends on |
 | --- | --- | --- | --- |
@@ -17,6 +17,8 @@ This is the initial delivery sequence, not a calendar commitment. The earlier 6�
 Setup and planning completion refer only to [TAR-001](backlog.md#tar-001) and [TAR-002](backlog.md#tar-002). Core product value is demonstrated at M3; M4 and M5 extend it. Changes to that scope require an explicit record, not silent omission of unfinished extensions.
 
 ## M1 — Foundation and domain profile
+
+Independent review at `b5a180f` reopened TAR-004/TAR-005 for format compatibility and ingestion correctness; all five findings remediated and all ten preserved probes now pass. See [review](evidence/m1-exit-review.md).
 
 Scope: TAR-003–005. Create a locked Python/Django/Graphene/Celery and React workspace, real PostgreSQL/RabbitMQ Compose environment, import contracts, minimal CI configuration, frozen supported metering/tariff/time profile and deterministic fixtures with revision ingestion.
 

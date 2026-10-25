@@ -118,4 +118,4 @@ Host-side commands (`uv run pytest`, `uv run python manage.py ...`) target these
 - Feature contracts: [metering and rating](docs/project/features/metering-and-rating.md), [billing and ledger](docs/project/features/billing-and-ledger.md), [legacy migration](docs/project/features/legacy-migration.md), [operator and clients](docs/project/features/operator-and-clients.md), [market integration](docs/project/features/market-integration.md), [verification](docs/project/features/verification.md)
 - [Open questions](docs/project/blockers.md) and [work journal](docs/project/journal/2026-10.md)
 
-TAR-003 bootstrap is complete and verified. Next implementation task: TAR-004 in the backlog.
+M1 is complete and verified; the independent review findings are remediated (see the [review](docs/project/evidence/m1-exit-review.md)). Next implementation task: TAR-006 (M2) in the [backlog](docs/project/backlog.md).

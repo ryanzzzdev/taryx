@@ -13,7 +13,6 @@ NMI = "4102000001"
 TS0 = "20260301120000"  # base UpdateDateTime / MSATSLoadDateTime
 TS1 = "20260303120000"
 TS2 = "20260304120000"
-TS3 = "20260305120000"
 
 
 def fmt(values: list[str]) -> str:
@@ -46,11 +45,9 @@ def nem12_two_channels(e1_lines: list[str], b1_lines: list[str]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def v_day(day: str, values: list[str], quals: list[str], ts: str) -> list[str]:
-    lines = [day_300(day, values, "V", ts)]
-    for i, q in enumerate(quals, start=1):
-        lines.append(f"400,{i},{q},,,{ts},{ts}")
-    return lines
+def ranged_400s(spans: list[tuple[int, int, str, str, str]]) -> list[str]:
+    """400,<StartInterval>,<EndInterval>,<QualityMethod>,<ReasonCode>,<Desc>."""
+    return [f"400,{s},{e},{qm},{rc},{desc}" for s, e, qm, rc, desc in spans]
 
 
 def main() -> None:
@@ -65,10 +62,10 @@ def main() -> None:
         [day_300("20260302", flat_b1, "A", TS0)],
     )
 
-    # RC-07a: 2026-03-03 E-quality file, then later-arriving A file.
+    # RC-07a: 2026-03-03 E52-quality file, then later-arriving A file.
     files["day2_est.nem12"] = nem12_two_channels(
-        [day_300("20260303", ["0.4"] * 48, "E", TS1)],
-        [day_300("20260303", ["0.15"] * 48, "E", TS1)],
+        [day_300("20260303", ["0.4"] * 48, "E52", TS1)],
+        [day_300("20260303", ["0.15"] * 48, "E52", TS1)],
     )
     files["day2_act.nem12"] = nem12_two_channels(
         [day_300("20260303", flat_e1, "A", TS2)],
@@ -89,12 +86,27 @@ def main() -> None:
     files["day1_conflict.nem12"] = nem12([day_300("20260302", conflict, "A", TS2)], config="E1B1")
 
     # RC-07b: substituted then final substitution on 2026-03-04.
-    files["day3_sub.nem12"] = nem12([day_300("20260304", ["0.6"] * 48, "S", TS1)])
-    files["day3_final.nem12"] = nem12([day_300("20260304", ["0.55"] * 48, "F", TS2)])
+    files["day3_sub.nem12"] = nem12([day_300("20260304", ["0.6"] * 48, "S14", TS1, reason="54")])
+    files["day3_final.nem12"] = nem12([day_300("20260304", ["0.55"] * 48, "F12", TS2, reason="54")])
 
-    # 'V' quality method with per-interval 400 records (mixed A/S/E/F day).
-    quals = ["A"] * 12 + ["S"] * 12 + ["E"] * 12 + ["F"] * 12
-    files["day5_var.nem12"] = nem12(v_day("20260305", flat_e1, quals, TS1))
+    # 'V' day resolved by ranged 400 records: A/S/E/F quarters (mixed methods).
+    files["day5_var.nem12"] = nem12(
+        [day_300("20260305", flat_e1, "V", TS1)]
+        + ranged_400s(
+            [
+                (1, 12, "A", "", ""),
+                (13, 24, "S14", "54", ""),
+                (25, 36, "E52", "", ""),
+                (37, 48, "F12", "54", ""),
+            ]
+        )
+    )
+
+    # 'A' day carrying ranged 400 reason codes (power outage 89, tamper 61).
+    files["day6_a_reasons.nem12"] = nem12(
+        [day_300("20260306", flat_e1, "A", TS1)]
+        + ranged_400s([(1, 26, "A", "", ""), (27, 31, "A", "61", ""), (32, 48, "A", "89", "")])
+    )
 
     # Invalid inputs (RC-08).
     bad_uom = nem12([day_300("20260302", flat_e1, "A", TS0)]).replace("kWh", "MWh")
@@ -113,9 +125,26 @@ def main() -> None:
         ]
     )
     files["v_missing_400.nem12"] = nem12([day_300("20260302", flat_e1, "V", TS0)])
+    files["incomplete_400.nem12"] = nem12([day_300("20260302", flat_e1, "V", TS0), "400,1,10,A,,"])
+    files["overlap_400.nem12"] = nem12(
+        [
+            day_300("20260302", flat_e1, "V", TS0),
+            "400,1,30,A,,",
+            "400,25,48,A,,",
+        ]
+    )
+    bad_values = flat_e1.copy()
+    bad_values[0] = "-0.5"
+    files["bad_value.nem12"] = nem12([day_300("20260302", bad_values, "A", TS0)])
+    files["truncated_300.nem12"] = nem12(["300"])
+    files["s_missing_reason.nem12"] = nem12([day_300("20260302", flat_e1, "S", TS0)])
 
     for name, text in files.items():
         (OUT / name).write_text(text, encoding="utf-8")
+
+    # Deliberately invalid UTF-8 payload for the byte-boundary rejection path.
+    raw = files["day1_base.nem12"].encode("utf-8").replace(b"0.5", b"\xff\xfe", 1)
+    (OUT / "bad_encoding.nem12").write_bytes(raw)
 
     expected = {
         "day1_base": {
@@ -127,7 +156,9 @@ def main() -> None:
         "day2_est_then_act": {
             "e1_value": "0.500000",
             "e1_quality": "A",
-            "note": "A outranks E regardless of arrival order",
+            "e1_method": None,
+            "e1_est_method": "52",
+            "note": "A outranks E regardless of arrival order; method codes are retained",
         },
         "day1_revisions": {
             "after_rev1_interval20": "0.800000",
@@ -138,10 +169,14 @@ def main() -> None:
             "open_quarantines": 1,
             "current_value_unchanged": "0.600000",
         },
-        "day3_sub_then_final": {"e1_value": "0.550000", "e1_quality": "F"},
+        "day3_sub_then_final": {"e1_value": "0.550000", "e1_quality": "F", "e1_method": "12"},
         "day5_var": {
             "status": "published",
             "qualities": {"A": 12, "S": 12, "E": 12, "F": 12},
+        },
+        "day6_a_reasons": {
+            "status": "published",
+            "reason_counts": {"61": 5, "89": 17},
         },
         "rejections": {
             "bad_uom": "unsupported_uom",
@@ -150,6 +185,12 @@ def main() -> None:
             "unknown_nmi": "unknown_nmi",
             "out_of_order": "out_of_order",
             "v_missing_400": "missing_400",
+            "incomplete_400": "incomplete_400",
+            "overlap_400": "bad_400_range",
+            "bad_value": "bad_value",
+            "truncated_300": "malformed_300",
+            "s_missing_reason": "missing_reason",
+            "bad_encoding": "invalid_encoding",
         },
     }
     (OUT / "expected.json").write_text(json.dumps(expected, indent=2) + "\n", encoding="utf-8")

@@ -45,6 +45,7 @@ class IntervalRecord(models.Model):
     interval_end_utc = models.DateTimeField()
     value = models.DecimalField(max_digits=18, decimal_places=6)
     quality = models.CharField(max_length=1)
+    method_code = models.CharField(max_length=2, null=True, blank=True)
     reason_code = models.CharField(max_length=8, null=True, blank=True)
     update_dt = models.DateTimeField(null=True)
     msats_load_dt = models.DateTimeField(null=True)

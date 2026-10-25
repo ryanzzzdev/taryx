@@ -1,7 +1,13 @@
 """Batch ingestion: stage, validate and publish NEM12 data atomically.
 
 A batch either publishes fully (records stored, current selection updated)
-or is rejected with an error code — never a partially visible dataset.
+or is rejected with a stable error code — never a partially visible dataset.
+
+Publication of the current selection is optimistic: candidates are first
+evaluated without locks, then every affected interval is re-evaluated and
+written under a per-interval row lock in deterministic order. A writer that
+raced a concurrent commit therefore re-reads the winner's records instead of
+publishing stale results, and equal-precedence conflicts still quarantine.
 """
 
 import hashlib
@@ -10,6 +16,7 @@ from datetime import date, datetime
 
 from django.db import transaction
 from django.db.utils import IntegrityError
+from django.utils import timezone
 
 from taryx.core.accounts.models import MeterChannel
 from taryx.core.metering.models import (
@@ -20,7 +27,7 @@ from taryx.core.metering.models import (
 )
 from taryx.core.metering.nem12 import ChannelData, ChannelMeta, Nem12Error, parse_nem12
 from taryx.core.metering.nem_time import nem_interval_end_utc
-from taryx.core.metering.selection import select_current
+from taryx.core.metering.selection import precedence, select_current
 
 
 @dataclass(frozen=True)
@@ -28,33 +35,75 @@ class IngestResult:
     batch: IngestionBatch
 
 
+def _duplicate_of_original(content_hash: str, source_name: str) -> IngestionBatch:
+    original = (
+        IngestionBatch.objects.exclude(status=IngestionBatch.Status.DUPLICATE)
+        .filter(content_sha256=content_hash)
+        .get()
+    )
+    return IngestionBatch.objects.create(
+        source_name=source_name,
+        content_sha256=content_hash,
+        status=IngestionBatch.Status.DUPLICATE,
+        duplicate_of=original,
+    )
+
+
 def ingest_nem12_content(content: bytes, source_name: str) -> IngestResult:
     content_hash = hashlib.sha256(content).hexdigest()
-    existing = IngestionBatch.objects.exclude(status=IngestionBatch.Status.DUPLICATE).filter(
-        content_sha256=content_hash
-    )
-    if existing.exists():
-        original = existing.get()
-        batch = IngestionBatch.objects.create(
-            source_name=source_name,
-            content_sha256=content_hash,
-            status=IngestionBatch.Status.DUPLICATE,
-            duplicate_of=original,
-        )
-        return IngestResult(batch)
+    if (
+        IngestionBatch.objects.exclude(status=IngestionBatch.Status.DUPLICATE)
+        .filter(content_sha256=content_hash)
+        .exists()
+    ):
+        return IngestResult(_duplicate_of_original(content_hash, source_name))
 
     try:
-        meta, channels = parse_nem12(content.decode("utf-8"))
+        text = content.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        return IngestResult(
+            _record_outcome(
+                content_hash,
+                source_name,
+                IngestionBatch.Status.REJECTED,
+                error_code="invalid_encoding",
+                error_detail=f"bytes are not valid UTF-8: {exc}",
+            )
+        )
+
+    try:
+        meta, channels = parse_nem12(text)
         batch = _publish(content_hash, source_name, meta, channels)
     except Nem12Error as exc:
-        batch = IngestionBatch.objects.create(
-            source_name=source_name,
-            content_sha256=content_hash,
-            status=IngestionBatch.Status.REJECTED,
+        batch = _record_outcome(
+            content_hash,
+            source_name,
+            IngestionBatch.Status.REJECTED,
             error_code=exc.code,
             error_detail=str(exc),
         )
     return IngestResult(batch)
+
+
+def _record_outcome(
+    content_hash: str, source_name: str, status: str, **fields: object
+) -> IngestionBatch:
+    """Insert a batch outcome row; lose the hash race gracefully as a duplicate.
+
+    The savepoint confines the unique-violation so the caller's transaction
+    state is untouched, and the loser resolves the actual winner — published
+    or rejected — rather than assuming one status.
+    """
+    try:
+        with transaction.atomic():
+            return IngestionBatch.objects.create(
+                source_name=source_name,
+                content_sha256=content_hash,
+                status=status,
+                **fields,
+            )
+    except IntegrityError:
+        return _duplicate_of_original(content_hash, source_name)
 
 
 def _publish(
@@ -65,22 +114,9 @@ def _publish(
 ) -> IngestionBatch:
     channel_rows = _resolve_channels(meta)
     with transaction.atomic():
-        try:
-            batch = IngestionBatch.objects.create(
-                source_name=source_name,
-                content_sha256=content_hash,
-                status=IngestionBatch.Status.PUBLISHED,
-            )
-        except IntegrityError:
-            original = IngestionBatch.objects.get(
-                content_sha256=content_hash, status=IngestionBatch.Status.PUBLISHED
-            )
-            return IngestionBatch.objects.create(
-                source_name=source_name,
-                content_sha256=content_hash,
-                status=IngestionBatch.Status.DUPLICATE,
-                duplicate_of=original,
-            )
+        batch = _record_outcome(content_hash, source_name, IngestionBatch.Status.PUBLISHED)
+        if batch.status == IngestionBatch.Status.DUPLICATE:
+            return batch
 
         records: list[IntervalRecord] = []
         for data in channels:
@@ -100,6 +136,7 @@ def _publish(
                             ),
                             value=item.value,
                             quality=item.quality or "",
+                            method_code=item.method_code,
                             reason_code=item.reason_code,
                             update_dt=item.update_dt,
                             msats_load_dt=item.msats_load_dt,
@@ -108,7 +145,7 @@ def _publish(
                     )
         IntervalRecord.objects.bulk_create(records)
 
-        affected = {(r.channel_id, r.interval_end_utc) for r in records}
+        affected = sorted({(r.channel_id, r.interval_end_utc) for r in records})
         accepted = _apply_selection(batch, affected)
         batch.record_count = len(records)
         batch.accepted_count = accepted
@@ -141,47 +178,78 @@ def _resolve_channels(
     return resolved
 
 
-def _apply_selection(batch: IngestionBatch, affected: set[tuple[int, datetime]]) -> int:
+def _apply_selection(batch: IngestionBatch, affected: list[tuple[int, datetime]]) -> int:
+    """Publish winners for affected intervals.
+
+    Phase 1 evaluates candidates without locks — the read a racing publisher
+    would have made. Phase 2 re-evaluates each interval under its
+    CurrentInterval row lock (created on first publication via insert retry),
+    so commits that landed mid-flight are seen before anything is written.
+    """
+    for channel_id, interval_end in affected:
+        select_current(
+            list(
+                IntervalRecord.objects.filter(channel_id=channel_id, interval_end_utc=interval_end)
+            )
+        )
+
     accepted = 0
     for channel_id, interval_end in affected:
-        candidates = list(
-            IntervalRecord.objects.filter(channel_id=channel_id, interval_end_utc=interval_end)
-        )
-        winner, conflict = select_current(candidates)
-        if conflict or winner is None:
-            quarantine, _ = QuarantinedInterval.objects.get_or_create(
-                channel_id=channel_id,
-                interval_end_utc=interval_end,
-                status=QuarantinedInterval.Status.OPEN,
-                defaults={"detail": "equal-precedence conflicting values"},
-            )
-            quarantine.candidate_records.add(*[c for c in candidates if c.batch_id == batch.id])
-            continue
-        current, created = CurrentInterval.objects.get_or_create(
+        for attempt in range(3):
+            try:
+                with transaction.atomic():
+                    accepted += _publish_interval(batch, channel_id, interval_end)
+                break
+            except IntegrityError:
+                if attempt == 2:
+                    raise
+    return accepted
+
+
+def _publish_interval(batch: IngestionBatch, channel_id: int, interval_end: datetime) -> int:
+    current = (
+        CurrentInterval.objects.select_for_update()
+        .filter(channel_id=channel_id, interval_end_utc=interval_end)
+        .first()
+    )
+    candidates = list(
+        IntervalRecord.objects.filter(channel_id=channel_id, interval_end_utc=interval_end)
+    )
+    winner, conflict = select_current(candidates)
+    if conflict or winner is None:
+        quarantine, _ = QuarantinedInterval.objects.get_or_create(
             channel_id=channel_id,
             interval_end_utc=interval_end,
-            defaults={
-                "value": winner.value,
-                "quality": winner.quality,
-                "source_record": winner,
-            },
+            status=QuarantinedInterval.Status.OPEN,
+            defaults={"detail": "equal-precedence conflicting values"},
         )
-        if not created and (current.source_record_id != winner.id or current.value != winner.value):
-            current.value = winner.value
-            current.quality = winner.quality
-            current.source_record = winner
-            current.selection_version += 1
-            current.save(
-                update_fields=[
-                    "value",
-                    "quality",
-                    "source_record",
-                    "selection_version",
-                    "updated_at",
-                ]
-            )
-        accepted += 1
-    return accepted
+        best = max(precedence(c) for c in candidates)
+        quarantine.candidate_records.add(*[c for c in candidates if precedence(c) == best])
+        return 0
+
+    if current is None:
+        CurrentInterval.objects.create(
+            channel_id=channel_id,
+            interval_end_utc=interval_end,
+            value=winner.value,
+            quality=winner.quality,
+            source_record=winner,
+        )
+    elif current.source_record_id != winner.id or current.value != winner.value:
+        current.value = winner.value
+        current.quality = winner.quality
+        current.source_record = winner
+        current.selection_version += 1
+        current.save(
+            update_fields=["value", "quality", "source_record", "selection_version", "updated_at"]
+        )
+
+    QuarantinedInterval.objects.filter(
+        channel_id=channel_id,
+        interval_end_utc=interval_end,
+        status=QuarantinedInterval.Status.OPEN,
+    ).update(status=QuarantinedInterval.Status.RESOLVED, resolved_at=timezone.now())
+    return 1
 
 
 @dataclass(frozen=True)

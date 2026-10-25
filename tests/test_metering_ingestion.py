@@ -1,9 +1,13 @@
 import json
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from pathlib import Path
+from threading import Barrier, Event, current_thread
+from unittest.mock import patch
 
 import pytest
+from django.db import close_old_connections
 
 from taryx.core.accounts.models import MeterChannel
 from taryx.core.accounts.seed import seed_demo_data
@@ -133,6 +137,43 @@ def test_equal_precedence_conflict_quarantines(seeded):
 
 
 @pytest.mark.django_db
+def test_quality_method_codes_retained(seeded):
+    ingest_nem12_content(load("day2_est.nem12"), "day2_est.nem12")
+    est = IntervalRecord.objects.filter(channel=channel("E1")).first()
+    assert est.quality == "E"
+    assert est.method_code == EXPECTED["day2_est_then_act"]["e1_est_method"]
+    ingest_nem12_content(load("day2_act.nem12"), "day2_act.nem12")
+    act = IntervalRecord.objects.filter(channel=channel("E1"), quality="A").first()
+    assert act.method_code is None
+
+
+@pytest.mark.django_db
+def test_actual_day_with_400_reason_codes(seeded):
+    result = ingest_nem12_content(load("day6_a_reasons.nem12"), "day6_a_reasons.nem12")
+    assert result.batch.status == EXPECTED["day6_a_reasons"]["status"]
+    assert {r.quality for r in CurrentInterval.objects.all()} == {"A"}
+    for code, count in EXPECTED["day6_a_reasons"]["reason_counts"].items():
+        assert (
+            IntervalRecord.objects.filter(channel=channel("E1"), reason_code=code).count() == count
+        )
+
+
+@pytest.mark.django_db
+def test_newer_revision_resolves_obsolete_quarantine(seeded):
+    ingest_nem12_content(load("day1_rev2.nem12"), "day1_rev2.nem12")
+    ingest_nem12_content(load("day1_conflict.nem12"), "day1_conflict.nem12")
+    assert QuarantinedInterval.objects.filter(status="open").count() == 1
+    text = (FIXTURES / "day1_rev2.nem12").read_text().replace("20260304120000", "20260310120000")
+    ingest_nem12_content(text.encode(), "day1_rev3.nem12")
+    quarantine = QuarantinedInterval.objects.get()
+    assert quarantine.status == "resolved"
+    assert quarantine.resolved_at is not None
+    assert quarantine.candidate_records.count() == 2  # both rivals kept
+    cov = channel_coverage(channel("E1"), date(2026, 3, 2), date(2026, 3, 3))
+    assert cov.complete
+
+
+@pytest.mark.django_db
 def test_variable_quality_day_uses_400_records(seeded):
     result = ingest_nem12_content(load("day5_var.nem12"), "day5_var.nem12")
     assert result.batch.status == EXPECTED["day5_var"]["status"]
@@ -171,6 +212,85 @@ def test_coverage_reports_gaps_and_completion(seeded):
 
     quarantine_cov = channel_coverage(e1, date(2026, 3, 2), date(2026, 3, 4))
     assert quarantine_cov.quarantined == 0
+
+
+@pytest.mark.django_db(transaction=True)
+def test_concurrent_duplicate_ingest_is_single_winner():
+    from taryx.core.metering import ingestion
+
+    seed_demo_data()
+    barrier = Barrier(2)
+    original = ingestion.parse_nem12
+
+    def parse(text):
+        parsed = original(text)
+        barrier.wait(timeout=10)
+        return parsed
+
+    def run():
+        close_old_connections()
+        try:
+            return ingest_nem12_content(load("day1_base.nem12"), "concurrent").batch.status
+        finally:
+            close_old_connections()
+
+    with (
+        patch.object(ingestion, "parse_nem12", parse),
+        ThreadPoolExecutor(max_workers=2) as pool,
+    ):
+        outcomes = sorted(f.result(timeout=30) for f in [pool.submit(run) for _ in range(2)])
+    assert outcomes == ["duplicate", "published"]
+
+
+@pytest.mark.django_db(transaction=True)
+def test_concurrent_revisions_keep_newest_current():
+    from taryx.core.metering import ingestion
+
+    seed_demo_data()
+    ingest_nem12_content(load("day1_base.nem12"), "day1_base.nem12")
+    low_read, high_done = Event(), Event()
+    original = ingestion.select_current
+
+    def revision(value: str, stamp: str) -> bytes:
+        lines = (FIXTURES / "day1_rev1.nem12").read_text().splitlines()
+        lines[2] = f"300,20260302,{','.join([value] * 48)},A,,,{stamp},{stamp}"
+        return ("\n".join(lines) + "\n").encode()
+
+    def select(records):
+        result = original(records)
+        if current_thread().name.endswith("_0") and not low_read.is_set():
+            low_read.set()
+            assert high_done.wait(15)
+        return result
+
+    def run(stamp, value, name):
+        close_old_connections()
+        try:
+            return ingest_nem12_content(revision(value, stamp), name)
+        finally:
+            close_old_connections()
+
+    def low():
+        return run("20260305000000", "0.6", "low")
+
+    def high():
+        try:
+            assert low_read.wait(10)
+            return run("20260306000000", "0.8", "high")
+        finally:
+            high_done.set()
+
+    with (
+        patch.object(ingestion, "select_current", select),
+        ThreadPoolExecutor(max_workers=2) as pool,
+    ):
+        a, b = pool.submit(low), pool.submit(high)
+        a.result(timeout=30)
+        b.result(timeout=30)
+    values = set(
+        CurrentInterval.objects.filter(channel=channel("E1")).values_list("value", flat=True)
+    )
+    assert values == {Decimal("0.8")}
 
 
 @pytest.mark.django_db
