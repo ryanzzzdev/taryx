@@ -2,6 +2,7 @@
 
 Date: 2026-10-25
 Status: TAR-009 slice implemented and re-verified after independent-review remediation (decision 004 contract: session auth, roles, bounded GraphQL, operation polling, audit, portal journey, CSRF origin bootstrap, durable browser operation IDs). Client isolation remains planning contract.
+Re-review at `de0e08d`: rating snapshot/membership and browser account-recovery claims above are only partially verified; see [remaining findings](../evidence/m2-independent-review.md). M2 remains open.
 Tasks: [TAR-009](../backlog.md#tar-009), [TAR-012](../backlog.md#tar-012), [TAR-013](../backlog.md#tar-013).
 
 ## Operator journeys

@@ -11,10 +11,10 @@ Task sections own status; index icons mirror them. See the [documentation guide]
 - ✅ [TAR-003 — Bootstrap the development workspace](#tar-003)
 - ✅ [TAR-004 — Freeze domain and measurement profiles](#tar-004)
 - ✅ [TAR-005 — Implement versioned meter ingestion and fixtures](#tar-005)
-- ✅ [TAR-006 — Implement deterministic itemised rating](#tar-006)
+- 🟢 [TAR-006 — Implement deterministic itemised rating](#tar-006)
 - ✅ [TAR-007 — Implement durable issuance and balanced posting](#tar-007)
 - ✅ [TAR-008 — Implement successive corrections and adjustments](#tar-008)
-- ✅ [TAR-009 — Deliver the core operator journey](#tar-009)
+- 🟢 [TAR-009 — Deliver the core operator journey](#tar-009)
 - 📋 [TAR-010 — Build independent legacy characterisation](#tar-010)
 - 📋 [TAR-011 — Implement isolated shadow comparison and gates](#tar-011)
 - 📋 [TAR-012 — Deliver operator migration and cutover](#tar-012)
@@ -27,9 +27,9 @@ Task sections own status; index icons mirror them. See the [documentation guide]
 
 ## Delivery notes
 
-M2 findings are remediated and verified (all six review probes pass; see the [review](evidence/m2-independent-review.md)). Next action: TAR-010 (M3). Later tasks remain Backlog until their dependencies and detailed contracts are ready. Portal/API slices can develop alongside their backend tasks; TAR-009 and TAR-012 own integrated acceptance. Observability hooks and correctness tests accompany implementation; TAR-016 owns the full cross-service campaign, not the first tests.
+M2 re-review at `de0e08d` confirms the original probes pass but reopens TAR-006 and TAR-009 for four remaining findings; see the [review](evidence/m2-independent-review.md). Next action: finish rating evidence and account-scoped recovery before M3. Later tasks remain Backlog until their dependencies and detailed contracts are ready. Portal/API slices can develop alongside their backend tasks; TAR-009 and TAR-012 own integrated acceptance. Observability hooks and correctness tests accompany implementation; TAR-016 owns the full cross-service campaign, not the first tests.
 
-The architecture and functional scope are the planning baseline; exact schemas, dependency versions and open profiles are refined in their named tasks. Split large tasks into new IDs before starting if necessary; preserve existing history. Next unused ID: TAR-019. M1 and M2 implementations remediated and re-verified.
+The architecture and functional scope are the planning baseline; exact schemas, dependency versions and open profiles are refined in their named tasks. Split large tasks into new IDs before starting if necessary; preserve existing history. Next unused ID: TAR-019. M1 remains verified; M2 remediation is partially verified.
 
 <a id="tar-001"></a>
 
@@ -203,7 +203,7 @@ Remediated after the [independent M1 review](evidence/m1-exit-review.md): two-ph
 - Area: pricing
 - Milestone: M2
 - Priority: High
-- Status: Done ✅
+- Status: Ready 🟢
 - Depends on: TAR-005
 - References: [Contract](features/metering-and-rating.md)
 
@@ -228,6 +228,8 @@ Implemented: pure engine in src/taryx/core/pricing/engine.py (separately testabl
 Reopened 2026-10-25 by the [independent M2 review](evidence/m2-independent-review.md). Prior evidence remains historical.
 
 Remediated 2026-10-25 (R5): RatingRun.input_snapshot now retains the exact digest payload (interval selections, agreements, tariff specs, open quarantines, versions) so published calculations reconstruct without trusting mutable metadata; rating runs/lines and interval records are immutable at the database boundary (pricing 0002, metering 0003). Reconstruction and immutability regressions in tests/test_pricing.py; the review's mutation probe passes.
+
+Independent re-review of `de0e08d`: reopened for remaining R5/R7 findings as applicable; see [review](evidence/m2-independent-review.md). Original checks pass; follow-up rating probes fail and account-switch display leakage is reproduced. Next action: resolve the remaining findings and rerun targeted checks.
 
 <a id="tar-007"></a>
 
@@ -306,7 +308,7 @@ Remediated 2026-10-25 (R2/R4): corrections share the same locked-revalidation bo
 - Area: portal
 - Milestone: M2
 - Priority: High
-- Status: Done ✅
+- Status: Ready 🟢
 - Depends on: TAR-008
 - References: [Contract](features/operator-and-clients.md)
 
@@ -332,6 +334,8 @@ GraphQL depth/cost bounds are not enforced beyond bounded lists (documented limi
 Reopened 2026-10-25 by the [independent M2 review](evidence/m2-independent-review.md). Prior evidence remains historical.
 
 Remediated 2026-10-25 (R1/R6/R7): DJANGO_CSRF_TRUSTED_ORIGINS covers the dev portal origin; the portal bootstraps CSRF with a safe GET, re-bootstraps and retries once on 403, and surfaces non-JSON/HTTP failures; billAccount resolves an existing operation by key before run selection; operation IDs are crypto.randomUUID persisted to localStorage before submission so retries after a lost response and post-reload polling resume the same identity, scoped to account+period, with terminal states clearing the intent. enforce_csrf_checks tests cover origin rejection, GET bootstrap and login rotation; vitest covers store persistence/scoping. Live browser-equivalent path verified through the Vite proxy (403 -> bootstrap -> login -> rotation -> bill -> polled COMPLETE -> identical retry resolves original).
+
+Independent re-review of `de0e08d`: reopened for remaining R5/R7 findings as applicable; see [review](evidence/m2-independent-review.md). Original checks pass; follow-up rating probes fail and account-switch display leakage is reproduced. Next action: resolve the remaining findings and rerun targeted checks.
 
 <a id="tar-010"></a>
 

@@ -112,3 +112,24 @@ Verification: `make check` green (102 tests), all six probes pass, live
 Compose verification of the seal trigger and the full CSRF/journey flow.
 The residual readiness gaps listed in the milestone decision remain open
 evidence work for the re-review.
+
+
+## Independent re-review of `de0e08d` — 2026-10-25
+
+Verdict: M2 remains In progress. The original six M2 probes and ten M1 probes pass. R1/R2/R3/R4/R6 are addressed for the reviewed scenarios; R5 and R7 remain incomplete. TAR-006 and TAR-009 are reopened; TAR-007/008 retain their verified remediation evidence.
+
+### Remaining findings
+
+1. **P2 — Seal the membership of published rating runs (R5).** `pricing/migrations/0002_snapshot_and_immutability.py` rejects UPDATE/DELETE but permits INSERT of additional RatingLine rows into an already issued run. Cloning an existing line with a new sequence commits successfully. Historical itemisation then disagrees with the immutable totals/snapshot; billing also derives charge/export amounts from these mutable memberships. Seal line insertion after the calculation transaction, and test appends as well as updates/deletes.
+2. **P2 — Include time-band windows in the snapshot/digest (R5).** `pricing/services.py:67` serialises band names/prices but omits `RateBand.window`, which controls interval allocation. Changing only windows leaves the digest unchanged; the saved snapshot cannot reconstruct that allocation independently of current tariff code. Persist ordered band windows (and other calculation-affecting inputs), and verify replay solely from retained evidence.
+3. **P2 — Reset account-scoped state and invalidate old callbacks (R7).** `web/src/App.tsx:274` resets only the operation display. AccountPanel is reused without a key; rating/batch state survives, and switching to an account without a pending intent does not stop the old poll or reset polledRef. Live reproduction: rate ACC-001 (run 6, $8.65), select ACC-002, and ACC-001's run/total/digest remain under the ACC-002 heading. Old poll results can similarly repopulate operation state. Reset all account data, stop polling on scope change, and reject late responses from the previous account.
+4. **P2 — Preserve independent pending intents (R7).** `web/src/operationStore.ts:63–68` saves every account/period into one localStorage key and clears it unconditionally. Admit an uncertain A operation, switch to B and bill: B overwrites A's identity, so returning to A generates a fresh ID. A delayed terminal callback from another account/tab can also erase B's intent. Key the store by account/period (or retain a map) and clear only the matching operation ID. Existing tests only check lookup filtering, not preservation across saves or late completion.
+
+### Verification and limits
+
+- `make check`: passed, including 102 pytest tests, Ruff, mypy, import boundaries/negative probe and frontend typecheck/build.
+- `uv run pytest docs/project/evidence/m1_review_probes.py docs/project/evidence/m2_review_probes.py -c pyproject.toml -q`: 16 passed.
+- `cd web && npm test`: 4 passed. This command is not included in `make check`.
+- `uv run pytest docs/project/evidence/m2_followup_probes.py -c pyproject.toml -q`: two focused cases fail (additional rating line accepted; changed time windows produce unchanged digest). Executed initially from an equivalent temporary file with an absolute fixture path; saved here with a portable fixture path.
+- Rebuilt local Compose api/worker/web; actual browser sign-in succeeded, account query and rate mutation succeeded after login/token rotation. Account-switch rating leakage reproduced above. No claim of a complete browser fault-injection campaign; multi-account intent overwrite/late-poll behaviour is source-inspected.
+- Existing broader readiness gaps remain as previously documented. No application fixes or commits made by this review.

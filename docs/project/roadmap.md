@@ -9,7 +9,7 @@ This is the initial delivery sequence, not a calendar commitment. The earlier 6�
 | Documentation setup | Portable Cateniq-style workflow | Complete | None |
 | Planning baseline | Architecture, feature contracts and evidence-driven backlog | Complete | Documentation setup |
 | M1 — Foundation and domain profile | Reproducible workspace, sourced profile and metering history | Complete | Planning baseline |
-| M2 — Explainable bills and corrections | End-to-end operator billing with financial integrity | Complete | M1 |
+| M2 — Explainable bills and corrections | End-to-end operator billing with financial integrity | In progress | M1 |
 | M3 — Safe legacy migration | Characterisation, shadow comparison and controlled cohort cutover | Planned | M2 |
 | M4 — Client variation and market boundary | Second isolated client and bounded integration | Planned | M3 |
 | M5 — Operational portfolio delivery | Recovery evidence, Kubernetes and reproducible demonstration | Planned | M4 |
@@ -34,6 +34,8 @@ Exit criteria:
 Excludes issuance, ledger, migration and Kubernetes. Gates: [BLK-001](blockers.md#blk-001), [BLK-003](blockers.md#blk-003).
 
 ## M2 — Explainable bills and corrections
+
+Current independent verdict at `de0e08d`: In progress. TAR-006/TAR-009 reopened for incomplete rating evidence and account-scoped recovery; the remediation statement below is historical. See the follow-up findings in the [review](evidence/m2-independent-review.md).
 
 Independent review at `2a46650` reopened TAR-006–009 for financial/input integrity and browser/retry failures; all seven findings remediated and the six preserved probes now pass alongside a 102-test suite and a live CSRF-origin-verified portal journey. See [review](evidence/m2-independent-review.md). Re-review of the residual readiness gaps it lists (itemised portal explanation, real broker-fault timing, after-commit/ack kill, bounded query behaviour) remains open evidence work.
 
