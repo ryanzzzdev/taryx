@@ -102,3 +102,35 @@ All eight findings resolved and verified; probes folded into `tests/test_migrati
 - **Format gate**: `ruff format` applied; `make check` is green end-to-end (140 pytest, 6 vitest, typecheck, build, mypy, import contracts, formatter).
 
 Verification: 8/8 preserved probes pass; 140 pytest on real PostgreSQL; live re-verified (policy-evidenced comparison, clean gate, guarded cutover, zero-delta generation-change adjustment, CLI outbox recovery).
+
+
+## Independent remediation re-review — `f9f21df`, 2026-10-25
+
+Verdict: **M3 remains In progress**. The eight original M3 probes now pass, as do all earlier M1/M2 probes. The preserved heritage GST policy, legacy comparison version token, CLI outbox composition, first post-cutover correction, original malformed shapes and original input-revision interleaving are fixed for the exercised cases. Portal validity/period-filter changes were inspected in source; no new browser campaign was performed in this re-review.
+
+Four remaining findings (five failing cases) prevent closure:
+
+### F1 — P1: A later failed comparison no longer blocks cutover (R4 regression)
+
+`src/taryx/core/migration/services.py:215–226` discards every INCONCLUSIVE row before selecting current evidence. Compare successfully and approve differences, then run a comparison that returns unavailable: `evaluation_blockers` returns no inconclusive blocker, even though no successful recovery attempt has occurred. This reverses the required failure semantics. Select the latest observation of any status; `updated_at` should allow a later success to supersede failure, not allow an earlier success to conceal it. The final validation must use the same rule.
+
+### F2 — P1: Final cutover validation does not recheck approval scope (R2 incomplete)
+
+`src/taryx/core/migration/services.py:313–342` selects a fresh comparison under the final account locks, but checks only input digest and policy identity. If a comparison for legacy engine 2.0.0 arrives after the initial gate approved 1.0.0 and before the final check, it has the same inputs/policy but no valid decisions. Cutover nevertheless commits. The deterministic probe inserts that independently versioned comparison at the validation boundary and observes NEW_ONLY instead of rejection. Re-evaluate the complete gate against a pinned, consistent evidence/decision revision through commit, including failure status, engine identity, freshness and decisions; do not replace it with a partial digest check.
+
+### F3 — P2: A second routing-change correction violates adjustment uniqueness (R6 incomplete)
+
+`src/taryx/core/billing/models.py:115–116` still makes (invoice, input_digest) unique, despite services now allowing the same inputs under a changed calculation source. Reproduction: issue legacy; cut over and explicitly correct under new; roll back and explicitly correct under legacy, with fresh rating runs and unique operation IDs. The first correction succeeds, but the rollback correction raises `IntegrityError` on `uniq_adjustment_digest` and leaves the operation pending. Use a financial generation identity/constraint that supports legitimate successive engine transitions while retaining retry idempotency. Merely adding source to the key also needs testing for repeated legacy→new→legacy→new cycles.
+
+### F4 — P2: Malformed response values still bypass INCONCLUSIVE persistence (R8 incomplete)
+
+`src/taryx/core/migration/legacy_adapter.py:110–114,148,153–157` handles absent fields and non-object bodies but not invalid field values. A complete zero-total response with `engine_version: null` reaches database persistence and raises a NOT NULL IntegrityError; `net: "sNaN"` raises decimal.InvalidOperation during reconciliation. Neither persists an INCONCLUSIVE comparison. Validate required metadata types/nonempty version identities and finite decimals inside the failure boundary, normalising bad values to LegacyFailure('malformed') before arithmetic or database writes.
+
+### Verification
+
+- `make check`: **passed** end-to-end, including formatter/lint, mypy, import contracts/negative probe, **140 backend tests**, **6 frontend tests**, typecheck and build.
+- Saved M1/M2/M3 review probes: **26 passed** in 25.84s.
+- [m3_followup_probes.py](m3_followup_probes.py): **5 failed**, covering F1–F4 (F4 has two cases). Command: `uv run pytest docs/project/evidence/m3_followup_probes.py -c pyproject.toml -q`. Uses existing portable helpers, real PostgreSQL and the independently launched legacy service; engine-arrival timing and malformed HTTP bodies are controlled test inputs.
+- No application fixes, commits or pushes. Updated evidence/status/journal only. Earlier findings remain historical; this section supersedes the implementer addendum's closure claim.
+
+Next action: resolve F1–F4 and rerun the saved probes plus normal checks before M4.

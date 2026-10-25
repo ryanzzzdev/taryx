@@ -69,6 +69,8 @@ A calculation is pinned to meter revision selection, tariff/agreement versions, 
 
 ## Legacy migration boundary
 
+Re-review at `f9f21df`: complete gate validation, successive source-change generations and malformed-value handling remain unverified/failed; see F1–F4 in the [review](evidence/m3-independent-review.md).
+
 Implementation review at `c06e1fc` leaves this contract partially verified: policy preservation, commit-safe gate freshness, legacy version identity, recovery and financial generation identity need remediation. See [independent M3 review](evidence/m3-independent-review.md).
 
 Both calculators receive the same immutable input snapshot. The legacy service returns calculation evidence only; core remains the single invoice/ledger writer for this demonstration. This is a migration of calculation responsibility, not a claim to migrate an entire historical accounting database.
