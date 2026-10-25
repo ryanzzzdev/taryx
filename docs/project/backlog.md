@@ -17,7 +17,7 @@ Task sections own status; index icons mirror them. See the [documentation guide]
 - ✅ [TAR-009 — Deliver the core operator journey](#tar-009)
 - ✅ [TAR-010 — Build independent legacy characterisation](#tar-010)
 - ✅ [TAR-011 — Implement isolated shadow comparison and gates](#tar-011)
-- 📋 [TAR-012 — Deliver operator migration and cutover](#tar-012)
+- ✅ [TAR-012 — Deliver operator migration and cutover](#tar-012)
 - 📋 [TAR-013 — Demonstrate two isolated client instances](#tar-013)
 - 📋 [TAR-014 — Freeze the bounded market workflow](#tar-014)
 - 📋 [TAR-015 — Implement market adapter and counterparty simulator](#tar-015)
@@ -27,7 +27,7 @@ Task sections own status; index icons mirror them. See the [documentation guide]
 
 ## Delivery notes
 
-M2 re-review findings are remediated and verified (both follow-up probes pass; see the [review](evidence/m2-independent-review.md)). Next action: TAR-010 (M3). Later tasks remain Backlog until their dependencies and detailed contracts are ready. Portal/API slices can develop alongside their backend tasks; TAR-009 and TAR-012 own integrated acceptance. Observability hooks and correctness tests accompany implementation; TAR-016 owns the full cross-service campaign, not the first tests.
+M2 re-review findings are remediated and verified (both follow-up probes pass; see the [review](evidence/m2-independent-review.md)). Next action: TAR-013 (M4). Later tasks remain Backlog until their dependencies and detailed contracts are ready. Portal/API slices can develop alongside their backend tasks; TAR-009 and TAR-012 own integrated acceptance. Observability hooks and correctness tests accompany implementation; TAR-016 owns the full cross-service campaign, not the first tests.
 
 The architecture and functional scope are the planning baseline; exact schemas, dependency versions and open profiles are refined in their named tasks. Split large tasks into new IDs before starting if necessary; preserve existing history. Next unused ID: TAR-019. M1 remains verified; M2 remediation is re-verified.
 
@@ -331,7 +331,7 @@ Contract frozen in [decision 004](decisions/004-operator-journey-contract.md): s
 
 ### Notes
 
-GraphQL depth/cost bounds are not enforced beyond bounded lists (documented limitation). Browser journey verified through GraphQL contract tests and a live curl session; no browser-automation harness yet. Next action: TAR-010 (M3).
+GraphQL depth/cost bounds are not enforced beyond bounded lists (documented limitation). Browser journey verified through GraphQL contract tests and a live curl session; no browser-automation harness yet. Next action: TAR-013 (M4).
 
 Reopened 2026-10-25 by the [independent M2 review](evidence/m2-independent-review.md). Prior evidence remains historical.
 
@@ -410,7 +410,7 @@ Refine and mark Ready once dependencies pass; record relevant gate resolutions b
 - Area: portal
 - Milestone: M3
 - Priority: High
-- Status: Backlog 📋
+- Status: Done ✅
 - Depends on: TAR-011
 - References: [Contract](features/legacy-migration.md)
 
@@ -426,11 +426,11 @@ Let an authorised operator investigate and migrate cohorts with auditable eviden
 
 ### Completion evidence
 
-Not started; no implementation or verification evidence.
+Implemented 2026-10-25. Billing ops pin `cohort_mode`/`cohort_revision` at admission; `process_operation` revalidates routing under `lock_inputs` (stale_routing raised on mismatch) and derives invoice amounts via the injected `calculate_for_billing` — legacy-authoritative under LEGACY_ONLY and SHADOW, with SHADOW persisting the comparison inline. Invoice.calculation_source records the engine. GraphQL: cohorts/comparisons/cohortEvents queries, decideDiscrepancy (operator+approver) and transitionCohort (approver) mutations with payload codes; viewer denied. Portal MigrationPanel renders mode/revision, eval window, gate blockers, per-account status and itemised diffs, records decisions and drives guarded transitions. Live: stale_revision rejection, SHADOW bill produced INV-000002 at legacy total 7.27 (new: 8.05), 9 scoped decisions, in_flight blocked rollback until drained, cutover gated, rollback to LEGACY_ONLY, full cohortEvents audit; injected malformed fault produced INCONCLUSIVE + gate blocker. 17 new tests; 131 total green. See evidence/m3-exit-review.md.
 
 ### Notes
 
-Refine and mark Ready once dependencies pass; record relevant gate resolutions before dependent implementation.
+Rollback concerns future routing only; issued bills are never reversed. Residuals recorded in evidence/m3-exit-review.md.
 
 <a id="tar-013"></a>
 

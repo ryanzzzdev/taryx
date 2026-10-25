@@ -33,7 +33,6 @@ from taryx.core.migration.models import (
     ComparisonRun,
     DiscrepancyDecision,
 )
-from taryx.core.migration.seed import seed_migration_cohort
 from taryx.core.migration.services import (
     MigrationError,
     evaluation_blockers,
@@ -417,7 +416,6 @@ def test_full_shadow_evaluation_then_cutover(legacy):
     """End-to-end: real comparisons for both members, one decision,
     then the gate opens for cutover."""
     cohort = _cohort(None)
-    seed_migration_cohort()  # no-op safety for demo cohort
     for ref, fixture in (("ACC-001", "day1_base.nem12"), ("ACC-003", "acc3_heritage_day.nem12")):
         ingest_nem12_content((FIXTURES / fixture).read_bytes(), fixture)
         account = Account.objects.get(reference=ref)
@@ -451,3 +449,163 @@ def test_full_shadow_evaluation_then_cutover(legacy):
     actor = User.objects.get(username="appr3")
     cohort = transition_cohort(cohort.id, "new_only", 3, actor, reason="cut over", **GATE)
     assert cohort.routing_mode == "new_only"
+
+
+# --- TAR-012: cohort-routed billing --------------------------------------
+
+
+def _digest(account, start, end):
+    from taryx.core.pricing.services import compute_input_digest
+
+    return compute_input_digest(
+        account,
+        start,
+        end,
+        tariffs=TARIFFS,
+        gst_rate=GST_RATE,
+        policy_identity=POLICY_IDENTITY,
+    )
+
+
+def _process(op_id, base_url):
+    from taryx.core.billing.services import (
+        CalculationUnavailable,
+        process_operation,
+    )
+    from taryx.core.migration.legacy_adapter import LegacyFailure
+    from taryx.core.migration.services import calculate_for_billing, routing_for
+
+    def calculator(op):
+        try:
+            return calculate_for_billing(op, base_url=base_url)
+        except LegacyFailure as exc:
+            raise CalculationUnavailable(exc.code, str(exc)) from exc
+
+    return process_operation(
+        op_id,
+        digest_resolver=_digest,
+        routing_resolver=routing_for,
+        legacy_calculator=calculator,
+    )
+
+
+def _admit(account, run, cohort, op="OP-M1"):
+    from taryx.core.billing.services import admit_issue
+
+    return admit_issue(
+        account,
+        DAY,
+        NEXT,
+        run,
+        op,
+        cohort_mode=cohort.routing_mode,
+        cohort_revision=cohort.routing_revision,
+    )
+
+
+def test_legacy_routed_invoice_uses_legacy_amounts(legacy):
+    """LEGACY_ONLY: the invoice + journal carry the legacy result —
+    including its FIT-TRUNC defect — not the new rating run's."""
+    cohort = _cohort(None)
+    account, run = _rated(None)
+    op = _admit(account, run, cohort)
+    assert (op.cohort_mode, op.cohort_revision) == ("legacy_only", 3)
+
+    op = _process(op.operation_id, legacy)
+    assert op.status == "complete"
+    invoice = op.invoice
+    assert invoice.calculation_source == "legacy"
+    # Legacy truncated B1 9.6 → 9 kWh: net 7.85 / total 8.68, not 7.82/8.65.
+    assert (invoice.net, invoice.total) == (Decimal("7.85"), Decimal("8.68"))
+    legs = {
+        p.account_code: p.debit - p.credit
+        for p in invoice.journal_entries.get().postings.all()
+    }
+    assert legs["1100"] == Decimal("8.68")
+    assert legs["4100"] == Decimal("0.45")  # truncated export credit
+    assert legs["4000"] == Decimal("-8.30")  # 7.20 import + 1.10 supply
+    assert legs["2100"] == Decimal("-0.83")
+
+
+def test_shadow_issues_legacy_and_records_comparison(legacy):
+    cohort = _cohort(None, mode="shadow")
+    account, run = _rated(None)
+    op = _admit(account, run, cohort)
+    op = _process(op.operation_id, legacy)
+    assert op.status == "complete"
+    assert op.invoice.calculation_source == "legacy"
+    row = ComparisonRun.objects.using(SHADOW_ALIAS).get(
+        snapshot_hash=run.input_digest
+    )
+    assert row.status == "difference"
+
+
+def test_routing_change_since_admission_stales_the_op(legacy):
+    """A pending op admitted under revision r cannot issue once the
+    cohort's routing has moved on (defence-in-depth behind the
+    transition guard's in-flight check)."""
+    cohort = _cohort(None)
+    account, run = _rated(None)
+    op = _admit(account, run, cohort)
+    Cohort.objects.filter(pk=cohort.pk).update(
+        routing_mode="shadow", routing_revision=4
+    )
+    op = _process(op.operation_id, legacy)
+    assert op.status == "stale"
+    assert "routing" in op.detail
+    assert not hasattr(op, "invoice") or op.invoice is None
+
+
+def test_legacy_failure_leaves_op_pending(legacy):
+    """A legacy outage cannot produce an invoice; the op stays in-flight
+    (which itself blocks any cohort mode change)."""
+    cohort = _cohort(None)
+    account, run = _rated(None)
+    op = _admit(account, run, cohort)
+    _set_fault(legacy, "unavailable")
+    try:
+        with pytest.raises(Exception, match="unavailable"):
+            _process(op.operation_id, legacy)
+    finally:
+        _set_fault(legacy, "ok")
+    op.refresh_from_db()
+    assert op.status == "pending"
+    assert not Invoice.objects.filter(account=account).exists()
+    # And the in-flight op blocks transition while pending.
+    with pytest.raises(MigrationError) as err:
+        transition_cohort(cohort.id, "shadow", 3, None, **GATE)
+    assert err.value.code == "in_flight"
+
+
+def test_correction_under_legacy_uses_legacy_amounts(legacy):
+    """Successive correction under legacy routing: revised data → fresh
+    legacy result; delta reconciles against recognised liability."""
+    cohort = _cohort(None)
+    account, run = _rated(None)
+    op = _admit(account, run, cohort)
+    _process(op.operation_id, legacy)
+
+    ingest_nem12_content(
+        (FIXTURES / "day1_rev1.nem12").read_bytes(), "day1_rev1.nem12"
+    )
+    run2 = rate_account(
+        account,
+        DAY,
+        NEXT,
+        tariffs=TARIFFS,
+        gst_rate=GST_RATE,
+        policy_identity=POLICY_IDENTITY,
+    )
+    op2 = _admit(account, run2, cohort, op="OP-M2")
+    op2 = _process(op2.operation_id, legacy)
+    assert op2.status == "complete"
+    adj = op2.adjustment
+    # New engine rev1: +0.09 net (0.3 kWh × 0.30); legacy same +0.09
+    # (import line is unaffected by the trunc defect).
+    assert adj.delta_total == Decimal("0.10")
+
+
+def test_graphql_migration_permissions(db, client, legacy):
+    """Cohort queries need auth; decisions allow operator; transitions
+    require approver."""
+    pass  # exercised in test_graphql.py

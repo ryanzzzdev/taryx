@@ -5,7 +5,7 @@ from datetime import date
 from django.utils import timezone
 
 from taryx.core.accounts.models import Account
-from taryx.core.migration.models import Cohort
+from taryx.core.migration.models import Cohort, CohortMembership
 
 
 def seed_migration_cohort() -> Cohort:
@@ -23,5 +23,14 @@ def seed_migration_cohort() -> Cohort:
         },
     )
     members = Account.objects.filter(reference__in=["ACC-001", "ACC-003"])
+    elsewhere = {
+        m.account_id
+        for m in CohortMembership.objects.filter(account__in=members).exclude(
+            cohort=cohort
+        )
+    }
+    if elsewhere:
+        refs = [a.reference for a in members if a.id in elsewhere]
+        raise ValueError(f"accounts already belong to another cohort: {refs}")
     cohort.members.set(members)
     return cohort

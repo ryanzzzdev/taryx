@@ -166,6 +166,7 @@ export function App() {
         <p>Select an account.</p>
       )}
       <QuarantinePanel role={me.role ?? ""} />
+      <MigrationPanel role={me.role ?? ""} />
     </main>
   );
 }
@@ -486,6 +487,213 @@ function QuarantinePanel({ role }: { role: string }) {
           ))}
         </div>
       ))}
+    </section>
+  );
+}
+
+/* Migration panel — cohorts, comparison evidence, scoped decisions and
+ * guarded transitions (TAR-012). */
+type Diff = {
+  fingerprint: string;
+  element: string;
+  band: string | null;
+  segment: [string, string];
+  field: string;
+  new: string;
+  legacy: string;
+  detail: string;
+};
+type Comparison = {
+  id: number;
+  account: { reference: string };
+  status: string;
+  failureCode: string | null;
+  snapshotHash: string;
+  newEngineVersion: string;
+  legacyVersionToken: string;
+  createdAt: string;
+  report: string; // JSONString — parsed at render
+};
+type Decision = {
+  fingerprint: string;
+  classification: string;
+  actor: string | null;
+  reason: string;
+};
+type Cohort = {
+  id: number;
+  name: string;
+  routingMode: string;
+  routingRevision: number;
+  evalPeriodStart: string;
+  evalPeriodEnd: string;
+  blockers: string[];
+  members: { reference: string }[];
+  decisions: Decision[];
+};
+
+const MODE_LABEL: Record<string, string> = {
+  LEGACY_ONLY: "legacy only",
+  SHADOW: "shadow",
+  NEW_ONLY: "new only",
+};
+
+function MigrationPanel({ role }: { role: string }) {
+  const [cohorts, setCohorts] = useState<Cohort[]>([]);
+  const [comparisons, setComparisons] = useState<Comparison[]>([]);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const refresh = useCallback(() => {
+    gql<{ cohorts: Cohort[] }>(
+      `{cohorts{id name routingMode routingRevision evalPeriodStart evalPeriodEnd
+        blockers members{reference} decisions{fingerprint classification actor reason}}}`,
+    ).then((d) => setCohorts(d.cohorts));
+    gql<{ comparisons: Comparison[] }>(
+      `{comparisons{id account{reference} status failureCode snapshotHash
+        newEngineVersion legacyVersionToken createdAt report}}`,
+    ).then((d) => setComparisons(d.comparisons));
+  }, []);
+  useEffect(refresh, [refresh]);
+
+  if (!cohorts.length) return null;
+  const canDecide = role === "operator" || role === "approver";
+  const canTransition = role === "approver";
+
+  const transition = (c: Cohort, toMode: string, reason: string) =>
+    gql<{ transitionCohort: { ok: boolean; code: string | null; message: string | null; cohort: { routingMode: string } | null } }>(
+      `mutation($c:Int!,$m:String!,$r:Int!,$reason:String){
+        transitionCohort(cohortId:$c,toMode:$m,expectedRevision:$r,reason:$reason){
+          ok code message cohort{routingMode routingRevision}}}`,
+      { c: c.id, m: toMode, r: c.routingRevision, reason },
+    )
+      .then((d) =>
+        setMsg(
+          d.transitionCohort.ok
+            ? `${c.name} → ${d.transitionCohort.cohort!.routingMode}`
+            : `blocked: ${d.transitionCohort.code} — ${d.transitionCohort.message ?? ""}`,
+        ),
+      )
+      .catch((e: Error) => setMsg(e.message))
+      .finally(refresh);
+
+  const decide = (c: Cohort, d: Diff, classification: string) => {
+    const reason = window.prompt(`Reason for ${classification}:`) ?? "";
+    if (!reason) return;
+    gql<{ decideDiscrepancy: { ok: boolean; code: string | null; message: string | null } }>(
+      `mutation($c:Int!,$f:String!,$cl:String!,$r:String!){
+        decideDiscrepancy(cohortId:$c,fingerprint:$f,classification:$cl,reason:$r){
+          ok code message}}`,
+      { c: c.id, f: d.fingerprint, cl: classification, r: reason },
+    )
+      .then((r) =>
+        setMsg(
+          r.decideDiscrepancy.ok
+            ? `decision recorded (${classification})`
+            : `decision failed: ${r.decideDiscrepancy.code}`,
+        ),
+      )
+      .finally(refresh);
+  };
+
+  return (
+    <section style={card}>
+      <strong>Migration cohorts</strong>
+      {msg && <p style={mono}>{msg}</p>}
+      {cohorts.map((c) => {
+        const decided = new Set(c.decisions.map((d) => d.fingerprint));
+        const members = new Set(c.members.map((m) => m.reference));
+        const evidence = comparisons
+          .filter((row) => members.has(row.account.reference))
+          .map((row) => ({
+            ...row,
+            parsed: JSON.parse(row.report) as { diffs: Diff[] },
+          }));
+        return (
+          <div key={c.id} style={{ ...card, borderColor: "#99c" }}>
+            <div>
+              <strong>{c.name}</strong> —{" "}
+              <em>{MODE_LABEL[c.routingMode] ?? c.routingMode}</em>{" "}
+              <span style={mono}>r{c.routingRevision}</span> · eval{" "}
+              {c.evalPeriodStart}→{c.evalPeriodEnd}
+            </div>
+            <div style={mono}>
+              members: {c.members.map((m) => m.reference).join(", ")}
+            </div>
+            {c.blockers.length > 0 && (
+              <div style={mono}>gate: {c.blockers.join(" · ")}</div>
+            )}
+            {evidence.map((row) => (
+              <div key={row.id} style={{ marginTop: "0.4rem" }}>
+                <div style={mono}>
+                  {row.account.reference}: <strong>{row.status}</strong>
+                  {row.failureCode ? ` (${row.failureCode})` : ""} · new=
+                  {row.newEngineVersion} legacy={row.legacyVersionToken} ·{" "}
+                  {row.createdAt.slice(0, 19)}
+                </div>
+                {row.parsed.diffs?.map((d) => (
+                  <div key={d.fingerprint} style={{ ...mono, marginLeft: "1rem" }}>
+                    {d.element}
+                    {d.band ? `/${d.band}` : ""} {d.field}: new={d.new} legacy=
+                    {d.legacy}
+                    {decided.has(d.fingerprint) ? (
+                      <span>
+                        {" "}
+                        — decided (
+                        {
+                          c.decisions.find((x) => x.fingerprint === d.fingerprint)
+                            ?.classification
+                        }
+                        )
+                      </span>
+                    ) : (
+                      canDecide && (
+                        <span>
+                          {" "}
+                          <button
+                            onClick={() =>
+                              decide(c, d, "preserve_client_policy")
+                            }
+                          >
+                            preserve policy
+                          </button>{" "}
+                          <button
+                            onClick={() =>
+                              decide(c, d, "approved_defect_correction")
+                            }
+                          >
+                            approve correction
+                          </button>
+                        </span>
+                      )
+                    )}
+                  </div>
+                ))}
+              </div>
+            ))}
+            {canTransition && (
+              <div style={{ marginTop: "0.4rem" }}>
+                {c.routingMode === "LEGACY_ONLY" && (
+                  <button onClick={() => transition(c, "shadow", "start shadow")}>
+                    Start shadow
+                  </button>
+                )}{" "}
+                {c.routingMode !== "NEW_ONLY" && (
+                  <button onClick={() => transition(c, "new_only", "cut over")}>
+                    Cut over to new
+                  </button>
+                )}{" "}
+                {c.routingMode !== "LEGACY_ONLY" && (
+                  <button
+                    onClick={() => transition(c, "legacy_only", "rollback routing")}
+                  >
+                    Roll back to legacy
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </section>
   );
 }

@@ -41,7 +41,12 @@ class CohortMembership(models.Model):
     joined_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ("cohort", "account")
+        constraints = [
+            models.UniqueConstraint(fields=["account"], name="uniq_cohortmembership_account"),
+            models.UniqueConstraint(
+                fields=["cohort", "account"], name="uniq_cohortmembership_pair"
+            ),
+        ]
 
 
 class LegacyCalculation(models.Model):

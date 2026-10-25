@@ -5,6 +5,7 @@ from django.core.management.base import BaseCommand, CommandError
 from taryx.composition.tasks import process_billing_operation
 from taryx.core.accounts.models import Account
 from taryx.core.billing.services import AdmissionError, admit_issue
+from taryx.core.migration.services import routing_for
 from taryx.core.pricing.models import RatingRun
 
 
@@ -36,7 +37,16 @@ class Command(BaseCommand):
         if run is None:
             raise CommandError("no rating run for this account and period — rate first")
         try:
-            op = admit_issue(account, options["start"], options["end"], run, options["op"])
+            mode, revision = routing_for(account)
+            op = admit_issue(
+                account,
+                options["start"],
+                options["end"],
+                run,
+                options["op"],
+                cohort_mode=mode,
+                cohort_revision=revision,
+            )
         except AdmissionError as exc:
             raise CommandError(f"{exc.code}: {exc}") from None
         try:

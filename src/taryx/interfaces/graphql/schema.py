@@ -37,6 +37,20 @@ from taryx.core.metering.models import (
     QuarantinedInterval,
 )
 from taryx.core.metering.nem_time import nem_interval_end_utc
+from taryx.core.migration.models import (
+    SHADOW_ALIAS,
+    Cohort,
+    CohortEvent,
+    ComparisonRun,
+)
+from taryx.core.migration.services import (
+    MigrationError,
+    decide_discrepancy,
+    evaluation_blockers,
+    routing_for,
+    run_comparison,
+    transition_cohort,
+)
 from taryx.core.pricing.engine import RatingError
 from taryx.core.pricing.models import RatingLine, RatingRun
 from taryx.core.pricing.services import rate_account
@@ -266,6 +280,92 @@ class BillingOperationType(DjangoObjectType):
         )
 
 
+class DecisionType(graphene.ObjectType):
+    fingerprint = graphene.String(required=True)
+    classification = graphene.String(required=True)
+    actor = graphene.String()
+    reason = graphene.String()
+
+
+class CohortType(DjangoObjectType):
+    members = graphene.List(AccountType, required=True)
+    blockers = graphene.List(graphene.String, required=True)
+    decisions = graphene.List(DecisionType, required=True)
+
+    class Meta:
+        model = Cohort
+        fields = (
+            "id",
+            "name",
+            "routing_mode",
+            "routing_revision",
+            "eval_period_start",
+            "eval_period_end",
+            "eval_frozen_at",
+        )
+
+    def resolve_members(cohort, info):
+        return cohort.members.all()
+
+    def resolve_blockers(cohort, info):
+        return evaluation_blockers(
+            cohort, tariffs=TARIFFS, gst_rate=GST_RATE, policy_identity=POLICY_IDENTITY
+        )
+
+    def resolve_decisions(cohort, info):
+        return [
+            DecisionType(
+                fingerprint=d.fingerprint,
+                classification=d.classification,
+                actor=d.actor.username,
+                reason=d.reason,
+            )
+            for d in cohort.discrepancydecision_set.order_by("created_at")
+        ]
+
+
+class ComparisonRunType(DjangoObjectType):
+    account = graphene.Field(AccountType, required=True)
+    report = graphene.JSONString()
+
+    class Meta:
+        model = ComparisonRun
+        fields = (
+            "id",
+            "period_start",
+            "period_end",
+            "snapshot_hash",
+            "new_engine_version",
+            "legacy_version_token",
+            "policy_identity",
+            "status",
+            "failure_code",
+            "created_at",
+        )
+
+    def resolve_report(row, info):
+        return row.report_json
+
+
+class CohortEventType(DjangoObjectType):
+    actor = graphene.String()
+
+    class Meta:
+        model = CohortEvent
+        fields = (
+            "id",
+            "action",
+            "from_mode",
+            "to_mode",
+            "routing_revision",
+            "detail",
+            "created_at",
+        )
+
+    def resolve_actor(event, info):
+        return event.actor.username if event.actor else None
+
+
 class UserType(graphene.ObjectType):
     username = graphene.String(required=True)
     role = graphene.String()
@@ -311,6 +411,27 @@ class Query(graphene.ObjectType):
     billing_operation = graphene.Field(
         BillingOperationType, operation_id=graphene.String(required=True)
     )
+
+    cohorts = graphene.List(CohortType, required=True)
+    comparisons = graphene.List(ComparisonRunType, required=True, account_ref=graphene.String())
+    cohort_events = graphene.List(
+        CohortEventType, required=True, cohort_id=graphene.Int(required=True)
+    )
+
+    def resolve_cohorts(root, info):
+        _require_auth(info)
+        return Cohort.objects.order_by("name")
+
+    def resolve_comparisons(root, info, account_ref=None):
+        _require_auth(info)
+        qs = ComparisonRun.objects.using(SHADOW_ALIAS).order_by("-created_at")[:50]
+        if account_ref:
+            return [c for c in qs if c.account.reference == account_ref]
+        return list(qs)
+
+    def resolve_cohort_events(root, info, cohort_id):
+        _require_auth(info)
+        return CohortEvent.objects.filter(cohort_id=cohort_id).order_by("-created_at")[:50]
 
     def resolve_ping(root, info):
         return "pong"
@@ -531,7 +652,16 @@ class BillAccount(graphene.Mutation):
         if run is None:
             return BillPayload(ok=False, code="no_rating_run", message="rate first")
         try:
-            op = admit_issue(account, period_start, period_end, run, operation_id)
+            mode, revision = routing_for(account)
+            op = admit_issue(
+                account,
+                period_start,
+                period_end,
+                run,
+                operation_id,
+                cohort_mode=mode,
+                cohort_revision=revision,
+            )
         except AdmissionError as exc:
             return BillPayload(ok=False, code=exc.code, message=str(exc))
         audit_record(
@@ -579,6 +709,127 @@ class ResolveQuarantine(graphene.Mutation):
         return ResolvePayload(ok=True, quarantine=quarantine)
 
 
+class ShadowPayload(graphene.ObjectType):
+    ok = graphene.Boolean(required=True)
+    code = graphene.String()
+    message = graphene.String()
+    comparison = graphene.Field(ComparisonRunType)
+
+
+class RunShadowComparison(graphene.Mutation):
+    class Arguments:
+        reference = graphene.String(required=True)
+        period_start = graphene.Date(required=True)
+        period_end = graphene.Date(required=True)
+
+    Output = ShadowPayload
+
+    def mutate(root, info, reference, period_start, period_end):
+        _require_group(info, "operator", "approver")
+        account = Account.objects.filter(reference=reference).first()
+        if account is None:
+            return ShadowPayload(ok=False, code="not_found", message="unknown account")
+        run = (
+            RatingRun.objects.filter(
+                account=account, period_start=period_start, period_end=period_end
+            )
+            .order_by("-id")
+            .first()
+        )
+        if run is None:
+            return ShadowPayload(ok=False, code="no_rating_run", message="rate first")
+        row = run_comparison(run)
+        audit_record(
+            _actor(info),
+            "migration.compare",
+            reference,
+            comparison_id=row.id,
+            status=row.status,
+        )
+        return ShadowPayload(ok=True, comparison=row)
+
+
+class DecidePayload(graphene.ObjectType):
+    ok = graphene.Boolean(required=True)
+    code = graphene.String()
+    message = graphene.String()
+
+
+class DecideDiscrepancy(graphene.Mutation):
+    class Arguments:
+        cohort_id = graphene.Int(required=True)
+        fingerprint = graphene.String(required=True)
+        classification = graphene.String(required=True)
+        reason = graphene.String(required=True)
+
+    Output = DecidePayload
+
+    def mutate(root, info, cohort_id, fingerprint, classification, reason):
+        _require_group(info, "operator", "approver")
+        cohort = Cohort.objects.filter(pk=cohort_id).first()
+        if cohort is None:
+            return DecidePayload(ok=False, code="not_found", message="unknown cohort")
+        try:
+            decide_discrepancy(
+                cohort=cohort,
+                fingerprint=fingerprint,
+                classification=classification,
+                actor=_user(info),
+                reason=reason,
+            )
+        except MigrationError as exc:
+            return DecidePayload(ok=False, code=exc.code, message=str(exc))
+        audit_record(
+            _actor(info),
+            "migration.decision",
+            f"cohort:{cohort_id}",
+            fingerprint=fingerprint,
+            classification=classification,
+        )
+        return DecidePayload(ok=True)
+
+
+class TransitionPayload(graphene.ObjectType):
+    ok = graphene.Boolean(required=True)
+    code = graphene.String()
+    message = graphene.String()
+    cohort = graphene.Field(CohortType)
+
+
+class TransitionCohort(graphene.Mutation):
+    class Arguments:
+        cohort_id = graphene.Int(required=True)
+        to_mode = graphene.String(required=True)
+        expected_revision = graphene.Int(required=True)
+        reason = graphene.String()
+
+    Output = TransitionPayload
+
+    def mutate(root, info, cohort_id, to_mode, expected_revision, reason=None):
+        _require_group(info, "approver")
+        try:
+            cohort = transition_cohort(
+                cohort_id,
+                to_mode,
+                expected_revision,
+                _user(info),
+                reason=reason or "",
+                tariffs=TARIFFS,
+                gst_rate=GST_RATE,
+                policy_identity=POLICY_IDENTITY,
+            )
+        except MigrationError as exc:
+            return TransitionPayload(ok=False, code=exc.code, message=str(exc))
+        audit_record(
+            _actor(info),
+            "migration.transition",
+            f"cohort:{cohort_id}",
+            to_mode=to_mode,
+            revision=cohort.routing_revision,
+        )
+        return TransitionPayload(ok=True, cohort=cohort)
+
+
 class Mutation(graphene.ObjectType):
     login = Login.Field()
     logout = Logout.Field()
@@ -586,6 +837,9 @@ class Mutation(graphene.ObjectType):
     rate_account = RateAccount.Field()
     bill_account = BillAccount.Field()
     resolve_quarantine = ResolveQuarantine.Field()
+    run_shadow_comparison = RunShadowComparison.Field()
+    decide_discrepancy = DecideDiscrepancy.Field()
+    transition_cohort = TransitionCohort.Field()
 
 
 schema = graphene.Schema(query=Query, mutation=Mutation)

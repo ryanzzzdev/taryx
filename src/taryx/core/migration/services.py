@@ -11,6 +11,7 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
+from taryx.core.accounts.models import Account
 from taryx.core.billing.models import BillingOperation
 from taryx.core.migration import comparison
 from taryx.core.migration.legacy_adapter import (
@@ -78,10 +79,57 @@ def run_comparison(rating_run: RatingRun, *, base_url: str | None = None) -> Com
             )
         return run_row
 
+    return _persist_comparison(rating_run, result)
+
+
+def routing_for(account: Account) -> tuple[str, int]:
+    """The authoritative routing mode + revision for an account.
+
+    Accounts in no cohort are on the new engine already."""
+    cohort = Cohort.objects.filter(members=account).first()
+    if cohort is None:
+        return ("new_only", 0)
+    return (cohort.routing_mode, cohort.routing_revision)
+
+
+def calculate_for_billing(op, *, base_url: str | None = None) -> dict:
+    """Legacy-authoritative amounts for a billing operation.
+
+    Under SHADOW the same response also feeds a persisted comparison —
+    the new engine's run is the comparison subject, the legacy result
+    is the authoritative amount basis.
+    """
+    rating_run = op.rating_run
+    request = build_request(rating_run.input_snapshot, rating_run.input_digest)
+    result = calculate(
+        request,
+        base_url=base_url or settings.LEGACY_BASE_URL,
+        timeout=settings.LEGACY_TIMEOUT_SECONDS,
+    )
+    _persist_legacy_result(result)
+    if op.cohort_mode == Cohort.Mode.SHADOW:
+        _persist_comparison(rating_run, result)
+    return {
+        "charge": sum(
+            (line.amount for line in result.lines if line.element in {"import", "supply"}),
+            Decimal(0),
+        ),
+        "export": -sum(
+            (line.amount for line in result.lines if line.element == "export_credit"),
+            Decimal(0),
+        ),
+        "gst": result.gst,
+        "net": result.net,
+        "total": result.total,
+    }
+
+
+def _persist_comparison(rating_run: RatingRun, result) -> ComparisonRun:
+    account = rating_run.account
     legacy_calc = _persist_legacy_result(result)
     data = comparison.report(rating_run, result, account.reference)
     with transaction.atomic(using=SHADOW_ALIAS):
-        run_row, _ = ComparisonRun.objects.using(SHADOW_ALIAS).get_or_create(
+        row, _ = ComparisonRun.objects.using(SHADOW_ALIAS).get_or_create(
             snapshot_hash=rating_run.input_digest,
             legacy_version_token=result.version_token,
             defaults={
@@ -96,7 +144,7 @@ def run_comparison(rating_run: RatingRun, *, base_url: str | None = None) -> Com
                 "report_json": data,
             },
         )
-    return run_row
+    return row
 
 
 def _persist_legacy_result(result) -> LegacyCalculation:
@@ -255,3 +303,46 @@ def transition_cohort(
             detail={"reason": reason},
         )
     return cohort
+
+
+def decide_discrepancy(
+    *, cohort: Cohort, fingerprint: str, classification: str, actor, reason: str
+) -> DiscrepancyDecision:
+    """Record a scoped decision for one diff fingerprint.
+
+    The decision pins the versions and snapshot hash of the latest cohort
+    evidence carrying that fingerprint — it cannot bless a difference it
+    never saw, nor carry forward to changed inputs or engines.
+    """
+    if classification not in DiscrepancyDecision.Classification.values:
+        raise MigrationError("bad_classification", f"unknown classification {classification!r}")
+    comparisons = (
+        ComparisonRun.objects.using(SHADOW_ALIAS)
+        .filter(
+            account__in=cohort.members.all(),
+            period_start=cohort.eval_period_start,
+            period_end=cohort.eval_period_end,
+        )
+        .order_by("-created_at")
+    )
+    source = next(
+        (
+            c
+            for c in comparisons
+            if any(d["fingerprint"] == fingerprint for d in c.report_json.get("diffs", []))
+        ),
+        None,
+    )
+    if source is None:
+        raise MigrationError("diff_not_found", "no cohort evidence carries that fingerprint")
+    return DiscrepancyDecision.objects.create(
+        cohort=cohort,
+        fingerprint=fingerprint,
+        snapshot_hash=source.snapshot_hash,
+        new_engine_version=source.new_engine_version,
+        legacy_version_token=source.legacy_version_token,
+        policy_identity=source.policy_identity,
+        classification=classification,
+        actor=actor,
+        reason=reason,
+    )

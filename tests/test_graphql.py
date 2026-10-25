@@ -8,6 +8,7 @@ problems.
 """
 
 import json
+from datetime import date as dd
 from decimal import Decimal
 from pathlib import Path
 
@@ -416,3 +417,102 @@ def test_login_rotates_csrf_token(seeded):
         **origin,
     )
     assert accepted.status_code == 200
+
+
+# --- TAR-012: migration journey ------------------------------------------
+
+
+@pytest.mark.django_db(databases=["default", "shadow"], transaction=True)
+def test_migration_journey_permissions_and_guards():
+    """Viewer reads evidence; operator decides; approver transitions;
+    stale revisions are rejected."""
+    from taryx.core.migration.seed import seed_migration_cohort
+
+    seed_demo_data()
+    seed_operator_identities()
+    cohort = seed_migration_cohort()
+
+    client = Client()
+    login(client, "viewer")
+    data = gql(client, "{cohorts{name routingMode routingRevision members{reference}}}")
+    [c] = data["data"]["cohorts"]
+    assert c["name"] == "Legacy Cohort A"
+    assert c["routingMode"] == "LEGACY_ONLY"
+    assert {m["reference"] for m in c["members"]} == {"ACC-001", "ACC-003"}
+
+    # Viewers cannot decide or transition.
+    out = gql(
+        client,
+        "mutation{decideDiscrepancy(cohortId:" + str(cohort.id) + ',fingerprint:"x",'
+        'classification:"preserve_client_policy",reason:"r"){ok code}}',
+    )
+    assert out["errors"][0]["extensions"]["code"] == "permission_denied"
+
+    login(client, "approver")
+    out = gql(
+        client,
+        'mutation($c:Int!){transitionCohort(cohortId:$c,toMode:"shadow",'
+        "expectedRevision:99){ok code}}",
+        c=cohort.id,
+    )
+    assert out["data"]["transitionCohort"] == {
+        "ok": False,
+        "code": "stale_revision",
+    }
+    out = gql(
+        client,
+        'mutation($c:Int!){transitionCohort(cohortId:$c,toMode:"shadow",'
+        "expectedRevision:1){ok code cohort{routingMode routingRevision}}}",
+        c=cohort.id,
+    )
+    assert out["data"]["transitionCohort"]["ok"]
+    assert out["data"]["transitionCohort"]["cohort"]["routingRevision"] == 2
+    assert out["data"]["transitionCohort"]["cohort"]["routingMode"] == "SHADOW"
+
+    # Rollback is permitted; the event log records both transitions.
+    out = gql(
+        client,
+        'mutation($c:Int!){transitionCohort(cohortId:$c,toMode:"legacy_only",'
+        "expectedRevision:2){ok}}",
+        c=cohort.id,
+    )
+    assert out["data"]["transitionCohort"]["ok"]
+    events = gql(client, "query($c:Int!){cohortEvents(cohortId:$c){action toMode}}", c=cohort.id)[
+        "data"
+    ]["cohortEvents"]
+    assert [e["toMode"] for e in events] == ["legacy_only", "shadow"]
+
+    # In-flight billing blocks any mode change.
+
+    from taryx.core.accounts.models import Account
+    from taryx.core.billing.models import BillingOperation
+    from taryx.core.metering.ingestion import ingest_nem12_content
+    from taryx.core.pricing.services import rate_account
+    from taryx.territories.au_nem.tariffs import GST_RATE, POLICY_IDENTITY, TARIFFS
+
+    ingest_nem12_content(load("day1_base.nem12").encode(), "day1_base.nem12")
+    account = Account.objects.get(reference="ACC-001")
+    run = rate_account(
+        account,
+        dd(2026, 3, 2),
+        dd(2026, 3, 3),
+        tariffs=TARIFFS,
+        gst_rate=GST_RATE,
+        policy_identity=POLICY_IDENTITY,
+    )
+    BillingOperation.objects.create(
+        operation_id="OP-INFLIGHT",
+        account=account,
+        period_start=dd(2026, 3, 2),
+        period_end=dd(2026, 3, 3),
+        rating_run=run,
+        payload_sha256="x",
+        status="pending",
+    )
+    out = gql(
+        client,
+        'mutation($c:Int!){transitionCohort(cohortId:$c,toMode:"shadow",'
+        "expectedRevision:3){ok code}}",
+        c=cohort.id,
+    )
+    assert out["data"]["transitionCohort"]["code"] == "in_flight"

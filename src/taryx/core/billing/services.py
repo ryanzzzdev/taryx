@@ -44,9 +44,29 @@ class AdmissionError(ValueError):
         super().__init__(detail)
 
 
-def _payload_sha(account: Account, period_start, period_end, rating_run: RatingRun) -> str:
+class CalculationUnavailable(Exception):
+    """The pinned authoritative engine could not produce a result.
+
+    Transient by definition: the operation stays PENDING (in-flight) so
+    it also blocks cohort mode changes until it resolves or is replaced.
+    """
+
+    def __init__(self, code: str, detail: str):
+        self.code = code
+        super().__init__(detail)
+
+
+def _payload_sha(
+    account: Account,
+    period_start,
+    period_end,
+    rating_run: RatingRun,
+    cohort_mode: str,
+    cohort_revision: int,
+) -> str:
     return hashlib.sha256(
-        f"{account.reference}|{period_start}|{period_end}|{rating_run.id}".encode()
+        f"{account.reference}|{period_start}|{period_end}|{rating_run.id}"
+        f"|{cohort_mode}|{cohort_revision}".encode()
     ).hexdigest()
 
 
@@ -56,6 +76,9 @@ def admit_issue(
     period_end,
     rating_run: RatingRun,
     operation_id: str,
+    *,
+    cohort_mode: str = "new_only",
+    cohort_revision: int = 0,
 ) -> BillingOperation:
     """Durably admit a billing operation and its outbox event atomically.
 
@@ -65,7 +88,9 @@ def admit_issue(
     fast-path task afterwards; if the broker is down the pending outbox
     event is recovered by drain_outbox.
     """
-    payload = _payload_sha(account, period_start, period_end, rating_run)
+    payload = _payload_sha(
+        account, period_start, period_end, rating_run, cohort_mode, cohort_revision
+    )
     try:
         with transaction.atomic():
             op = BillingOperation.objects.create(
@@ -75,6 +100,8 @@ def admit_issue(
                 period_end=period_end,
                 rating_run=rating_run,
                 payload_sha256=payload,
+                cohort_mode=cohort_mode,
+                cohort_revision=cohort_revision,
             )
             OutboxEvent.objects.create(operation=op, topic=TOPIC_ISSUE)
         return op
@@ -109,6 +136,7 @@ def _run_amounts(run: RatingRun) -> dict[str, Decimal]:
             start=zero,
         ),
         "gst": run.gst,
+        "net": run.net,
         "total": run.total,
     }
 
@@ -145,9 +173,20 @@ def _signed_leg(journal: JournalEntry, code: str, delta: Decimal, memo: str) -> 
     return _leg(journal, code, max(delta, 0), max(-delta, 0), memo)
 
 
-def _issue(op: BillingOperation) -> Invoice:
+def _authoritative_amounts(op: BillingOperation, legacy_calculator) -> dict[str, Decimal]:
+    """Amounts per the op's pinned routing mode: under legacy_only/shadow
+    the legacy calculator is authoritative; otherwise the rating run."""
+    if op.cohort_mode in {"legacy_only", "shadow"}:
+        if legacy_calculator is None:
+            raise CalculationUnavailable(
+                "no_calculator", "no legacy calculator configured for legacy routing"
+            )
+        return legacy_calculator(op)
+    return _run_amounts(op.rating_run)
+
+
+def _issue(op: BillingOperation, amounts: dict[str, Decimal]) -> Invoice:
     run = op.rating_run
-    amounts = _run_amounts(run)
     invoice = Invoice.objects.create(
         number=_next_number("billing_invoice_number_seq", "INV"),
         account=op.account,
@@ -155,9 +194,10 @@ def _issue(op: BillingOperation) -> Invoice:
         period_end=op.period_end,
         rating_run=run,
         input_digest=run.input_digest,
-        net=run.net,
-        gst=run.gst,
-        total=run.total,
+        calculation_source=("legacy" if op.cohort_mode in {"legacy_only", "shadow"} else "new"),
+        net=amounts["net"],
+        gst=amounts["gst"],
+        total=amounts["total"],
     )
     journal = JournalEntry.objects.create(
         invoice=invoice,
@@ -178,13 +218,15 @@ def _issue(op: BillingOperation) -> Invoice:
     return invoice
 
 
-def _post_correction(op: BillingOperation, invoice: Invoice, generation: int) -> Adjustment:
-    """Append a linked adjustment reconciling the revised run against the
-    liability already recognised on this invoice (invoice row lock held)."""
+def _post_correction(
+    op: BillingOperation, invoice: Invoice, generation: int, revised: dict[str, Decimal]
+) -> Adjustment:
+    """Append a linked adjustment reconciling the revised calculation
+    against the liability already recognised on this invoice (invoice
+    row lock held)."""
     run = op.rating_run
-    revised = _run_amounts(run)
     recognised = _recognised_amounts(invoice)
-    delta = {key: revised[key] - recognised[key] for key in revised}
+    delta = {key: revised[key] - recognised[key] for key in recognised}
     adjustment = Adjustment.objects.create(
         number=_next_number("billing_adjustment_number_seq", "ADJ"),
         invoice=invoice,
@@ -225,7 +267,11 @@ def _finish(op: BillingOperation, status: str, detail: str = "") -> BillingOpera
 
 
 def process_operation(
-    operation_id: str, *, digest_resolver: Callable[[Account, object, object], str]
+    operation_id: str,
+    *,
+    digest_resolver: Callable[[Account, object, object], str],
+    routing_resolver: Callable[[Account], tuple[str, int]] | None = None,
+    legacy_calculator: Callable[[BillingOperation], dict] | None = None,
 ) -> BillingOperation:
     """Process one admitted operation idempotently under its row lock.
 
@@ -247,6 +293,29 @@ def process_operation(
                 BillingOperation.Status.STALE,
                 "input selection changed since the pinned rating run",
             )
+
+        # Routing pin re-check: the cohort mode/revision this op was
+        # admitted under must still be current. (Mode changes are already
+        # blocked while ops are pending; this guard also catches a cohort
+        # membership adopted after admission.)
+        if routing_resolver is not None:
+            current_mode, current_revision = routing_resolver(op.account)
+            if (current_mode, current_revision) != (
+                op.cohort_mode,
+                op.cohort_revision,
+            ):
+                return _finish(
+                    op,
+                    BillingOperation.Status.STALE,
+                    "cohort routing changed since admission",
+                )
+
+        # Under legacy routing the authoritative amounts come from a
+        # remote call that also writes shadow-alias evidence. It must run
+        # BEFORE lock_inputs: the shadow connection's FK checks wait on
+        # FOR UPDATE locks held by this transaction (account lock →
+        # deadlock the database cannot detect cross-connection).
+        amounts = _authoritative_amounts(op, legacy_calculator)
 
         # Commit-safe revalidation: lock the account and every row feeding
         # the digest, then recompute under those locks. Any input change
@@ -278,7 +347,7 @@ def process_operation(
         if invoice is None:
             try:
                 with transaction.atomic():
-                    invoice = _issue(op)
+                    invoice = _issue(op, amounts)
             except IntegrityError as exc:
                 # Only the generation-key uniqueness violation means a
                 # racing issuance already posted; anything else is a real
@@ -309,7 +378,10 @@ def process_operation(
             else:
                 op.invoice = invoice
                 op.adjustment = _post_correction(
-                    op, invoice, generation=(latest.generation if latest else 0) + 1
+                    op,
+                    invoice,
+                    generation=(latest.generation if latest else 0) + 1,
+                    revised=amounts,
                 )
 
         _finish(op, BillingOperation.Status.COMPLETE)
@@ -319,7 +391,11 @@ def process_operation(
 
 
 def drain_outbox(
-    *, digest_resolver: Callable[[Account, object, object], str], limit: int = 200
+    *,
+    digest_resolver: Callable[[Account, object, object], str],
+    routing_resolver: Callable[[Account], tuple[str, int]] | None = None,
+    legacy_calculator: Callable[[BillingOperation], dict] | None = None,
+    limit: int = 200,
 ) -> list[BillingOperation]:
     """Recover pending outbox events (broker outage, lost tasks)."""
     pending = list(
@@ -328,5 +404,11 @@ def drain_outbox(
         .values_list("operation__operation_id", flat=True)[:limit]
     )
     return [
-        process_operation(operation_id, digest_resolver=digest_resolver) for operation_id in pending
+        process_operation(
+            operation_id,
+            digest_resolver=digest_resolver,
+            routing_resolver=routing_resolver,
+            legacy_calculator=legacy_calculator,
+        )
+        for operation_id in pending
     ]

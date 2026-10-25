@@ -24,6 +24,11 @@ class BillingOperation(models.Model):
     period_end = models.DateField()
     rating_run = models.ForeignKey(RatingRun, on_delete=models.PROTECT, related_name="billing_ops")
     payload_sha256 = models.CharField(max_length=64)
+    # Cohort routing pinned at admission (resolved by the caller — billing
+    # stays unaware of the migration app): which engine is authoritative
+    # for this op and which routing revision it was admitted under.
+    cohort_mode = models.CharField(max_length=16, default="new_only")
+    cohort_revision = models.PositiveIntegerField(default=0)
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.PENDING)
     invoice = models.ForeignKey(
         "Invoice", null=True, blank=True, on_delete=models.PROTECT, related_name="+"
@@ -63,6 +68,9 @@ class Invoice(models.Model):
     period_end = models.DateField()
     rating_run = models.ForeignKey(RatingRun, on_delete=models.PROTECT)
     input_digest = models.CharField(max_length=64)
+    # "new" = Taryx rating run; "legacy" = authoritative figures from the
+    # pinned legacy calculation (cohort routing modes legacy/shadow).
+    calculation_source = models.CharField(max_length=8, default="new")
     net = models.DecimalField(max_digits=14, decimal_places=2)
     gst = models.DecimalField(max_digits=14, decimal_places=2)
     total = models.DecimalField(max_digits=14, decimal_places=2)
