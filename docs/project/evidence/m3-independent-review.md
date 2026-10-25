@@ -145,3 +145,32 @@ F1–F4 resolved; all five follow-up probes pass and are folded into `tests/test
 - **F4**: `_decimal` rejects non-finite values; reconciliation arithmetic runs inside the failure boundary (InvalidOperation → malformed); all five metadata fields must be non-empty strings — both `sNaN` and null-version bodies now persist INCONCLUSIVE.
 
 Verification: 13/13 preserved M3 probes (8 original + 5 follow-up); 145 pytest total; ruff/format/mypy/import contracts clean. Live: rollback-correction cycle and failure-blocking semantics re-verified against the real legacy service.
+
+
+## Independent re-review — `db18588`, 2026-10-25
+
+Verdict: **one P1 finding remains in F2; M3 stays In progress**. F1 (latest failure), F3 (rollback correction uniqueness) and F4 (invalid response values) pass their original probes. The previous F2 interleaving before the second gate also passes. TAR-010 remains Done; TAR-011/TAR-012 are reopened for the remaining cutover boundary.
+
+### P1 — Evidence updates can still commit after final validation
+
+Locations: `src/taryx/core/migration/services.py:63–81` (failed-attempt upsert) and `306–331` (final gate under account locks).
+
+Account locks do not serialize updates to existing ComparisonRun rows. The shadow connection updates these rows without taking the same account/revision lock; unchanged foreign-key values do not force a conflicting account-row lock. Reproduction:
+
+1. Record an unavailable comparison, then a successful retry and valid decisions. The gate is clean.
+2. Begin cutover and let its second, complete gate evaluation read that successful evidence while holding account locks.
+3. Before the route commit, publish another failed attempt by updating the existing unavailable row through the actual shadow database connection.
+4. The update commits without waiting; cutover nevertheless commits NEW_ONLY using its earlier clean result.
+
+[m3_commit_window_probe.py](m3_commit_window_probe.py) deterministically reproduces this transaction interleaving with real PostgreSQL connections. It accepts either blocked evidence publication (bounded by a two-second statement timeout) or rejected cutover; current code does neither. The legacy failure is injected at the adapter boundary; successful evidence comes from the independently launched legacy simulator.
+
+Use a shared serialization/revision protocol between cutover and **all gate-affecting writers**, including updates to existing evidence and decisions. Pin the evidence evaluated until the route commits. Adding another unlocked read merely moves the race window. Keep the restricted shadow role's financial-write prohibition intact.
+
+### Verification
+
+- `make check`: passes, including **145 backend tests**, **6 frontend tests**, formatter/lint, mypy, import contracts/negative probe, TypeScript and build.
+- All saved M1/M2/M3 probes through `m3_followup_probes.py`: **31 passed**.
+- New saved commit-window probe: **1 failed**. Command: `POSTGRES_DB=taryx_review_window uv run pytest docs/project/evidence/m3_commit_window_probe.py -c pyproject.toml -q`. The separate test database allowed this probe to run independently of the main suite; no persistent demo financial data changed.
+- No new browser campaign; this re-review targets the changed backend safety boundary. No application fixes, commits or pushes.
+
+Next action: complete F2's serialization guarantee, then rerun the saved probes and normal checks. Earlier findings and implementer addenda remain historical.

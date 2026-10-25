@@ -1,5 +1,6 @@
 # Taryx architecture
 
+Current independent verification at `db18588`: one cutover evidence-update race remains (F2); see [review](evidence/m3-independent-review.md). Other prior finding probes pass.
 Date: 2026-10-25
 Status: Planning baseline. Concept choices are accepted through the user's agreement with the reviewed project direction. Detailed contracts below are design selections within the requested planning work, subject to the named verification gates. M1 implementation is verified against the original review findings. M2 findings from the [independent review](evidence/m2-independent-review.md) are remediated and re-verified. Unimplemented sections remain design intent.
 

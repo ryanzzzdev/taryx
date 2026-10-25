@@ -15,7 +15,7 @@ Task sections own status; index icons mirror them. See the [documentation guide]
 - ✅ [TAR-007 — Implement durable issuance and balanced posting](#tar-007)
 - ✅ [TAR-008 — Implement successive corrections and adjustments](#tar-008)
 - ✅ [TAR-009 — Deliver the core operator journey](#tar-009)
-- 🟢 [TAR-010 — Build independent legacy characterisation](#tar-010)
+- ✅ [TAR-010 — Build independent legacy characterisation](#tar-010)
 - 🟢 [TAR-011 — Implement isolated shadow comparison and gates](#tar-011)
 - 🟢 [TAR-012 — Deliver operator migration and cutover](#tar-012)
 - 📋 [TAR-013 — Demonstrate two isolated client instances](#tar-013)
@@ -27,9 +27,11 @@ Task sections own status; index icons mirror them. See the [documentation guide]
 
 ## Delivery notes
 
-M2 re-review findings are remediated and verified (both follow-up probes pass; see the [review](evidence/m2-independent-review.md)). Independent M3 re-review of `f9f21df` found F1–F4; all resolved and re-verified (13/13 preserved probes pass). Next action: TAR-013 (M4). Later tasks remain Backlog until their dependencies and detailed contracts are ready. Portal/API slices can develop alongside their backend tasks; TAR-009 and TAR-012 own integrated acceptance. Observability hooks and correctness tests accompany implementation; TAR-016 owns the full cross-service campaign, not the first tests.
+M2 re-review findings are remediated and verified (both follow-up probes pass; see the [review](evidence/m2-independent-review.md)). Independent M3 re-review of `f9f21df` found F1–F4; all resolved and re-verified (13/13 preserved probes pass). Next action: close the remaining F2 cutover race in TAR-011/TAR-012 before M4. Later tasks remain Backlog until their dependencies and detailed contracts are ready. Portal/API slices can develop alongside their backend tasks; TAR-009 and TAR-012 own integrated acceptance. Observability hooks and correctness tests accompany implementation; TAR-016 owns the full cross-service campaign, not the first tests.
 
 The architecture and functional scope are the planning baseline; exact schemas, dependency versions and open profiles are refined in their named tasks. Split large tasks into new IDs before starting if necessary; preserve existing history. Next unused ID: TAR-019. M1 remains verified; M2 remediation is re-verified.
+
+Current re-review of `db18588`: F1/F3/F4 and all existing probes pass; F2 still permits an evidence update after final gate validation. See [review](evidence/m3-independent-review.md).
 
 <a id="tar-001"></a>
 
@@ -349,7 +351,7 @@ Re-remediated 2026-10-25: AccountPanel is keyed by account.reference so switchin
 - Area: migration
 - Milestone: M3
 - Priority: High
-- Status: Ready 🟢
+- Status: Done ✅
 - Depends on: TAR-009
 - References: [Contract](features/legacy-migration.md)
 
@@ -374,6 +376,8 @@ Refine and mark Ready once dependencies pass; record relevant gate resolutions b
 Reopened by independent review of `c06e1fc` (2026-10-25); all eight findings remediated and the eight preserved probes now pass as permanent regressions in tests/test_migration.py — see the [remediation addendum](evidence/m3-independent-review.md#remediation-addendum--2026-10-25).
 
 Independent re-review of `f9f21df` found F1–F4; all remediated with the five follow-up probes passing as permanent regressions — see the [second remediation addendum](evidence/m3-independent-review.md#second-remediation-addendum--2026-10-25).
+
+Re-review at `db18588`: TAR-010 remediation verified by all original adapter and invalid-response probes plus the full suite. Remaining F2 cutover serialization belongs to TAR-011/TAR-012.
 
 <a id="tar-011"></a>
 
@@ -410,6 +414,8 @@ Reopened by independent review of `c06e1fc` (2026-10-25); all eight findings rem
 
 Independent re-review of `f9f21df` found F1–F4; all remediated with the five follow-up probes passing as permanent regressions — see the [second remediation addendum](evidence/m3-independent-review.md#second-remediation-addendum--2026-10-25).
 
+Reopened at `db18588`: one P1 F2 race remains after the final gate read. Share the serialization protocol with evidence/decision writers; see [re-review and probe](evidence/m3-independent-review.md). Other original findings pass their regression checks.
+
 <a id="tar-012"></a>
 
 ## TAR-012 — Deliver operator migration and cutover
@@ -443,6 +449,8 @@ Rollback concerns future routing only; issued bills are never reversed. Residual
 Reopened by independent review of `c06e1fc` (2026-10-25); all eight findings remediated and the eight preserved probes now pass as permanent regressions in tests/test_migration.py — see the [remediation addendum](evidence/m3-independent-review.md#remediation-addendum--2026-10-25).
 
 Independent re-review of `f9f21df` found F1–F4; all remediated with the five follow-up probes passing as permanent regressions — see the [second remediation addendum](evidence/m3-independent-review.md#second-remediation-addendum--2026-10-25).
+
+Reopened at `db18588`: one P1 F2 race remains after the final gate read. Share the serialization protocol with evidence/decision writers; see [re-review and probe](evidence/m3-independent-review.md). Other original findings pass their regression checks.
 
 <a id="tar-013"></a>
 
