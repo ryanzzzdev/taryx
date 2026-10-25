@@ -129,7 +129,10 @@ def _persist_comparison(rating_run: RatingRun, result) -> ComparisonRun:
     legacy_calc = _persist_legacy_result(result)
     data = comparison.report(rating_run, result, account.reference)
     with transaction.atomic(using=SHADOW_ALIAS):
-        row, _ = ComparisonRun.objects.using(SHADOW_ALIAS).get_or_create(
+        # Re-verified success updates the stable comparison identity and
+        # bumps updated_at — an intervening failed attempt is retained but
+        # no longer the latest conclusive observation.
+        row, _ = ComparisonRun.objects.using(SHADOW_ALIAS).update_or_create(
             snapshot_hash=rating_run.input_digest,
             legacy_version_token=result.version_token,
             defaults={
@@ -141,6 +144,7 @@ def _persist_comparison(rating_run: RatingRun, result) -> ComparisonRun:
                 "new_engine_version": rating_run.engine_version,
                 "policy_identity": rating_run.policy_identity,
                 "status": data["status"],
+                "failure_code": None,
                 "report_json": data,
             },
         )
@@ -205,18 +209,22 @@ def evaluation_blockers(
                 period_start=cohort.eval_period_start,
                 period_end=cohort.eval_period_end,
             )
-            .order_by("-created_at")
+            .order_by("-updated_at")
         )
         ref = f"{account.reference}"
-        if not comparisons:
-            blockers.append(f"missing_evidence: no comparison for {ref}")
+        conclusive = [c for c in comparisons if c.status != ComparisonRun.Status.INCONCLUSIVE]
+        if not conclusive:
+            if comparisons:
+                latest_attempt = comparisons[0]
+                blockers.append(
+                    f"inconclusive: {ref} comparison failed ({latest_attempt.failure_code})"
+                )
+            else:
+                blockers.append(f"missing_evidence: no comparison for {ref}")
             continue
-        latest = comparisons[0]
-        if latest.created_at < cohort.eval_frozen_at:
+        latest = conclusive[0]
+        if latest.updated_at < cohort.eval_frozen_at:
             blockers.append(f"stale_window: {ref} evidence predates the freeze")
-            continue
-        if latest.status == ComparisonRun.Status.INCONCLUSIVE:
-            blockers.append(f"inconclusive: {ref} comparison failed ({latest.failure_code})")
             continue
         current_digest = compute_input_digest(
             account,
@@ -232,18 +240,25 @@ def evaluation_blockers(
         if latest.policy_identity != policy_identity:
             blockers.append(f"stale_policy: {ref} evidence predates {policy_identity}")
             continue
+        latest_diffs = {d["fingerprint"] for d in latest.report_json.get("diffs", [])}
         decided = {
-            d.fingerprint
+            d.fingerprint: d.classification
             for d in DiscrepancyDecision.objects.using(SHADOW_ALIAS).filter(cohort=cohort)
             if d.is_valid_for(latest)
         }
-        unresolved = [
-            d["fingerprint"]
-            for d in latest.report_json.get("diffs", [])
-            if d["fingerprint"] not in decided
-        ]
-        for fp in unresolved:
-            blockers.append(f"unresolved_difference: {ref} {fp[:12]}")
+        for fp in sorted(latest_diffs):
+            classification = decided.get(fp)
+            if classification is None:
+                blockers.append(f"unresolved_difference: {ref} {fp[:12]}")
+            elif classification == DiscrepancyDecision.Classification.PRESERVE_CLIENT_POLICY:
+                # A preserved policy must be implemented by the new
+                # engine — evidenced by the fingerprint no longer
+                # appearing. A still-present difference means the policy
+                # would be dropped by cutover.
+                blockers.append(f"unpreserved_policy: {ref} {fp[:12]}")
+        # A preserve decision whose fingerprint is absent from the latest
+        # diffs is satisfied: the new engine now produces the preserved
+        # behaviour, evidenced by the difference disappearing.
     return blockers
 
 
@@ -290,6 +305,45 @@ def transition_cohort(
             )
             if blockers:
                 raise MigrationError("gate_blocked", "; ".join(blockers))
+            # Commit-safe revalidation: lock every member account row,
+            # then re-verify freshness and in-flight state. Inputs or ops
+            # committed during gate evaluation are now visible (stale →
+            # reject); ones still in flight block on the account lock and
+            # can only commit after this transaction — i.e. after cutover.
+            members = list(Account.objects.filter(cohort=cohort).order_by("pk").select_for_update())
+            for account in members:
+                latest = (
+                    ComparisonRun.objects.using(SHADOW_ALIAS)
+                    .exclude(status=ComparisonRun.Status.INCONCLUSIVE)
+                    .filter(
+                        account=account,
+                        period_start=cohort.eval_period_start,
+                        period_end=cohort.eval_period_end,
+                    )
+                    .order_by("-updated_at")
+                    .first()
+                )
+                current_digest = compute_input_digest(
+                    account,
+                    cohort.eval_period_start,
+                    cohort.eval_period_end,
+                    tariffs=tariffs,
+                    gst_rate=gst_rate,
+                    policy_identity=policy_identity,
+                )
+                if (
+                    latest is None
+                    or latest.snapshot_hash != current_digest
+                    or latest.policy_identity != policy_identity
+                ):
+                    raise MigrationError(
+                        "stale_evidence",
+                        f"{account.reference} inputs or policy changed during gate evaluation",
+                    )
+            if BillingOperation.objects.filter(
+                account__in=members, status=BillingOperation.Status.PENDING
+            ).exists():
+                raise MigrationError("in_flight", "billing admitted during gate evaluation")
         cohort.routing_mode = to_mode
         cohort.routing_revision += 1
         cohort.save(update_fields=["routing_mode", "routing_revision"])

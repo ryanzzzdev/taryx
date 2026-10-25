@@ -94,6 +94,10 @@ class ComparisonRun(models.Model):
     failure_code = models.CharField(max_length=32, null=True, blank=True)
     report_json = models.JSONField(default=dict)
     created_at = models.DateTimeField(auto_now_add=True)
+    # Last verified observation for this comparison identity — a later
+    # successful retry refreshes it so it supersedes an intervening
+    # failed attempt for gate freshness; failed attempts are retained.
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         # Same snapshot + same engines → the same comparison identity;

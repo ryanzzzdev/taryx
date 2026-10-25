@@ -41,3 +41,7 @@ class TariffSpec:
     supply_per_day: Decimal
     import_bands: tuple[RateBand, ...]
     export_credit_per_kwh: Decimal | None = None
+    # A preserved client commitment (e.g. pre-GST heritage contract) —
+    # the new engine must implement it for a preserve-policy decision to
+    # be satisfiable at cutover.
+    gst_exempt: bool = False

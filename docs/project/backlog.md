@@ -15,9 +15,9 @@ Task sections own status; index icons mirror them. See the [documentation guide]
 - ✅ [TAR-007 — Implement durable issuance and balanced posting](#tar-007)
 - ✅ [TAR-008 — Implement successive corrections and adjustments](#tar-008)
 - ✅ [TAR-009 — Deliver the core operator journey](#tar-009)
-- 🟢 [TAR-010 — Build independent legacy characterisation](#tar-010)
-- 🟢 [TAR-011 — Implement isolated shadow comparison and gates](#tar-011)
-- 🟢 [TAR-012 — Deliver operator migration and cutover](#tar-012)
+- ✅ [TAR-010 — Build independent legacy characterisation](#tar-010)
+- ✅ [TAR-011 — Implement isolated shadow comparison and gates](#tar-011)
+- ✅ [TAR-012 — Deliver operator migration and cutover](#tar-012)
 - 📋 [TAR-013 — Demonstrate two isolated client instances](#tar-013)
 - 📋 [TAR-014 — Freeze the bounded market workflow](#tar-014)
 - 📋 [TAR-015 — Implement market adapter and counterparty simulator](#tar-015)
@@ -27,7 +27,7 @@ Task sections own status; index icons mirror them. See the [documentation guide]
 
 ## Delivery notes
 
-M2 re-review findings are remediated and verified (both follow-up probes pass; see the [review](evidence/m2-independent-review.md)). Next action: resolve the [independent M3 findings](evidence/m3-independent-review.md) in TAR-010–012 before M4. Later tasks remain Backlog until their dependencies and detailed contracts are ready. Portal/API slices can develop alongside their backend tasks; TAR-009 and TAR-012 own integrated acceptance. Observability hooks and correctness tests accompany implementation; TAR-016 owns the full cross-service campaign, not the first tests.
+M2 re-review findings are remediated and verified (both follow-up probes pass; see the [review](evidence/m2-independent-review.md)). Independent M3 findings resolved and re-verified (see [review](evidence/m3-independent-review.md)). Next action: TAR-013 (M4). Later tasks remain Backlog until their dependencies and detailed contracts are ready. Portal/API slices can develop alongside their backend tasks; TAR-009 and TAR-012 own integrated acceptance. Observability hooks and correctness tests accompany implementation; TAR-016 owns the full cross-service campaign, not the first tests.
 
 The architecture and functional scope are the planning baseline; exact schemas, dependency versions and open profiles are refined in their named tasks. Split large tasks into new IDs before starting if necessary; preserve existing history. Next unused ID: TAR-019. M1 remains verified; M2 remediation is re-verified.
 
@@ -349,7 +349,7 @@ Re-remediated 2026-10-25: AccountPanel is keyed by account.reference so switchin
 - Area: migration
 - Milestone: M3
 - Priority: High
-- Status: Ready 🟢
+- Status: Done ✅
 - Depends on: TAR-009
 - References: [Contract](features/legacy-migration.md)
 
@@ -371,7 +371,7 @@ Implemented 2026-10-25. `legacy-sim/` is a separate image (stdlib HTTP, own sqli
 
 Refine and mark Ready once dependencies pass; record relevant gate resolutions before dependent implementation.
 
-Reopened by independent review of `c06e1fc` (2026-10-25): see [M3 findings and reproduction evidence](evidence/m3-independent-review.md). Prior completion evidence is historical. Next action: repair the applicable adapter/version, gate/policy, recovery and portal findings; pass the formatter gate and independent probes before claiming completion.
+Reopened by independent review of `c06e1fc` (2026-10-25); all eight findings remediated and the eight preserved probes now pass as permanent regressions in tests/test_migration.py — see the [remediation addendum](evidence/m3-independent-review.md#remediation-addendum--2026-10-25).
 
 <a id="tar-011"></a>
 
@@ -381,7 +381,7 @@ Reopened by independent review of `c06e1fc` (2026-10-25): see [M3 findings and r
 - Area: migration
 - Milestone: M3
 - Priority: High
-- Status: Ready 🟢
+- Status: Done ✅
 - Depends on: TAR-010
 - References: [Contract](features/legacy-migration.md)
 
@@ -404,7 +404,7 @@ Implemented 2026-10-25. `taryx.core.migration` holds Cohort (routing mode + opti
 
 Refine and mark Ready once dependencies pass; record relevant gate resolutions before dependent implementation.
 
-Reopened by independent review of `c06e1fc` (2026-10-25): see [M3 findings and reproduction evidence](evidence/m3-independent-review.md). Prior completion evidence is historical. Next action: repair the applicable adapter/version, gate/policy, recovery and portal findings; pass the formatter gate and independent probes before claiming completion.
+Reopened by independent review of `c06e1fc` (2026-10-25); all eight findings remediated and the eight preserved probes now pass as permanent regressions in tests/test_migration.py — see the [remediation addendum](evidence/m3-independent-review.md#remediation-addendum--2026-10-25).
 
 <a id="tar-012"></a>
 
@@ -414,7 +414,7 @@ Reopened by independent review of `c06e1fc` (2026-10-25): see [M3 findings and r
 - Area: portal
 - Milestone: M3
 - Priority: High
-- Status: Ready 🟢
+- Status: Done ✅
 - Depends on: TAR-011
 - References: [Contract](features/legacy-migration.md)
 
@@ -436,7 +436,7 @@ Implemented 2026-10-25. Billing ops pin `cohort_mode`/`cohort_revision` at admis
 
 Rollback concerns future routing only; issued bills are never reversed. Residuals recorded in evidence/m3-exit-review.md.
 
-Reopened by independent review of `c06e1fc` (2026-10-25): see [M3 findings and reproduction evidence](evidence/m3-independent-review.md). Prior completion evidence is historical. Next action: repair the applicable adapter/version, gate/policy, recovery and portal findings; pass the formatter gate and independent probes before claiming completion.
+Reopened by independent review of `c06e1fc` (2026-10-25); all eight findings remediated and the eight preserved probes now pass as permanent regressions in tests/test_migration.py — see the [remediation addendum](evidence/m3-independent-review.md#remediation-addendum--2026-10-25).
 
 <a id="tar-013"></a>
 

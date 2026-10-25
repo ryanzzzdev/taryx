@@ -138,7 +138,11 @@ def rate(
     ) -> ComputedLine:
         sign = Decimal(-1) if element == "export_credit" else Decimal(1)
         amount = _round(sign * quantity * rate_)
-        gst = _round(amount * gst_rate) if element in GSTABLE_ELEMENTS else Decimal(0)
+        gst = (
+            _round(amount * gst_rate)
+            if element in GSTABLE_ELEMENTS and not spec.gst_exempt
+            else Decimal(0)
+        )
         return ComputedLine(
             agreement_id=agreement.agreement_id,
             tariff_code=spec.code,

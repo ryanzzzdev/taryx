@@ -506,6 +506,8 @@ type Diff = {
 type Comparison = {
   id: number;
   account: { reference: string };
+  periodStart: string;
+  periodEnd: string;
   status: string;
   failureCode: string | null;
   snapshotHash: string;
@@ -519,6 +521,7 @@ type Decision = {
   classification: string;
   actor: string | null;
   reason: string;
+  valid: boolean;
 };
 type Cohort = {
   id: number;
@@ -546,11 +549,11 @@ function MigrationPanel({ role }: { role: string }) {
   const refresh = useCallback(() => {
     gql<{ cohorts: Cohort[] }>(
       `{cohorts{id name routingMode routingRevision evalPeriodStart evalPeriodEnd
-        blockers members{reference} decisions{fingerprint classification actor reason}}}`,
+        blockers members{reference} decisions{fingerprint classification actor reason valid}}}`,
     ).then((d) => setCohorts(d.cohorts));
     gql<{ comparisons: Comparison[] }>(
-      `{comparisons{id account{reference} status failureCode snapshotHash
-        newEngineVersion legacyVersionToken createdAt report}}`,
+      `{comparisons{id account{reference} periodStart periodEnd status failureCode
+        snapshotHash newEngineVersion legacyVersionToken createdAt report}}`,
     ).then((d) => setComparisons(d.comparisons));
   }, []);
   useEffect(refresh, [refresh]);
@@ -600,10 +603,15 @@ function MigrationPanel({ role }: { role: string }) {
       <strong>Migration cohorts</strong>
       {msg && <p style={mono}>{msg}</p>}
       {cohorts.map((c) => {
-        const decided = new Set(c.decisions.map((d) => d.fingerprint));
+        const decisions = new Map(c.decisions.map((d) => [d.fingerprint, d]));
         const members = new Set(c.members.map((m) => m.reference));
         const evidence = comparisons
-          .filter((row) => members.has(row.account.reference))
+          .filter(
+            (row) =>
+              members.has(row.account.reference) &&
+              row.periodStart >= c.evalPeriodStart &&
+              row.periodEnd <= c.evalPeriodEnd,
+          )
           .map((row) => ({
             ...row,
             parsed: JSON.parse(row.report) as { diffs: Diff[] },
@@ -635,37 +643,34 @@ function MigrationPanel({ role }: { role: string }) {
                     {d.element}
                     {d.band ? `/${d.band}` : ""} {d.field}: new={d.new} legacy=
                     {d.legacy}
-                    {decided.has(d.fingerprint) ? (
-                      <span>
-                        {" "}
-                        — decided (
-                        {
-                          c.decisions.find((x) => x.fingerprint === d.fingerprint)
-                            ?.classification
-                        }
-                        )
-                      </span>
-                    ) : (
-                      canDecide && (
+                    {(() => {
+                      const dec = decisions.get(d.fingerprint);
+                      if (dec?.valid)
+                        return <span> — decided ({dec.classification})</span>;
+                      return (
                         <span>
-                          {" "}
-                          <button
-                            onClick={() =>
-                              decide(c, d, "preserve_client_policy")
-                            }
-                          >
-                            preserve policy
-                          </button>{" "}
-                          <button
-                            onClick={() =>
-                              decide(c, d, "approved_defect_correction")
-                            }
-                          >
-                            approve correction
-                          </button>
+                          {dec ? " — stale decision (re-decide) " : " "}
+                          {canDecide && (
+                            <span>
+                              <button
+                                onClick={() =>
+                                  decide(c, d, "preserve_client_policy")
+                                }
+                              >
+                                preserve policy
+                              </button>{" "}
+                              <button
+                                onClick={() =>
+                                  decide(c, d, "approved_defect_correction")
+                                }
+                              >
+                                approve correction
+                              </button>
+                            </span>
+                          )}
                         </span>
-                      )
-                    )}
+                      );
+                    })()}
                   </div>
                 ))}
               </div>

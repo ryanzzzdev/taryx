@@ -97,6 +97,9 @@ class Adjustment(models.Model):
     invoice = models.ForeignKey(Invoice, on_delete=models.PROTECT, related_name="adjustments")
     rating_run = models.ForeignKey(RatingRun, on_delete=models.PROTECT)
     input_digest = models.CharField(max_length=64)
+    # Authoritative engine for this generation — the same input digest
+    # under a different engine is a different generation, not a retry.
+    calculation_source = models.CharField(max_length=8, default="new")
     generation = models.PositiveIntegerField()
     delta_charge = models.DecimalField(max_digits=14, decimal_places=2)
     delta_export = models.DecimalField(max_digits=14, decimal_places=2)

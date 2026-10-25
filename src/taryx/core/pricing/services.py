@@ -75,6 +75,7 @@ def _input_payload(
                 "export_credit_per_kwh": (
                     str(spec.export_credit_per_kwh) if spec.export_credit_per_kwh else None
                 ),
+                "gst_exempt": spec.gst_exempt,
             }
             for code, spec in sorted(tariffs.items())
         },

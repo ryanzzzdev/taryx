@@ -194,7 +194,7 @@ def _issue(op: BillingOperation, amounts: dict[str, Decimal]) -> Invoice:
         period_end=op.period_end,
         rating_run=run,
         input_digest=run.input_digest,
-        calculation_source=("legacy" if op.cohort_mode in {"legacy_only", "shadow"} else "new"),
+        calculation_source=_op_source(op),
         net=amounts["net"],
         gst=amounts["gst"],
         total=amounts["total"],
@@ -218,6 +218,10 @@ def _issue(op: BillingOperation, amounts: dict[str, Decimal]) -> Invoice:
     return invoice
 
 
+def _op_source(op: BillingOperation) -> str:
+    return "legacy" if op.cohort_mode in {"legacy_only", "shadow"} else "new"
+
+
 def _post_correction(
     op: BillingOperation, invoice: Invoice, generation: int, revised: dict[str, Decimal]
 ) -> Adjustment:
@@ -232,6 +236,7 @@ def _post_correction(
         invoice=invoice,
         rating_run=run,
         input_digest=run.input_digest,
+        calculation_source=_op_source(op),
         generation=generation,
         delta_charge=delta["charge"],
         delta_export=delta["export"],
@@ -365,11 +370,14 @@ def process_operation(
             run = op.rating_run
             latest = invoice.adjustments.order_by("-generation").first()
             recognised = latest or invoice
-            if recognised.input_digest == run.input_digest:
-                # Repeat of the currently recognised generation.
+            op_source = _op_source(op)
+            same_source = recognised.calculation_source == op_source
+            if recognised.input_digest == run.input_digest and same_source:
+                # Repeat of the currently recognised generation — same
+                # inputs under the same authoritative engine.
                 op.invoice = invoice
                 op.adjustment = latest
-            elif run.id <= recognised.rating_run_id:
+            elif run.id <= recognised.rating_run_id and same_source:
                 return _finish(
                     op,
                     BillingOperation.Status.STALE,

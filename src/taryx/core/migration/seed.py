@@ -25,9 +25,7 @@ def seed_migration_cohort() -> Cohort:
     members = Account.objects.filter(reference__in=["ACC-001", "ACC-003"])
     elsewhere = {
         m.account_id
-        for m in CohortMembership.objects.filter(account__in=members).exclude(
-            cohort=cohort
-        )
+        for m in CohortMembership.objects.filter(account__in=members).exclude(cohort=cohort)
     }
     if elsewhere:
         refs = [a.reference for a in members if a.id in elsewhere]

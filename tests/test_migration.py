@@ -518,8 +518,7 @@ def test_legacy_routed_invoice_uses_legacy_amounts(legacy):
     # Legacy truncated B1 9.6 → 9 kWh: net 7.85 / total 8.68, not 7.82/8.65.
     assert (invoice.net, invoice.total) == (Decimal("7.85"), Decimal("8.68"))
     legs = {
-        p.account_code: p.debit - p.credit
-        for p in invoice.journal_entries.get().postings.all()
+        p.account_code: p.debit - p.credit for p in invoice.journal_entries.get().postings.all()
     }
     assert legs["1100"] == Decimal("8.68")
     assert legs["4100"] == Decimal("0.45")  # truncated export credit
@@ -534,9 +533,7 @@ def test_shadow_issues_legacy_and_records_comparison(legacy):
     op = _process(op.operation_id, legacy)
     assert op.status == "complete"
     assert op.invoice.calculation_source == "legacy"
-    row = ComparisonRun.objects.using(SHADOW_ALIAS).get(
-        snapshot_hash=run.input_digest
-    )
+    row = ComparisonRun.objects.using(SHADOW_ALIAS).get(snapshot_hash=run.input_digest)
     assert row.status == "difference"
 
 
@@ -547,9 +544,7 @@ def test_routing_change_since_admission_stales_the_op(legacy):
     cohort = _cohort(None)
     account, run = _rated(None)
     op = _admit(account, run, cohort)
-    Cohort.objects.filter(pk=cohort.pk).update(
-        routing_mode="shadow", routing_revision=4
-    )
+    Cohort.objects.filter(pk=cohort.pk).update(routing_mode="shadow", routing_revision=4)
     op = _process(op.operation_id, legacy)
     assert op.status == "stale"
     assert "routing" in op.detail
@@ -585,9 +580,7 @@ def test_correction_under_legacy_uses_legacy_amounts(legacy):
     op = _admit(account, run, cohort)
     _process(op.operation_id, legacy)
 
-    ingest_nem12_content(
-        (FIXTURES / "day1_rev1.nem12").read_bytes(), "day1_rev1.nem12"
-    )
+    ingest_nem12_content((FIXTURES / "day1_rev1.nem12").read_bytes(), "day1_rev1.nem12")
     run2 = rate_account(
         account,
         DAY,
@@ -609,3 +602,186 @@ def test_graphql_migration_permissions(db, client, legacy):
     """Cohort queries need auth; decisions allow operator; transitions
     require approver."""
     pass  # exercised in test_graphql.py
+
+
+def _approve_all(cohort, row, actor=None, preserve_fields=("gst", "gst_total")):
+    """Decide every diff in a comparison report — preserve for policy
+    fields, defect-correction otherwise."""
+    from taryx.core.migration.services import decide_discrepancy
+
+    actor = actor or User.objects.create_user("decider")
+    for diff in row.report_json["diffs"]:
+        decide_discrepancy(
+            cohort=cohort,
+            fingerprint=diff["fingerprint"],
+            classification=(
+                "preserve_client_policy"
+                if diff["field"] in preserve_fields
+                else "approved_defect_correction"
+            ),
+            actor=actor,
+            reason="test decision",
+        )
+    return actor
+
+
+def test_preserved_policy_survives_cutover(legacy):
+    """R1: a preserve-policy decision only passes the gate when the new
+    engine evidences the policy — the heritage exemption produces a
+    zero-GST invoice after cutover."""
+    cohort = _cohort(None, refs=("ACC-003",))
+    account, run = _rated(None, "acc3_heritage_day.nem12", "ACC-003")
+    row = run_comparison(run, base_url=legacy)
+    actor = _approve_all(cohort, row)
+    cohort = transition_cohort(cohort.id, "new_only", 3, actor, **GATE)
+    op = _process(_admit(account, run, cohort).operation_id, legacy)
+    assert op.invoice.gst == 0
+
+
+def test_preserve_decision_on_still_different_policy_blocks(legacy):
+    """R1 converse: a preserve decision on a difference the new engine
+    still produces is an unpreserved_policy blocker."""
+    from taryx.core.migration.services import decide_discrepancy
+
+    cohort = _cohort(None)
+    account, run = _rated(None)
+    row = run_comparison(run, base_url=legacy)
+    actor = User.objects.create_user("p")
+    fp = row.report_json["diffs"][0]["fingerprint"]
+    decide_discrepancy(
+        cohort=cohort,
+        fingerprint=fp,
+        classification="preserve_client_policy",
+        actor=actor,
+        reason="keep legacy behaviour",
+    )
+    blockers = evaluation_blockers(cohort, **GATE)
+    assert any(b.startswith("unpreserved_policy") for b in blockers)
+
+
+def test_successful_retry_supersedes_failed_attempt(legacy):
+    """R4: a re-verified success is the latest conclusive observation;
+    the intervening failed attempt is retained, not governing."""
+    cohort = _cohort(None, refs=("ACC-001",))
+    account, run = _rated(None)
+    row = run_comparison(run, base_url=legacy)
+    _approve_all(cohort, row)
+    _set_fault(legacy, "unavailable")
+    try:
+        failed = run_comparison(run, base_url=legacy)
+    finally:
+        _set_fault(legacy, "ok")
+    assert failed.status == "inconclusive"
+    retry = run_comparison(run, base_url=legacy)
+    assert retry.pk == row.pk  # same comparison identity
+    assert evaluation_blockers(cohort, **GATE) == []
+    assert ComparisonRun.objects.using(SHADOW_ALIAS).filter(status="inconclusive").exists()
+
+
+def test_engine_upgrade_gets_new_comparison_identity(legacy):
+    """R3: engine_version is part of comparison identity."""
+    from dataclasses import replace
+    from unittest.mock import patch
+
+    from taryx.core.migration import services
+    from taryx.core.migration.legacy_adapter import build_request, calculate
+
+    account, run = _rated(None)
+    result = calculate(build_request(run.input_snapshot, run.input_digest), base_url=legacy)
+    with patch.object(services, "calculate", return_value=result):
+        first = run_comparison(run)
+    with patch.object(services, "calculate", return_value=replace(result, engine_version="2.0.0")):
+        second = run_comparison(run)
+    assert first.pk != second.pk
+
+
+def test_drain_outbox_command_recovers_legacy_op(legacy, settings):
+    """R5: the CLI recovery path composes the same dependencies as the
+    worker task."""
+    from django.core.management import call_command
+
+    settings.LEGACY_BASE_URL = legacy
+    cohort = _cohort(None, refs=("ACC-001",))
+    account, run = _rated(None)
+    op = _admit(account, run, cohort)
+    call_command("drain_outbox")
+    op.refresh_from_db()
+    assert op.status == "complete"
+
+
+def test_cutover_revalidates_inputs_committed_during_gate(legacy):
+    """R2: a revision committed between gate evaluation and route commit
+    is detected — cutover rejects rather than using stale evidence."""
+    from concurrent.futures import ThreadPoolExecutor
+    from unittest.mock import patch
+
+    from django.db import close_old_connections
+
+    from taryx.core.migration import services
+
+    cohort = _cohort(None, refs=("ACC-001",))
+    account, run = _rated(None)
+    row = run_comparison(run, base_url=legacy)
+    actor = _approve_all(cohort, row)
+    original = services.evaluation_blockers
+
+    def race(*args, **kwargs):
+        result = original(*args, **kwargs)
+
+        def revise():
+            close_old_connections()
+            try:
+                ingest_nem12_content((FIXTURES / "day1_rev1.nem12").read_bytes(), "race")
+            finally:
+                close_old_connections()
+
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            pool.submit(revise).result(timeout=20)
+        return result
+
+    with (
+        patch.object(services, "evaluation_blockers", side_effect=race),
+        pytest.raises(MigrationError),
+    ):
+        services.transition_cohort(cohort.id, "new_only", 3, actor, **GATE)
+
+
+def test_correction_after_cutover_uses_new_amounts(legacy):
+    """R6: engine identity is part of the generation — an explicit
+    correction under the new engine produces an adjustment against the
+    legacy-recognised liability."""
+    cohort = _cohort(None, refs=("ACC-001",))
+    account, run = _rated(None)
+    first = _process(_admit(account, run, cohort).operation_id, legacy)
+    row = run_comparison(run, base_url=legacy)
+    actor = _approve_all(cohort, row)
+    cohort = transition_cohort(cohort.id, "new_only", 3, actor, **GATE)
+    run2 = rate_account(
+        account, DAY, NEXT, tariffs=TARIFFS, gst_rate=GST_RATE, policy_identity=POLICY_IDENTITY
+    )
+    second = _process(_admit(account, run2, cohort, "OP-NEW").operation_id, legacy)
+    assert second.adjustment is not None
+    assert second.adjustment.delta_total == run2.total - first.invoice.total
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        [],
+        {"protocol": "taryx-legacy/1", "lines": [], "net": "0", "gst": "0", "total": "0"},
+    ],
+)
+def test_malformed_json_shapes_persist_inconclusive(legacy, payload):
+    """R8: valid-JSON-but-invalid-shape responses normalise to
+    INCONCLUSIVE evidence that blocks the gate."""
+    from unittest.mock import MagicMock, patch
+
+    account, run = _rated(None)
+    response = MagicMock()
+    response.__enter__.return_value = response
+    response.status = 200
+    response.read.return_value = json.dumps(payload).encode()
+    with patch("urllib.request.urlopen", return_value=response):
+        row = run_comparison(run, base_url=legacy)
+    assert row.status == "inconclusive"
+    assert row.failure_code == "malformed"

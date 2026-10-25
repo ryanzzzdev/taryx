@@ -285,6 +285,9 @@ class DecisionType(graphene.ObjectType):
     classification = graphene.String(required=True)
     actor = graphene.String()
     reason = graphene.String()
+    # Whether the decision still pins the latest cohort evidence carrying
+    # its fingerprint — stale decisions need re-approval, not reuse.
+    valid = graphene.Boolean(required=True)
 
 
 class CohortType(DjangoObjectType):
@@ -313,12 +316,36 @@ class CohortType(DjangoObjectType):
         )
 
     def resolve_decisions(cohort, info):
+        evidence = list(
+            ComparisonRun.objects.using(SHADOW_ALIAS)
+            .filter(
+                account__in=cohort.members.all(),
+                period_start=cohort.eval_period_start,
+                period_end=cohort.eval_period_end,
+            )
+            .order_by("-updated_at")
+        )
+
+        def valid(d) -> bool:
+            carrier = next(
+                (
+                    c
+                    for c in evidence
+                    if any(
+                        x["fingerprint"] == d.fingerprint for x in c.report_json.get("diffs", [])
+                    )
+                ),
+                None,
+            )
+            return carrier is not None and d.is_valid_for(carrier)
+
         return [
             DecisionType(
                 fingerprint=d.fingerprint,
                 classification=d.classification,
                 actor=d.actor.username,
                 reason=d.reason,
+                valid=valid(d),
             )
             for d in cohort.discrepancydecision_set.order_by("created_at")
         ]

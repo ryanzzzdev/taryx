@@ -60,7 +60,7 @@ class LegacyResult:
 
     @property
     def version_token(self) -> str:
-        return f"{self.engine}:{self.catalogue_version}"
+        return f"{self.engine}:{self.engine_version}:{self.catalogue_version}"
 
 
 def build_request(payload: dict, snapshot_hash: str) -> dict:
@@ -114,7 +114,9 @@ def _decimal(raw, field: str) -> Decimal:
         raise LegacyFailure("malformed", f"{field} is not decimal: {raw!r}") from exc
 
 
-def _parse(result: dict) -> LegacyResult:
+def _parse(result) -> LegacyResult:
+    if not isinstance(result, dict):
+        raise LegacyFailure("malformed", f"response is not an object: {type(result).__name__}")
     if result.get("protocol") != PROTOCOL:
         raise LegacyFailure(
             "version_mismatch", f"protocol {result.get('protocol')!r} != {PROTOCOL!r}"
@@ -149,17 +151,20 @@ def _parse(result: dict) -> LegacyResult:
         raise LegacyFailure("malformed", "gst does not equal sum of line gst")
     if net + gst != total:
         raise LegacyFailure("malformed", "total does not equal net + gst")
-    return LegacyResult(
-        engine=result["engine"],
-        engine_version=result["engine_version"],
-        catalogue_version=result["catalogue_version"],
-        snapshot_hash=result["snapshot_hash"],
-        request_id=result["request_id"],
-        lines=lines,
-        net=net,
-        gst=gst,
-        total=total,
-    )
+    try:
+        return LegacyResult(
+            engine=result["engine"],
+            engine_version=result["engine_version"],
+            catalogue_version=result["catalogue_version"],
+            snapshot_hash=result["snapshot_hash"],
+            request_id=result["request_id"],
+            lines=lines,
+            net=net,
+            gst=gst,
+            total=total,
+        )
+    except (KeyError, TypeError) as exc:
+        raise LegacyFailure("malformed", f"response metadata invalid: {exc}") from exc
 
 
 def calculate(request: dict, *, base_url: str, timeout: float = 5.0) -> LegacyResult:

@@ -86,3 +86,19 @@ Validate the complete response shape/metadata and numeric domain before use; nor
 ## Next action
 
 Resolve R1–R8 and the formatter gate, fold meaningful probes into the normal suite, then re-review cutover and recovery before beginning M4. Keep prior decisions/evidence and financial records intact.
+
+## Remediation addendum — 2026-10-25
+
+All eight findings resolved and verified; probes folded into `tests/test_migration.py` (nine new regressions).
+
+- **R1**: `TariffSpec.gst_exempt` implemented; engine honours it and the digest payload pins it; `T-FLAT-FIT-HERITAGE` now carries the preserved exemption under catalogue `2026-10-25.3`. The gate reports `unpreserved_policy` when a valid preserve decision's fingerprint still appears in the latest evidence — preservation must be implemented and evidenced, not merely classified. Live: ACC-003 rates gst 0 / total 7.27; only the FIT truncation remains.
+- **R2**: `transition_cohort` revalidates after gate evaluation under member account `select_for_update` locks — input digests and policy identity re-verified, in-flight ops re-checked; concurrent revisions serialize on the account lock (commit before the lock is seen as stale, commit after lands post-cutover).
+- **R3**: `version_token` now includes `engine_version`; an engine upgrade produces a new comparison identity and invalidates scoped decisions.
+- **R4**: `ComparisonRun.updated_at` separates stable comparison identity from observation freshness — `update_or_create` refreshes conclusive evidence so a re-verified success supersedes an intervening failed attempt; failed attempts are retained. Freshness is evaluated on `updated_at`.
+- **R5**: `drain_outbox` command composes the same `routing_resolver`/`legacy_calculator` dependencies as the Celery task; verified live recovering a pending operation.
+- **R6**: `calculation_source` recorded on `Invoice` and `Adjustment`; generation identity is (engine source, input digest) — a changed authoritative engine reconciles through the normal adjustment path. Live: ACC-003 new-engine billing after cutover produced ADJ-000003 (delta 0.00, audit evidence) preserving INV-000002.
+- **R7**: `DecisionType.valid` exposes scope validity against the latest evidence carrying each fingerprint; the portal filters comparisons to the evaluation window, labels stale decisions and offers re-approval.
+- **R8**: `_parse` validates object shape and metadata inside the failure boundary — non-object and missing-metadata bodies normalise to `LegacyFailure("malformed")` and persist INCONCLUSIVE.
+- **Format gate**: `ruff format` applied; `make check` is green end-to-end (140 pytest, 6 vitest, typecheck, build, mypy, import contracts, formatter).
+
+Verification: 8/8 preserved probes pass; 140 pytest on real PostgreSQL; live re-verified (policy-evidenced comparison, clean gate, guarded cutover, zero-delta generation-change adjustment, CLI outbox recovery).
