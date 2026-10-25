@@ -16,6 +16,7 @@ INSTALLED_APPS = [
     "taryx.core.pricing",
     "taryx.core.billing",
     "taryx.core.migration",
+    "taryx.composition",
 ]
 
 MIDDLEWARE = [

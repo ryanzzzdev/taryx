@@ -108,6 +108,17 @@ def main() -> None:
         + ranged_400s([(1, 26, "A", "", ""), (27, 31, "A", "61", ""), (32, 48, "A", "89", "")])
     )
 
+    # Rating scenarios (RC-01..06): uniform E1-only files for T-FLAT/T-TOU and
+    # agreement-boundary accounts.
+    files["e1_flat.nem12"] = nem12([day_300("20260302", flat_e1, "A", TS0)])
+    files["e1_flat_jan.nem12"] = nem12(
+        [day_300(f"202601{d:02d}", flat_e1, "A", TS0) for d in range(1, 32)]
+    )
+    files["e1_flat_feb2028.nem12"] = nem12(
+        [day_300(f"202802{d:02d}", flat_e1, "A", TS0) for d in range(1, 30)]
+    )
+    files["e1_flat_dst.nem12"] = nem12([day_300("20261004", flat_e1, "A", TS0)])
+
     # Invalid inputs (RC-08).
     bad_uom = nem12([day_300("20260302", flat_e1, "A", TS0)]).replace("kWh", "MWh")
     files["bad_uom.nem12"] = bad_uom

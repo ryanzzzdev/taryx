@@ -18,3 +18,8 @@ def nem_interval_end_utc(
 
 def nem_intervals_per_day(interval_minutes: int) -> int:
     return (24 * 60) // interval_minutes
+
+
+def nem_local(instant: datetime) -> datetime:
+    """NEM civil datetime for a UTC instant (fixed UTC+10, no DST)."""
+    return instant.astimezone(NEM_TZ)

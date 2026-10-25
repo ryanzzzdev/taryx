@@ -11,7 +11,7 @@ Task sections own status; index icons mirror them. See the [documentation guide]
 - ✅ [TAR-003 — Bootstrap the development workspace](#tar-003)
 - ✅ [TAR-004 — Freeze domain and measurement profiles](#tar-004)
 - ✅ [TAR-005 — Implement versioned meter ingestion and fixtures](#tar-005)
-- 📋 [TAR-006 — Implement deterministic itemised rating](#tar-006)
+- ✅ [TAR-006 — Implement deterministic itemised rating](#tar-006)
 - 📋 [TAR-007 — Implement durable issuance and balanced posting](#tar-007)
 - 📋 [TAR-008 — Implement successive corrections and adjustments](#tar-008)
 - 📋 [TAR-009 — Deliver the core operator journey](#tar-009)
@@ -203,7 +203,7 @@ Remediated after the [independent M1 review](evidence/m1-exit-review.md): two-ph
 - Area: pricing
 - Milestone: M2
 - Priority: High
-- Status: Backlog 📋
+- Status: Done ✅
 - Depends on: TAR-005
 - References: [Contract](features/metering-and-rating.md)
 
@@ -223,7 +223,7 @@ Not started; no implementation or verification evidence.
 
 ### Notes
 
-Refine and mark Ready once dependencies pass; record relevant gate resolutions before dependent implementation.
+Implemented: pure engine in src/taryx/core/pricing/engine.py (separately testable), pinned RatingRun/RatingLine artifacts with input digest, fictional catalogue in src/taryx/territories/au_nem/tariffs.py injected via composition, rate_account command. RC-01..06 verified; coverage gaps, quarantines and agreement faults are explicit errors; replay deterministic. Next action: TAR-007.
 
 <a id="tar-007"></a>
 
