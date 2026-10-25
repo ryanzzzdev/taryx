@@ -174,3 +174,12 @@ Use a shared serialization/revision protocol between cutover and **all gate-affe
 - No new browser campaign; this re-review targets the changed backend safety boundary. No application fixes, commits or pushes.
 
 Next action: complete F2's serialization guarantee, then rerun the saved probes and normal checks. Earlier findings and implementer addenda remain historical.
+
+
+## Third remediation addendum — 2026-10-25
+
+F2's remaining commit-window race is resolved by a shared serialization protocol: a transaction-scoped advisory lock (`pg_advisory_xact_lock(ns, cohort_id)`) keyed on the cohort, taken by **every gate-affecting writer** before it commits — `run_comparison` (failed-attempt upserts and `_persist_comparison`, which also covers the SHADOW billing path), `decide_discrepancy`, and the seeded membership `set`. `transition_cohort` acquires the same lock after the member account locks and holds it across the full final gate re-read through the route commit. Lock ordering is consistent (account rows → advisory), so no deadlock cycle exists with the billing path. Advisory locks need no table privileges — the restricted `taryx_shadow` role takes them on the same database, and its financial-write prohibition is unchanged.
+
+An evidence write now either commits before the lock is held (then the complete re-evaluation sees and rejects it) or blocks until after the route commit — nothing can land inside the window. The `m3_commit_window_probe.py` case passes via blocked publication bounded by its statement timeout.
+
+Verification: the commit-window probe plus all 13 preserved M3 probes pass; the probe is folded into `tests/test_migration.py` alongside the updated F2 race case (32 migration tests); 146 pytest total; format/lint/mypy/import contracts clean. Verified live: a comparison write through the API container blocked 6.7s on a manually held cohort gate lock, then committed — the protocol serializes against the real database and credentials.

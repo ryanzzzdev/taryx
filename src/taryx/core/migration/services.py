@@ -8,7 +8,7 @@ itself rejects any financial write attempted from a shadow code path.
 from decimal import Decimal
 
 from django.conf import settings
-from django.db import transaction
+from django.db import connections, transaction
 from django.utils import timezone
 
 from taryx.core.accounts.models import Account
@@ -46,6 +46,28 @@ class MigrationError(Exception):
         super().__init__(detail)
 
 
+# Advisory-lock namespace for the cutover gate ("TAR").
+_GATE_LOCK_NS = 0x544152
+
+
+def _gate_lock(cohort_id: int, *, using: str) -> None:
+    """Serialize gate evaluation with gate-affecting evidence writes.
+
+    A transaction-scoped advisory lock keyed on the cohort: every writer
+    of comparison evidence, scoped decisions or memberships takes it
+    before committing, and transition_cohort holds it across the final
+    gate re-read — a committed write can never land between that read
+    and the route commit. Advisory locks need no table privileges, so
+    the restricted shadow role takes them on the same database.
+    """
+    with connections[using].cursor() as cur:
+        cur.execute("SELECT pg_advisory_xact_lock(%s, %s)", [_GATE_LOCK_NS, cohort_id])
+
+
+def _cohort_of(account: Account) -> Cohort | None:
+    return Cohort.objects.filter(members=account).first()
+
+
 def run_comparison(rating_run: RatingRun, *, base_url: str | None = None) -> ComparisonRun:
     """Call legacy for the run's snapshot and persist comparison evidence.
 
@@ -59,7 +81,10 @@ def run_comparison(rating_run: RatingRun, *, base_url: str | None = None) -> Com
     try:
         result = calculate(request, base_url=url, timeout=settings.LEGACY_TIMEOUT_SECONDS)
     except LegacyFailure as exc:
+        cohort = _cohort_of(account)
         with transaction.atomic(using=SHADOW_ALIAS):
+            if cohort is not None:
+                _gate_lock(cohort.id, using=SHADOW_ALIAS)
             run_row, _ = ComparisonRun.objects.using(SHADOW_ALIAS).update_or_create(
                 snapshot_hash=rating_run.input_digest,
                 legacy_version_token="unavailable",
@@ -128,7 +153,10 @@ def _persist_comparison(rating_run: RatingRun, result) -> ComparisonRun:
     account = rating_run.account
     legacy_calc = _persist_legacy_result(result)
     data = comparison.report(rating_run, result, account.reference)
+    cohort = _cohort_of(account)
     with transaction.atomic(using=SHADOW_ALIAS):
+        if cohort is not None:
+            _gate_lock(cohort.id, using=SHADOW_ALIAS)
         # Re-verified success updates the stable comparison identity and
         # bumps updated_at — an intervening failed attempt is retained but
         # no longer the latest conclusive observation.
@@ -311,6 +339,11 @@ def transition_cohort(
             # still in flight block on the account lock and can only
             # commit after this transaction — i.e. after cutover.
             members = list(Account.objects.filter(cohort=cohort).order_by("pk").select_for_update())
+            # Hold the shared gate lock from the final re-read through
+            # commit: writers of evidence/decisions/memberships either
+            # committed before this point (re-evaluated above) or block
+            # here and can only publish after the route commit.
+            _gate_lock(cohort.id, using="default")
             blockers = evaluation_blockers(
                 cohort,
                 tariffs=tariffs,
@@ -371,14 +404,16 @@ def decide_discrepancy(
     )
     if source is None:
         raise MigrationError("diff_not_found", "no cohort evidence carries that fingerprint")
-    return DiscrepancyDecision.objects.create(
-        cohort=cohort,
-        fingerprint=fingerprint,
-        snapshot_hash=source.snapshot_hash,
-        new_engine_version=source.new_engine_version,
-        legacy_version_token=source.legacy_version_token,
-        policy_identity=source.policy_identity,
-        classification=classification,
-        actor=actor,
-        reason=reason,
-    )
+    with transaction.atomic():
+        _gate_lock(cohort.id, using="default")
+        return DiscrepancyDecision.objects.create(
+            cohort=cohort,
+            fingerprint=fingerprint,
+            snapshot_hash=source.snapshot_hash,
+            new_engine_version=source.new_engine_version,
+            legacy_version_token=source.legacy_version_token,
+            policy_identity=source.policy_identity,
+            classification=classification,
+            actor=actor,
+            reason=reason,
+        )

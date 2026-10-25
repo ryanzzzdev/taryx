@@ -2,6 +2,7 @@
 
 from datetime import date
 
+from django.db import transaction
 from django.utils import timezone
 
 from taryx.core.accounts.models import Account
@@ -30,5 +31,11 @@ def seed_migration_cohort() -> Cohort:
     if elsewhere:
         refs = [a.reference for a in members if a.id in elsewhere]
         raise ValueError(f"accounts already belong to another cohort: {refs}")
-    cohort.members.set(members)
+    # Membership changes are gate-affecting: serialize with cutover's
+    # final gate re-read via the shared advisory lock.
+    from taryx.core.migration.services import _gate_lock
+
+    with transaction.atomic():
+        _gate_lock(cohort.id, using="default")
+        cohort.members.set(members)
     return cohort

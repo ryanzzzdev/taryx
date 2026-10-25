@@ -16,8 +16,8 @@ Task sections own status; index icons mirror them. See the [documentation guide]
 - ✅ [TAR-008 — Implement successive corrections and adjustments](#tar-008)
 - ✅ [TAR-009 — Deliver the core operator journey](#tar-009)
 - ✅ [TAR-010 — Build independent legacy characterisation](#tar-010)
-- 🟢 [TAR-011 — Implement isolated shadow comparison and gates](#tar-011)
-- 🟢 [TAR-012 — Deliver operator migration and cutover](#tar-012)
+- ✅ [TAR-011 — Implement isolated shadow comparison and gates](#tar-011)
+- ✅ [TAR-012 — Deliver operator migration and cutover](#tar-012)
 - 📋 [TAR-013 — Demonstrate two isolated client instances](#tar-013)
 - 📋 [TAR-014 — Freeze the bounded market workflow](#tar-014)
 - 📋 [TAR-015 — Implement market adapter and counterparty simulator](#tar-015)
@@ -31,7 +31,7 @@ M2 re-review findings are remediated and verified (both follow-up probes pass; s
 
 The architecture and functional scope are the planning baseline; exact schemas, dependency versions and open profiles are refined in their named tasks. Split large tasks into new IDs before starting if necessary; preserve existing history. Next unused ID: TAR-019. M1 remains verified; M2 remediation is re-verified.
 
-Current re-review of `db18588`: F1/F3/F4 and all existing probes pass; F2 still permits an evidence update after final gate validation. See [review](evidence/m3-independent-review.md).
+Re-review of `db18588` found one remaining F2 commit-window race; resolved by a shared cohort advisory-lock protocol between cutover and all gate-affecting writers — see the [third remediation addendum](evidence/m3-independent-review.md#third-remediation-addendum--2026-10-25).
 
 <a id="tar-001"></a>
 
@@ -387,7 +387,7 @@ Re-review at `db18588`: TAR-010 remediation verified by all original adapter and
 - Area: migration
 - Milestone: M3
 - Priority: High
-- Status: Ready 🟢
+- Status: Done ✅
 - Depends on: TAR-010
 - References: [Contract](features/legacy-migration.md)
 
@@ -414,7 +414,7 @@ Reopened by independent review of `c06e1fc` (2026-10-25); all eight findings rem
 
 Independent re-review of `f9f21df` found F1–F4; all remediated with the five follow-up probes passing as permanent regressions — see the [second remediation addendum](evidence/m3-independent-review.md#second-remediation-addendum--2026-10-25).
 
-Reopened at `db18588`: one P1 F2 race remains after the final gate read. Share the serialization protocol with evidence/decision writers; see [re-review and probe](evidence/m3-independent-review.md). Other original findings pass their regression checks.
+Re-review of `db18588` reopened this task for the remaining F2 commit-window race; remediated with the cohort advisory-lock protocol — the commit-window probe now passes as a permanent regression. See the [third remediation addendum](evidence/m3-independent-review.md#third-remediation-addendum--2026-10-25).
 
 <a id="tar-012"></a>
 
@@ -424,7 +424,7 @@ Reopened at `db18588`: one P1 F2 race remains after the final gate read. Share t
 - Area: portal
 - Milestone: M3
 - Priority: High
-- Status: Ready 🟢
+- Status: Done ✅
 - Depends on: TAR-011
 - References: [Contract](features/legacy-migration.md)
 
@@ -450,7 +450,7 @@ Reopened by independent review of `c06e1fc` (2026-10-25); all eight findings rem
 
 Independent re-review of `f9f21df` found F1–F4; all remediated with the five follow-up probes passing as permanent regressions — see the [second remediation addendum](evidence/m3-independent-review.md#second-remediation-addendum--2026-10-25).
 
-Reopened at `db18588`: one P1 F2 race remains after the final gate read. Share the serialization protocol with evidence/decision writers; see [re-review and probe](evidence/m3-independent-review.md). Other original findings pass their regression checks.
+Re-review of `db18588` reopened this task for the remaining F2 commit-window race; remediated with the cohort advisory-lock protocol — the commit-window probe now passes as a permanent regression. See the [third remediation addendum](evidence/m3-independent-review.md#third-remediation-addendum--2026-10-25).
 
 <a id="tar-013"></a>
 

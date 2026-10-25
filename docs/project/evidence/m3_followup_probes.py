@@ -75,7 +75,12 @@ def test_invalid_response_is_inconclusive(legacy, bad):
 
 
 def test_new_unapproved_evidence_during_cutover_is_rechecked(legacy):
+    # Updated for the shared gate-lock protocol: the write either commits
+    # before the final gate re-read (then full re-evaluation rejects the
+    # cutover) or blocks on the advisory lock — it can never land between
+    # the final read and the route commit.
     from dataclasses import replace
+    from django.db import connections, OperationalError
     from taryx.core.migration.legacy_adapter import calculate, build_request
 
     c = m._cohort(None, refs=("ACC-001",))
@@ -84,15 +89,30 @@ def test_new_unapproved_evidence_during_cutover_is_rechecked(legacy):
     actor = h.approve(c, row)
     result = calculate(build_request(r.input_snapshot, r.input_digest), base_url=legacy)
     original = services.evaluation_blockers
+    published = False
 
     def race(*args, **kwargs):
+        nonlocal published
         blockers = original(*args, **kwargs)
-        with patch.object(
-            services, "calculate", return_value=replace(result, engine_version="2.0.0")
-        ):
-            services.run_comparison(r)
+        with connections["shadow"].cursor() as cur:
+            cur.execute("SET statement_timeout='2s'")
+        try:
+            with patch.object(
+                services, "calculate", return_value=replace(result, engine_version="2.0.0")
+            ):
+                services.run_comparison(r)
+            published = True
+        except OperationalError as exc:
+            if "statement timeout" not in str(exc):
+                raise
+        finally:
+            with connections["shadow"].cursor() as cur:
+                cur.execute("SET statement_timeout=0")
         return blockers
 
     with patch.object(services, "evaluation_blockers", side_effect=race):
-        with pytest.raises(services.MigrationError):
+        try:
             services.transition_cohort(c.id, "new_only", 3, actor, **m.GATE)
+        except services.MigrationError:
+            return
+    assert not published, "NEW_ONLY committed despite evidence publishing after the final gate read"

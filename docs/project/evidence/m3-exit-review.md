@@ -8,7 +8,7 @@ Verdict: independent review of `c06e1fc` raised eight findings; all are remediat
 
 Current verdict: M3 closed — re-review findings F1–F4 remediated with all five follow-up probes passing as permanent regressions; see [second remediation addendum](m3-independent-review.md#second-remediation-addendum--2026-10-25).
 
-Current verdict at `db18588`: M3 remains open for one F2 commit-window race despite all prior probes passing. See [latest review](m3-independent-review.md).
+Current verdict at `db18588`: the F2 commit-window race is remediated via the cohort advisory-lock protocol — commit-window probe and all preserved probes pass as regressions; see the [third remediation addendum](m3-independent-review.md#third-remediation-addendum--2026-10-25). M3 closed pending re-review.
 
 ## Criterion 1 — Equivalent snapshots, line differences even when totals match
 

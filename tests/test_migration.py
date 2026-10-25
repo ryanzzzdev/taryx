@@ -860,10 +860,14 @@ def test_invalid_response_values_are_inconclusive(legacy, bad):
 
 
 def test_new_unapproved_evidence_during_cutover_is_rechecked(legacy):
-    """F2: a differently-versioned comparison committed during gate
-    evaluation is caught by the full re-evaluation under commit locks."""
+    """F2: a differently-versioned comparison arriving during gate
+    evaluation either commits before the commit lock (then the full
+    re-evaluation rejects the cutover) or blocks on the shared gate
+    lock — it can never land between the final read and route commit."""
     from dataclasses import replace
     from unittest.mock import patch
+
+    from django.db import OperationalError
 
     from taryx.core.migration import services
     from taryx.core.migration.legacy_adapter import build_request, calculate
@@ -874,17 +878,83 @@ def test_new_unapproved_evidence_during_cutover_is_rechecked(legacy):
     actor = _approve_all(cohort, row)
     result = calculate(build_request(run.input_snapshot, run.input_digest), base_url=legacy)
     original = services.evaluation_blockers
+    published = False
 
     def race(*args, **kwargs):
+        nonlocal published
         blockers = original(*args, **kwargs)
-        with patch.object(
-            services, "calculate", return_value=replace(result, engine_version="2.0.0")
-        ):
-            services.run_comparison(run)
+        with connections["shadow"].cursor() as cur:
+            cur.execute("SET statement_timeout='2s'")
+        try:
+            with patch.object(
+                services, "calculate", return_value=replace(result, engine_version="2.0.0")
+            ):
+                services.run_comparison(run)
+            published = True
+        except OperationalError as exc:
+            if "statement timeout" not in str(exc):
+                raise
+        finally:
+            with connections["shadow"].cursor() as cur:
+                cur.execute("SET statement_timeout=0")
         return blockers
 
-    with (
-        patch.object(services, "evaluation_blockers", side_effect=race),
-        pytest.raises(MigrationError),
-    ):
-        services.transition_cohort(cohort.id, "new_only", 3, actor, **GATE)
+    with patch.object(services, "evaluation_blockers", side_effect=race):
+        try:
+            services.transition_cohort(cohort.id, "new_only", 3, actor, **GATE)
+        except MigrationError:
+            return
+    assert not published, "NEW_ONLY committed despite evidence publishing after the final gate read"
+
+
+def test_existing_failure_update_cannot_bypass_final_gate(legacy):
+    """F2 commit window: an UPDATE to an existing evidence row through
+    the shadow connection is serialized with the final gate re-read —
+    it either blocks on the gate lock until after the route commit, or
+    commits early enough to be re-evaluated and reject the cutover."""
+    from unittest.mock import patch
+
+    from django.db import OperationalError
+
+    from taryx.core.migration import services
+    from taryx.core.migration.legacy_adapter import LegacyFailure
+
+    cohort = _cohort(None, refs=("ACC-001",))
+    account, run = _rated(None)
+    with patch.object(services, "calculate", side_effect=LegacyFailure("unavailable", "probe")):
+        run_comparison(run)
+    row = run_comparison(run, base_url=legacy)
+    actor = _approve_all(cohort, row)
+    original = services.evaluation_blockers
+    calls = 0
+    published = False
+
+    def race(*args, **kwargs):
+        nonlocal calls, published
+        calls += 1
+        result = original(*args, **kwargs)
+        if calls == 2:
+            with connections["shadow"].cursor() as cur:
+                cur.execute("SET statement_timeout='2s'")
+            try:
+                with patch.object(
+                    services, "calculate", side_effect=LegacyFailure("unavailable", "probe")
+                ):
+                    services.run_comparison(run)
+                published = True
+            except OperationalError as exc:
+                if "statement timeout" not in str(exc):
+                    raise
+            finally:
+                with connections["shadow"].cursor() as cur:
+                    cur.execute("SET statement_timeout=0")
+        return result
+
+    with patch.object(services, "evaluation_blockers", side_effect=race):
+        try:
+            services.transition_cohort(cohort.id, "new_only", 3, actor, **GATE)
+        except MigrationError:
+            return
+    assert not published, (
+        "NEW_ONLY committed despite failed evidence publishing after final gate read"
+    )

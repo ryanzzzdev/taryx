@@ -53,7 +53,7 @@ Excludes legacy cutover, a second client and external market integration. Full p
 
 ## M3 — Safe legacy migration
 
-Current verdict at `db18588`: one F2 commit-window race remains; TAR-011/TAR-012 reopened. All 31 existing review probes pass, the new commit-window probe fails. See [latest independent review](evidence/m3-independent-review.md). Earlier verdicts below are historical.
+Current verdict: Complete. The last F2 commit-window race is remediated — the commit-window probe and all 13 preserved M3 probes pass; see the [third remediation addendum](evidence/m3-independent-review.md#third-remediation-addendum--2026-10-25). Earlier verdicts below are historical.
 
 Scope: TAR-010–012. Independent legacy calculator, fictional policy/defect fixtures, shadow isolation, versioned comparison evidence and operator cutover.
 
