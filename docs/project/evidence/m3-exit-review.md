@@ -4,6 +4,8 @@ Date: 2026-10-25. Reviewer: Devin (SWE-2 High), campaign checkpoints TAR-010/011
 Scope: [M3 exit criteria](../roadmap.md#m3--safe-legacy-migration). Contract:
 [legacy-migration](../features/legacy-migration.md).
 
+Current verdict: independent review of `c06e1fc` reopens M3/TAR-010–012. Eight findings and eight failing probes are recorded in [independent review](m3-independent-review.md); the evidence below is the original implementer assessment.
+
 ## Criterion 1 — Equivalent snapshots, line differences even when totals match
 
 - Both engines consume `RatingRun.input_snapshot` — the same immutable payload is

@@ -1,0 +1,88 @@
+# Independent M3 review
+
+Date: 2026-10-25. Reviewed HEAD: `c06e1fc`, including M2 remediation `6e491ae` and M3 commits `370ed54`, `2ea4fb5`, `c06e1fc`.
+
+## Verdict
+
+M3 remains **In progress**. Reopen TAR-010–012 for the findings below. The independent legacy service, restricted shadow credential, itemised comparison, role checks and basic routing journey are implemented, but the policy-preservation and safe-cutover criteria are not satisfied. Original implementer evidence in [m3-exit-review.md](m3-exit-review.md) is retained as history.
+
+The earlier M2 findings pass their saved regressions: 18 M1/M2 probes pass, including rating-line insertion protection and tariff-window digest changes. Code inspection confirms account-panel remounting and account/period-keyed pending intents with identity-specific clearing. These earlier findings are closed for their tested scope; the M3 billing integration regressions below belong to TAR-012.
+
+## Findings
+
+### R1 — P1: “Preserve client policy” permits dropping the policy
+
+Location: `src/taryx/core/migration/services.py:235–243` (`evaluation_blockers`).
+
+Both classifications simply add fingerprints to the accepted set. A preserve-policy decision does not require the new engine to implement the policy or block its removal. Reproduction: compare ACC-003, classify its GST differences as preserve-client-policy, approve the defect differences, cut over, then bill. The new invoice charges **$0.78 GST** despite the preserved fictional heritage exemption. No legacy invoice exists in this probe, so it directly tests new issuance after migration.
+
+Require preserved policy to be implemented and evidenced in the new calculation before cutover (or retain legacy routing until it is). A classification is not evidence that preservation occurred. Add an end-to-end financial assertion after cutover, not only an assertion that the gate opens.
+
+### R2 — P1: Input changes can commit between gate validation and cutover
+
+Location: `src/taryx/core/migration/services.py:267–295` (`transition_cohort`).
+
+The transaction locks the cohort row, but not the account/input rows participating in freshness validation. In a separate connection, ingestion can commit a revision after `evaluation_blockers` computes a clean result and before the route is saved. The deterministic probe interleaves a real `day1_rev1.nem12` ingestion at that point: NEW_ONLY commits using now-stale evidence instead of rejecting or serialising the revision.
+
+Hold a shared input/admission revision protocol through the route commit and revalidate under it. Include concurrent membership, admission and evidence changes when testing this boundary; the existing sequential pending-operation test does not establish concurrency safety.
+
+### R3 — P1: Legacy engine upgrades reuse old comparison and decision identity
+
+Location: `src/taryx/core/migration/legacy_adapter.py:61–63` (`LegacyResult.version_token`), consumed by `services.py:132–145`.
+
+The token contains engine name and catalogue version, but **omits engine_version**. Returning the same snapshot/catalogue under engine 2.0.0 after 1.0.0 resolves to the same ComparisonRun, retaining the old report and linked calculation. Existing scoped decisions can therefore remain valid across an arithmetic engine upgrade. The probe changes only engine_version and observes the same comparison PK.
+
+Include every relevant engine/catalogue/policy version in comparison identity and approval scope, and require evidence for the deployed version at cutover. Preserve old evidence rather than silently reusing it.
+
+### R4 — P2: A successful retry cannot supersede an earlier comparison failure
+
+Location: `src/taryx/core/migration/services.py:132–145` and `evaluation_blockers` latest-created selection.
+
+Sequence: successful comparison, transient unavailable response, successful retry of the unchanged snapshot. Success uses get_or_create and returns the first success row with its original timestamp; the newer unavailable row remains the latest. The gate stays `inconclusive: ACC-001 comparison failed (unavailable)` indefinitely, despite recovery. Re-freezing the evaluation window has a related inability to produce fresh observations for unchanged inputs.
+
+Separate stable calculation/comparison identity from attempt/observation freshness. Retain failed attempts while letting a later verified success become the latest observation for gate evaluation.
+
+### R5 — P2: The documented outbox command cannot recover legacy billing
+
+Location: `src/taryx/composition/management/commands/drain_outbox.py:11`.
+
+The Celery drain wrapper injects routing and legacy calculation callbacks, but the management command still passes only digest_resolver. With a pending legacy operation, `call_command('drain_outbox')` raises `CalculationUnavailable: no legacy calculator configured for legacy routing`. It also omits routing revalidation. This breaks the broker-outage recovery path precisely when the broker task cannot be used.
+
+Use the same fully composed dependencies in all recovery entry points, and test command execution against pending LEGACY_ONLY and SHADOW operations.
+
+### R6 — P2: Billing after cutover treats a different authoritative result as a duplicate
+
+Location: `src/taryx/core/billing/services.py:368–371`.
+
+Generation equality only checks the new-engine input digest. Issue ACC-001 under legacy ($8.68), approve its defect correction and cut over, create a fresh rating run with the same inputs, then explicitly bill/correct under NEW_ONLY ($8.65). The operation completes with the original invoice and no adjustment because the input digest is unchanged. The authoritative engine/result changed, but the financial generation identity did not. This is an explicit subsequent correction request, not a request for automatic retroactive rewriting on cutover.
+
+Pin authoritative calculation identity/version/result on financial generations and distinguish retries from changed authoritative results. Preserve old invoices and reconcile changed liability through the normal adjustment path. Assert the expected −$0.03 adjustment for this fixture.
+
+### R7 — P2: Portal approval display ignores version/snapshot scope
+
+Location: `web/src/App.tsx:603` and `638–645`.
+
+The UI builds a set of all decision fingerprints and labels every matching diff “decided,” hiding its decision controls. Backend validity additionally depends on snapshot and engine/policy versions. After a reading revision that leaves one export discrepancy unchanged, that discrepancy keeps its fingerprint but needs a new scoped decision; the gate rejects the old approval while the portal still labels it decided and offers no reapproval button. Comparisons are also displayed without evaluation-period filtering.
+
+Expose validity against each current comparison, display stale decisions explicitly, and allow a new version-scoped decision. This finding is source-inspected; no automated browser stale-approval sequence was executed.
+
+### R8 — P2: Malformed JSON shapes escape the inconclusive path
+
+Location: `src/taryx/core/migration/legacy_adapter.py:117–120` and `152–158`.
+
+Valid JSON is not necessarily a valid response object. `[]` raises AttributeError at result.get; a protocol-correct object with empty lines/zero totals but missing engine metadata raises KeyError while constructing LegacyResult outside the protected parsing block. Both propagate through run_comparison without a persisted INCONCLUSIVE row, leaving any prior gate evidence untouched. The two parameterised probes reproduce these exceptions via mocked HTTP response bodies.
+
+Validate the complete response shape/metadata and numeric domain before use; normalise invalid responses into LegacyFailure('malformed') so every failed comparison attempt is persisted and blocks evaluation until recovery.
+
+## Verification
+
+- `make check` **fails** at Ruff format: `src/taryx/core/migration/seed.py` and `tests/test_migration.py`. Ruff lint passes. The implementer's green-check claim does not hold at reviewed HEAD.
+- Continued with `make typecheck contracts test web-check`: **passed**, including mypy, import contracts and deliberate negative probe, **131 pytest tests**, **6 frontend tests**, TypeScript and production build.
+- Saved M1/M2 probe command: **18 passed** (`m1_review_probes.py`, `m2_review_probes.py`, `m2_followup_probes.py`, with `-c pyproject.toml`).
+- [m3_review_probes.py](m3_review_probes.py): eight failing cases covering R1–R6 and the two R8 malformed shapes. Run with `uv run pytest docs/project/evidence/m3_review_probes.py -c pyproject.toml -q`. Uses real PostgreSQL and an independently launched legacy-sim subprocess; mocks only upgrade response metadata, malformed response bodies and the deterministic gate interleaving hook. R2's competing ingestion uses a separate database connection.
+- Local Compose api/worker/web/legacy rebuilt without resetting volumes. Actual browser renders authenticated accounts, migration cohort r4, itemised decisions and the existing malformed-response blocker. No cutover was performed against the persistent demo database. Browser stale-approval automation and a full process-kill campaign were not performed.
+- Review adds evidence/probes and project-record changes only. No application fixes, commits or pushes.
+
+## Next action
+
+Resolve R1–R8 and the formatter gate, fold meaningful probes into the normal suite, then re-review cutover and recovery before beginning M4. Keep prior decisions/evidence and financial records intact.

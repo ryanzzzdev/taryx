@@ -69,6 +69,8 @@ A calculation is pinned to meter revision selection, tariff/agreement versions, 
 
 ## Legacy migration boundary
 
+Implementation review at `c06e1fc` leaves this contract partially verified: policy preservation, commit-safe gate freshness, legacy version identity, recovery and financial generation identity need remediation. See [independent M3 review](evidence/m3-independent-review.md).
+
 Both calculators receive the same immutable input snapshot. The legacy service returns calculation evidence only; core remains the single invoice/ledger writer for this demonstration. This is a migration of calculation responsibility, not a claim to migrate an entire historical accounting database.
 
 `LEGACY_ONLY`, `SHADOW` and `NEW_ONLY` select the authoritative calculator for new operations. Existing operations retain their recorded mode/version; cutover checks for in-flight issuance or explicitly drains it. Shadow work persists comparison evidence under restricted credentials and cannot invoke issuance or write financial tables. Comparison errors are inconclusive, never parity. Reverting future routing does not reverse issued bills. See [migration contract](features/legacy-migration.md).

@@ -158,3 +158,8 @@ their coverage is folded into `tests/`:
 Verification: 2/2 follow-up probes pass; 103 pytest tests on real
 PostgreSQL; ruff/mypy/import contracts green; vitest 6/6 + typecheck +
 build; live Compose verification of the rating-line seal.
+
+
+## Confirmation during M3 review — 2026-10-25
+
+At `c06e1fc`, all 18 saved M1/M2 probes pass, including both follow-up rating cases. `6e491ae` also keys AccountPanel by account and stores pending identities by account/period with matching-ID clearing; six frontend tests pass. Earlier M2 findings are closed for that tested scope. M3 introduces separate migration/billing integration findings recorded in [its review](m3-independent-review.md).
