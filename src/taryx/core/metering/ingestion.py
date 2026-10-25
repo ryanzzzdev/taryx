@@ -252,6 +252,70 @@ def _publish_interval(batch: IngestionBatch, channel_id: int, interval_end: date
     return 1
 
 
+class ResolutionError(ValueError):
+    def __init__(self, code: str, detail: str):
+        self.code = code
+        super().__init__(detail)
+
+
+def resolve_quarantine(
+    quarantine_id: int, record_id: int, *, actor: str, reason: str
+) -> QuarantinedInterval:
+    """Approver-selected resolution for an open quarantine.
+
+    The chosen candidate must be one of the recorded conflicting records.
+    Its value is published as the current interval and the quarantine is
+    closed with the actor and reason retained."""
+    with transaction.atomic():
+        quarantine = (
+            QuarantinedInterval.objects.select_for_update()
+            .filter(pk=quarantine_id, status=QuarantinedInterval.Status.OPEN)
+            .first()
+        )
+        if quarantine is None:
+            raise ResolutionError("not_found", "quarantine not found or already resolved")
+        record = quarantine.candidate_records.filter(pk=record_id).first()
+        if record is None:
+            raise ResolutionError(
+                "not_a_candidate", f"record {record_id} is not a quarantine candidate"
+            )
+        current = (
+            CurrentInterval.objects.select_for_update()
+            .filter(
+                channel_id=quarantine.channel_id,
+                interval_end_utc=quarantine.interval_end_utc,
+            )
+            .first()
+        )
+        if current is None:
+            CurrentInterval.objects.create(
+                channel_id=quarantine.channel_id,
+                interval_end_utc=quarantine.interval_end_utc,
+                value=record.value,
+                quality=record.quality,
+                source_record=record,
+            )
+        else:
+            current.value = record.value
+            current.quality = record.quality
+            current.source_record = record
+            current.selection_version += 1
+            current.save(
+                update_fields=[
+                    "value",
+                    "quality",
+                    "source_record",
+                    "selection_version",
+                    "updated_at",
+                ]
+            )
+        quarantine.status = QuarantinedInterval.Status.RESOLVED
+        quarantine.resolved_at = timezone.now()
+        quarantine.detail = f"{quarantine.detail} | resolved by {actor}: {reason}".strip(" |")
+        quarantine.save(update_fields=["status", "resolved_at", "detail"])
+    return quarantine
+
+
 @dataclass(frozen=True)
 class ChannelCoverage:
     channel_id: int

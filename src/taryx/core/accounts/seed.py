@@ -2,6 +2,8 @@
 
 from datetime import date
 
+from django.contrib.auth.models import Group, User
+
 from taryx.core.accounts.models import (
     Account,
     MeterChannel,
@@ -71,3 +73,24 @@ def seed_demo_data() -> list[Account]:
             )
         accounts.append(account)
     return accounts
+
+
+# Development-only operator identities (decision 004). Never real customers.
+DEMO_USERS = {
+    "viewer": "taryx-viewer",
+    "operator": "taryx-operator",
+    "approver": "taryx-approver",
+}
+
+
+def seed_operator_identities() -> list[User]:
+    """Seed the viewer/operator/approver groups and one user each."""
+    users = []
+    for role, password in DEMO_USERS.items():
+        group, _ = Group.objects.get_or_create(name=role)
+        user, _ = User.objects.get_or_create(username=role)
+        user.set_password(password)
+        user.groups.set([group])
+        user.save()
+        users.append(user)
+    return users

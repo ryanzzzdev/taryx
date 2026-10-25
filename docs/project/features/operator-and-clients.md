@@ -1,7 +1,7 @@
 # Operator portal and client isolation
 
 Date: 2026-10-25
-Status: Planning contract.
+Status: TAR-009 slice implemented and verified (decision 004 contract: session auth, roles, bounded GraphQL, operation polling, audit, portal journey). Client isolation remains planning contract.
 Tasks: [TAR-009](../backlog.md#tar-009), [TAR-012](../backlog.md#tar-012), [TAR-013](../backlog.md#tar-013).
 
 ## Operator journeys

@@ -14,7 +14,7 @@ Task sections own status; index icons mirror them. See the [documentation guide]
 - ✅ [TAR-006 — Implement deterministic itemised rating](#tar-006)
 - ✅ [TAR-007 — Implement durable issuance and balanced posting](#tar-007)
 - ✅ [TAR-008 — Implement successive corrections and adjustments](#tar-008)
-- 🟢 [TAR-009 — Deliver the core operator journey](#tar-009)
+- ✅ [TAR-009 — Deliver the core operator journey](#tar-009)
 - 📋 [TAR-010 — Build independent legacy characterisation](#tar-010)
 - 📋 [TAR-011 — Implement isolated shadow comparison and gates](#tar-011)
 - 📋 [TAR-012 — Deliver operator migration and cutover](#tar-012)
@@ -27,7 +27,7 @@ Task sections own status; index icons mirror them. See the [documentation guide]
 
 ## Delivery notes
 
-Next action: TAR-009 — the core operator journey over the verified rating/issuance/correction pipeline (M2). TAR-006 through TAR-008 are implemented and verified; TAR-009's dependencies pass. Later tasks remain Backlog until their dependencies and detailed contracts are ready. Portal/API slices can develop alongside their backend tasks; TAR-009 and TAR-012 own integrated acceptance. Observability hooks and correctness tests accompany implementation; TAR-016 owns the full cross-service campaign, not the first tests.
+Next action: TAR-010 — independent legacy characterisation (M3). TAR-006 through TAR-009 are implemented and verified; the M2 exit review (docs/project/evidence/m2-exit-review.md) maps evidence to all five criteria. Later tasks remain Backlog until their dependencies and detailed contracts are ready. Portal/API slices can develop alongside their backend tasks; TAR-009 and TAR-012 own integrated acceptance. Observability hooks and correctness tests accompany implementation; TAR-016 owns the full cross-service campaign, not the first tests.
 
 The architecture and functional scope are the planning baseline; exact schemas, dependency versions and open profiles are refined in their named tasks. Split large tasks into new IDs before starting if necessary; preserve existing history. Next unused ID: TAR-019. M1 implementation remediated and re-verified.
 
@@ -294,7 +294,7 @@ Correction triggering is operator-driven (ingest revision -> rate -> bill_accoun
 - Area: portal
 - Milestone: M2
 - Priority: High
-- Status: Ready 🟢
+- Status: Done ✅
 - Depends on: TAR-008
 - References: [Contract](features/operator-and-clients.md)
 
@@ -311,11 +311,11 @@ Expose real ingestion, bill explanation and correction workflows in GraphQL and 
 
 ### Completion evidence
 
-Not started; no implementation or verification evidence.
+Contract frozen in [decision 004](decisions/004-operator-journey-contract.md): session auth + CSRF, viewer/operator/approver groups, bounded queries, payload-code mutations, operation polling on the durable operation ID. Implemented: full GraphQL schema (bounded queries, login/logout/ingest/rate/bill/resolve mutations with server-side group checks), audit app writing entries for consequential actions, approver quarantine resolution publishing the selected candidate, seeded dev identities via seed_demo, and the React portal journey (login, ingest, rate, bill/correct with operation polling, invoice/journal/adjustment display, quarantine review). 7 tests in tests/test_graphql.py cover auth negatives per role, the complete journey ending in a linked adjustment, idempotent retry, audit assertions and stable rejection codes. make check green (92 tests). Live verification: CSRF rotation enforced, viewer denied mutation, operator bill -> polled COMPLETE outcome via the real worker. [M2 exit review](evidence/m2-exit-review.md) maps evidence to all five criteria — M2 complete.
 
 ### Notes
 
-Refine and mark Ready once dependencies pass; record relevant gate resolutions before dependent implementation.
+GraphQL depth/cost bounds are not enforced beyond bounded lists (documented limitation). Browser journey verified through GraphQL contract tests and a live curl session; no browser-automation harness yet. Next action: TAR-010 (M3).
 
 <a id="tar-010"></a>
 

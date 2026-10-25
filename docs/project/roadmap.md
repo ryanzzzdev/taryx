@@ -9,7 +9,7 @@ This is the initial delivery sequence, not a calendar commitment. The earlier 6�
 | Documentation setup | Portable Cateniq-style workflow | Complete | None |
 | Planning baseline | Architecture, feature contracts and evidence-driven backlog | Complete | Documentation setup |
 | M1 — Foundation and domain profile | Reproducible workspace, sourced profile and metering history | Complete | Planning baseline |
-| M2 — Explainable bills and corrections | End-to-end operator billing with financial integrity | Planned | M1 |
+| M2 — Explainable bills and corrections | End-to-end operator billing with financial integrity | Complete | M1 |
 | M3 — Safe legacy migration | Characterisation, shadow comparison and controlled cohort cutover | Planned | M2 |
 | M4 — Client variation and market boundary | Second isolated client and bounded integration | Planned | M3 |
 | M5 — Operational portfolio delivery | Recovery evidence, Kubernetes and reproducible demonstration | Planned | M4 |
