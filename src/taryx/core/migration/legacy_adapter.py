@@ -109,9 +109,12 @@ def build_request(payload: dict, snapshot_hash: str) -> dict:
 
 def _decimal(raw, field: str) -> Decimal:
     try:
-        return Decimal(str(raw))
+        value = Decimal(str(raw))
     except InvalidOperation as exc:
         raise LegacyFailure("malformed", f"{field} is not decimal: {raw!r}") from exc
+    if not value.is_finite():
+        raise LegacyFailure("malformed", f"{field} is not finite: {raw!r}")
+    return value
 
 
 def _parse(result) -> LegacyResult:
@@ -145,26 +148,40 @@ def _parse(result) -> LegacyResult:
         total = _decimal(result["total"], "total")
     except (KeyError, TypeError, IndexError, ValueError) as exc:
         raise LegacyFailure("malformed", f"response shape invalid: {exc}") from exc
-    if sum((item.amount for item in lines), Decimal(0)) != net:
-        raise LegacyFailure("malformed", "net does not equal sum of line amounts")
-    if sum((item.gst for item in lines), Decimal(0)) != gst:
-        raise LegacyFailure("malformed", "gst does not equal sum of line gst")
-    if net + gst != total:
-        raise LegacyFailure("malformed", "total does not equal net + gst")
     try:
-        return LegacyResult(
-            engine=result["engine"],
-            engine_version=result["engine_version"],
-            catalogue_version=result["catalogue_version"],
-            snapshot_hash=result["snapshot_hash"],
-            request_id=result["request_id"],
-            lines=lines,
-            net=net,
-            gst=gst,
-            total=total,
-        )
+        if sum((item.amount for item in lines), Decimal(0)) != net:
+            raise LegacyFailure("malformed", "net does not equal sum of line amounts")
+        if sum((item.gst for item in lines), Decimal(0)) != gst:
+            raise LegacyFailure("malformed", "gst does not equal sum of line gst")
+        if net + gst != total:
+            raise LegacyFailure("malformed", "total does not equal net + gst")
+        meta = {
+            key: result[key]
+            for key in (
+                "engine",
+                "engine_version",
+                "catalogue_version",
+                "snapshot_hash",
+                "request_id",
+            )
+        }
+        if not all(isinstance(v, str) and v for v in meta.values()):
+            raise TypeError("metadata values must be non-empty strings")
+    except InvalidOperation as exc:
+        raise LegacyFailure("malformed", f"reconciliation arithmetic failed: {exc}") from exc
     except (KeyError, TypeError) as exc:
         raise LegacyFailure("malformed", f"response metadata invalid: {exc}") from exc
+    return LegacyResult(
+        engine=meta["engine"],
+        engine_version=meta["engine_version"],
+        catalogue_version=meta["catalogue_version"],
+        snapshot_hash=meta["snapshot_hash"],
+        request_id=meta["request_id"],
+        lines=lines,
+        net=net,
+        gst=gst,
+        total=total,
+    )
 
 
 def calculate(request: dict, *, base_url: str, timeout: float = 5.0) -> LegacyResult:

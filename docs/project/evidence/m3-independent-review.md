@@ -134,3 +134,14 @@ Four remaining findings (five failing cases) prevent closure:
 - No application fixes, commits or pushes. Updated evidence/status/journal only. Earlier findings remain historical; this section supersedes the implementer addendum's closure claim.
 
 Next action: resolve F1–F4 and rerun the saved probes plus normal checks before M4.
+
+## Second remediation addendum — 2026-10-25
+
+F1–F4 resolved; all five follow-up probes pass and are folded into `tests/test_migration.py`.
+
+- **F1**: the gate selects the latest observation of ANY status by `updated_at` — a failure after the last success blocks with `inconclusive:` until a re-verified success refreshes the conclusive row's `updated_at` and supersedes it. Verified live (unavailable → inconclusive blocker; retry → clean gate).
+- **F2**: `transition_cohort` re-runs the COMPLETE `evaluation_blockers` under member account locks (plus the in-flight check) before committing NEW_ONLY — evidence/decision/membership/input changes committed during the first evaluation are re-evaluated in full, not partially.
+- **F3**: `uniq_adjustment_digest` removed; `(invoice, generation)` is the financial generation identity. Successive engine transitions (legacy→new→legacy→…) reconcile through the normal adjustment path; retry idempotency is the recognised-generation check under the operation + invoice locks. Verified live: rollback produced ADJ-000005 (delta 0.00).
+- **F4**: `_decimal` rejects non-finite values; reconciliation arithmetic runs inside the failure boundary (InvalidOperation → malformed); all five metadata fields must be non-empty strings — both `sNaN` and null-version bodies now persist INCONCLUSIVE.
+
+Verification: 13/13 preserved M3 probes (8 original + 5 follow-up); 145 pytest total; ruff/format/mypy/import contracts clean. Live: rollback-correction cycle and failure-blocking semantics re-verified against the real legacy service.

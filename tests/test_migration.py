@@ -785,3 +785,106 @@ def test_malformed_json_shapes_persist_inconclusive(legacy, payload):
         row = run_comparison(run, base_url=legacy)
     assert row.status == "inconclusive"
     assert row.failure_code == "malformed"
+
+
+def test_latest_failure_blocks_even_after_previous_success(legacy):
+    """F1: a failed attempt after the last success blocks until a
+    re-verified success supersedes it."""
+    cohort = _cohort(None, refs=("ACC-001",))
+    account, run = _rated(None)
+    row = run_comparison(run, base_url=legacy)
+    _approve_all(cohort, row)
+    _set_fault(legacy, "unavailable")
+    try:
+        run_comparison(run, base_url=legacy)
+    finally:
+        _set_fault(legacy, "ok")
+    assert any(b.startswith("inconclusive:") for b in evaluation_blockers(cohort, **GATE))
+
+
+def test_cutover_then_rollback_can_correct_same_inputs(legacy):
+    """F3: successive engine transitions correct the same inputs —
+    each reconciles against recognised liability, uniqueness holds on
+    (invoice, generation)."""
+    cohort = _cohort(None, refs=("ACC-001",))
+    account, run = _rated(None)
+    _process(_admit(account, run, cohort, "first").operation_id, legacy)
+    row = run_comparison(run, base_url=legacy)
+    actor = _approve_all(cohort, row)
+    cohort = transition_cohort(cohort.id, "new_only", 3, actor, **GATE)
+    run2 = rate_account(
+        account, DAY, NEXT, tariffs=TARIFFS, gst_rate=GST_RATE, policy_identity=POLICY_IDENTITY
+    )
+    second = _process(_admit(account, run2, cohort, "second").operation_id, legacy)
+    assert second.adjustment is not None
+    cohort = transition_cohort(cohort.id, "legacy_only", cohort.routing_revision, actor, **GATE)
+    run3 = rate_account(
+        account, DAY, NEXT, tariffs=TARIFFS, gst_rate=GST_RATE, policy_identity=POLICY_IDENTITY
+    )
+    third = _process(_admit(account, run3, cohort, "third").operation_id, legacy)
+    assert third.status == "complete"
+    assert third.adjustment.delta_total == -second.adjustment.delta_total
+
+
+@pytest.mark.parametrize("bad", ["nonfinite", "null_version"])
+def test_invalid_response_values_are_inconclusive(legacy, bad):
+    """F4: non-finite decimals and null metadata normalise to
+    INCONCLUSIVE evidence rather than leaking IntegrityError/decimal
+    exceptions."""
+    from unittest.mock import MagicMock, patch
+
+    account, run = _rated(None)
+    payload = {
+        "protocol": "taryx-legacy/1",
+        "lines": [],
+        "net": "0",
+        "gst": "0",
+        "total": "0",
+        "engine": "legacy-sim",
+        "engine_version": "1.0.0",
+        "catalogue_version": "L-2003.4",
+        "snapshot_hash": run.input_digest,
+        "request_id": "review",
+    }
+    if bad == "nonfinite":
+        payload["net"] = "sNaN"
+    else:
+        payload["engine_version"] = None
+    response = MagicMock()
+    response.__enter__.return_value = response
+    response.status = 200
+    response.read.return_value = json.dumps(payload).encode()
+    with patch("urllib.request.urlopen", return_value=response):
+        row = run_comparison(run, base_url=legacy)
+    assert row.status == "inconclusive"
+
+
+def test_new_unapproved_evidence_during_cutover_is_rechecked(legacy):
+    """F2: a differently-versioned comparison committed during gate
+    evaluation is caught by the full re-evaluation under commit locks."""
+    from dataclasses import replace
+    from unittest.mock import patch
+
+    from taryx.core.migration import services
+    from taryx.core.migration.legacy_adapter import build_request, calculate
+
+    cohort = _cohort(None, refs=("ACC-001",))
+    account, run = _rated(None)
+    row = run_comparison(run, base_url=legacy)
+    actor = _approve_all(cohort, row)
+    result = calculate(build_request(run.input_snapshot, run.input_digest), base_url=legacy)
+    original = services.evaluation_blockers
+
+    def race(*args, **kwargs):
+        blockers = original(*args, **kwargs)
+        with patch.object(
+            services, "calculate", return_value=replace(result, engine_version="2.0.0")
+        ):
+            services.run_comparison(run)
+        return blockers
+
+    with (
+        patch.object(services, "evaluation_blockers", side_effect=race),
+        pytest.raises(MigrationError),
+    ):
+        services.transition_cohort(cohort.id, "new_only", 3, actor, **GATE)

@@ -6,7 +6,7 @@ Scope: [M3 exit criteria](../roadmap.md#m3--safe-legacy-migration). Contract:
 
 Verdict: independent review of `c06e1fc` raised eight findings; all are remediated with the eight preserved probes now passing as permanent regressions — see [independent review](m3-independent-review.md#remediation-addendum--2026-10-25). The evidence below is the original implementer assessment, retained as history.
 
-Current independent verdict at `f9f21df`: M3 remains open for F1–F4; normal checks and original probes pass, five follow-up cases fail. See [re-review](m3-independent-review.md).
+Current verdict: M3 closed — re-review findings F1–F4 remediated with all five follow-up probes passing as permanent regressions; see [second remediation addendum](m3-independent-review.md#second-remediation-addendum--2026-10-25).
 
 ## Criterion 1 — Equivalent snapshots, line differences even when totals match
 

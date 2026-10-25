@@ -10,7 +10,7 @@ This is the initial delivery sequence, not a calendar commitment. The earlier 6�
 | Planning baseline | Architecture, feature contracts and evidence-driven backlog | Complete | Documentation setup |
 | M1 — Foundation and domain profile | Reproducible workspace, sourced profile and metering history | Complete | Planning baseline |
 | M2 — Explainable bills and corrections | End-to-end operator billing with financial integrity | Complete | M1 |
-| M3 — Safe legacy migration | Characterisation, shadow comparison and controlled cohort cutover | In progress | M2 |
+| M3 — Safe legacy migration | Characterisation, shadow comparison and controlled cohort cutover | Complete | M2 |
 | M4 — Client variation and market boundary | Second isolated client and bounded integration | Planned | M3 |
 | M5 — Operational portfolio delivery | Recovery evidence, Kubernetes and reproducible demonstration | Planned | M4 |
 
@@ -52,8 +52,6 @@ Exit criteria:
 Excludes legacy cutover, a second client and external market integration. Full process-fault and performance campaigns mature in M5, but tests necessary to establish financial correctness cannot be deferred.
 
 ## M3 — Safe legacy migration
-
-Current verdict at `f9f21df`: In progress; F1–F4 remain despite original probes passing. See [independent re-review](evidence/m3-independent-review.md). Prior completion claims below are historical.
 
 Scope: TAR-010–012. Independent legacy calculator, fictional policy/defect fixtures, shadow isolation, versioned comparison evidence and operator cutover.
 

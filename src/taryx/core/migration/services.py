@@ -212,17 +212,16 @@ def evaluation_blockers(
             .order_by("-updated_at")
         )
         ref = f"{account.reference}"
-        conclusive = [c for c in comparisons if c.status != ComparisonRun.Status.INCONCLUSIVE]
-        if not conclusive:
-            if comparisons:
-                latest_attempt = comparisons[0]
-                blockers.append(
-                    f"inconclusive: {ref} comparison failed ({latest_attempt.failure_code})"
-                )
-            else:
-                blockers.append(f"missing_evidence: no comparison for {ref}")
+        if not comparisons:
+            blockers.append(f"missing_evidence: no comparison for {ref}")
             continue
-        latest = conclusive[0]
+        # Latest observation of ANY status governs: a failed attempt
+        # after the last success blocks until a re-verified success
+        # (which refreshes updated_at) supersedes it.
+        latest = comparisons[0]
+        if latest.status == ComparisonRun.Status.INCONCLUSIVE:
+            blockers.append(f"inconclusive: {ref} comparison failed ({latest.failure_code})")
+            continue
         if latest.updated_at < cohort.eval_frozen_at:
             blockers.append(f"stale_window: {ref} evidence predates the freeze")
             continue
@@ -306,40 +305,23 @@ def transition_cohort(
             if blockers:
                 raise MigrationError("gate_blocked", "; ".join(blockers))
             # Commit-safe revalidation: lock every member account row,
-            # then re-verify freshness and in-flight state. Inputs or ops
-            # committed during gate evaluation are now visible (stale →
-            # reject); ones still in flight block on the account lock and
-            # can only commit after this transaction — i.e. after cutover.
+            # then re-run the COMPLETE gate and the in-flight check.
+            # Inputs, comparisons, decisions or ops committed during the
+            # first evaluation are now visible (stale → reject); ones
+            # still in flight block on the account lock and can only
+            # commit after this transaction — i.e. after cutover.
             members = list(Account.objects.filter(cohort=cohort).order_by("pk").select_for_update())
-            for account in members:
-                latest = (
-                    ComparisonRun.objects.using(SHADOW_ALIAS)
-                    .exclude(status=ComparisonRun.Status.INCONCLUSIVE)
-                    .filter(
-                        account=account,
-                        period_start=cohort.eval_period_start,
-                        period_end=cohort.eval_period_end,
-                    )
-                    .order_by("-updated_at")
-                    .first()
+            blockers = evaluation_blockers(
+                cohort,
+                tariffs=tariffs,
+                gst_rate=gst_rate,
+                policy_identity=policy_identity,
+            )
+            if blockers:
+                raise MigrationError(
+                    "gate_blocked",
+                    "revalidation under commit locks: " + "; ".join(blockers),
                 )
-                current_digest = compute_input_digest(
-                    account,
-                    cohort.eval_period_start,
-                    cohort.eval_period_end,
-                    tariffs=tariffs,
-                    gst_rate=gst_rate,
-                    policy_identity=policy_identity,
-                )
-                if (
-                    latest is None
-                    or latest.snapshot_hash != current_digest
-                    or latest.policy_identity != policy_identity
-                ):
-                    raise MigrationError(
-                        "stale_evidence",
-                        f"{account.reference} inputs or policy changed during gate evaluation",
-                    )
             if BillingOperation.objects.filter(
                 account__in=members, status=BillingOperation.Status.PENDING
             ).exists():

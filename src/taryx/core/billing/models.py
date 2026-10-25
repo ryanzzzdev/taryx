@@ -109,11 +109,14 @@ class Adjustment(models.Model):
 
     class Meta:
         constraints = [
+            # (invoice, generation) is the financial generation identity.
+            # Digest is intentionally NOT unique: legitimate successive
+            # routing transitions may correct the same inputs under a
+            # different authoritative engine (legacy→new→legacy→…), while
+            # retry idempotency is enforced by the recognised-generation
+            # check under the operation lock.
             models.UniqueConstraint(
                 fields=["invoice", "generation"], name="uniq_adjustment_generation"
-            ),
-            models.UniqueConstraint(
-                fields=["invoice", "input_digest"], name="uniq_adjustment_digest"
             ),
         ]
 
