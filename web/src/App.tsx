@@ -153,7 +153,11 @@ export function App() {
         ))}
       </nav>
       {account ? (
+        // Keying by account forces a clean remount on switch: all
+        // account-scoped state (batch, run, operation) resets and the old
+        // poll interval is destroyed with the component.
         <AccountPanel
+          key={account.reference}
           account={account}
           role={me.role ?? ""}
           onError={setError}
@@ -252,7 +256,7 @@ function AccountPanel({
             setOp(d.billingOperation);
             if (d.billingOperation.status !== "PENDING") {
               if (pollRef.current) clearInterval(pollRef.current);
-              clearPending(localStorage);
+              clearPending(localStorage, d.billingOperation.operationId);
               refreshInvoices();
             }
           })
@@ -269,13 +273,18 @@ function AccountPanel({
     },
     [],
   );
-  // Resume a persisted pending operation (reload recovery); reset display
-  // state whenever the account changes so stale results can't bleed over.
+  // Resume a persisted pending operation on mount (reload recovery).
+  // The component is keyed by account, so mount state is always fresh.
   useEffect(() => {
-    setOp(null);
     const pending = pendingFor(localStorage, account.reference, period.s, period.e);
     if (pending) {
-      setOp({ operationId: pending.operationId, status: "PENDING", detail: null, invoice: null, adjustment: null });
+      setOp({
+        operationId: pending.operationId,
+        status: "PENDING",
+        detail: null,
+        invoice: null,
+        adjustment: null,
+      });
       startPoll(pending.operationId);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -316,7 +325,7 @@ function AccountPanel({
       .then((d) => {
         const p = d.billAccount;
         if (!p.ok) {
-          clearPending(localStorage); // terminal server-side refusal
+          clearPending(localStorage, operationId); // terminal server-side refusal
           onError(`${p.code}: ${p.message}`);
         } else if (p.operation) {
           setOp(p.operation);

@@ -133,3 +133,28 @@ Verdict: M2 remains In progress. The original six M2 probes and ten M1 probes pa
 - `uv run pytest docs/project/evidence/m2_followup_probes.py -c pyproject.toml -q`: two focused cases fail (additional rating line accepted; changed time windows produce unchanged digest). Executed initially from an equivalent temporary file with an absolute fixture path; saved here with a portable fixture path.
 - Rebuilt local Compose api/worker/web; actual browser sign-in succeeded, account query and rate mutation succeeded after login/token rotation. Account-switch rating leakage reproduced above. No claim of a complete browser fault-injection campaign; multi-account intent overwrite/late-poll behaviour is source-inspected.
 - Existing broader readiness gaps remain as previously documented. No application fixes or commits made by this review.
+
+## Re-remediation addendum — 2026-10-25
+
+All four follow-up findings resolved; both preserved probes pass and
+their coverage is folded into `tests/`:
+
+- **Rating-line membership (R5)**: `pricing/0003` seals line insertion —
+  the run's insert sets a transaction-local open flag that dies with the
+  (sub)transaction; the line trigger only admits legs for open runs.
+  Verified live and in `test_published_rating_evidence_is_immutable`.
+- **Band windows (R5)**: ordered `RateBand.window` serialised into the
+  digest payload/snapshot; a window-only tariff change repins.
+- **Account-scoped state (R7)**: `AccountPanel` is keyed by account
+  reference — switching remounts, resetting batch/run/operation state
+  and destroying the old poll interval; the resume effect only runs on
+  mount.
+- **Independent intents (R7)**: `operationStore` keys intents by
+  account+period; `clearPending` removes only the matching operationId —
+  an uncertain operation on one account survives billing another, and a
+  delayed terminal callback cannot erase an unrelated identity.
+  `npm test` is now part of `make check`.
+
+Verification: 2/2 follow-up probes pass; 103 pytest tests on real
+PostgreSQL; ruff/mypy/import contracts green; vitest 6/6 + typecheck +
+build; live Compose verification of the rating-line seal.

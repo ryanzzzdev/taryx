@@ -31,6 +31,6 @@ test:
 	uv run pytest -q
 
 web-check:
-	cd web && npm run typecheck && npm run build
+	cd web && npm test && npm run typecheck && npm run build
 
 check: lint typecheck contracts test web-check

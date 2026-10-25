@@ -3,7 +3,7 @@
 Date: 2026-10-25
 Scope: TAR-006–TAR-009. Original implementer verdict: criteria satisfied on the evidence below.
 
-Current verdict: M2 remains In progress after independent re-review of `de0e08d`; original probes pass but four R5/R7 follow-up findings remain. See [independent review](m2-independent-review.md). Original evidence below is historical.
+Current verdict: the independent re-review of `de0e08d` found four follow-up findings, now remediated and verified (both follow-up probes pass). See [independent review](m2-independent-review.md). Original evidence below is historical.
 Suite: `make check` green — 92 pytest tests on real PostgreSQL, ruff,
 mypy, three import contracts (plus the deliberate-violation probe),
 frontend typecheck/build. Compose stack verified live.

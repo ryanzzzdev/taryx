@@ -64,7 +64,14 @@ def _input_payload(
             code: {
                 "version": spec.version,
                 "supply_per_day": str(spec.supply_per_day),
-                "import_bands": [[b.name, str(b.price)] for b in spec.import_bands],
+                "import_bands": [
+                    [
+                        b.name,
+                        str(b.price),
+                        ([b.window[0].isoformat(), b.window[1].isoformat()] if b.window else None),
+                    ]
+                    for b in spec.import_bands
+                ],
                 "export_credit_per_kwh": (
                     str(spec.export_credit_per_kwh) if spec.export_credit_per_kwh else None
                 ),

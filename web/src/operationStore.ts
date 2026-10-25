@@ -3,9 +3,9 @@
  * A billing click generates one collision-resistant operation ID and
  * persists the intent before submission. A lost response is recovered by
  * reusing that same ID (the server's idempotent retry path), and a page
- * reload resumes polling the persisted pending operation. State is
- * scoped to the account + period it was admitted for, so switching
- * accounts never replays or misattributes an operation.
+ * reload resumes polling the persisted pending operation. Intents are
+ * keyed by account + period, so an in-flight operation for one account
+ * is never overwritten or cleared by work on another.
  */
 
 export interface PendingOperation {
@@ -16,14 +16,17 @@ export interface PendingOperation {
   submittedAt: string;
 }
 
-const KEY = "taryx.pendingOperation";
+const PREFIX = "taryx.pendingOperation";
+
+function keyFor(accountReference: string, periodStart: string, periodEnd: string): string {
+  return `${PREFIX}.${accountReference}.${periodStart}.${periodEnd}`;
+}
 
 export function newOperationId(): string {
   return crypto.randomUUID();
 }
 
-export function loadPending(storage: Storage): PendingOperation | null {
-  const raw = storage.getItem(KEY);
+function parse(raw: string | null): PendingOperation | null {
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw) as Partial<PendingOperation>;
@@ -48,7 +51,7 @@ export function pendingFor(
   periodStart: string,
   periodEnd: string,
 ): PendingOperation | null {
-  const pending = loadPending(storage);
+  const pending = parse(storage.getItem(keyFor(accountReference, periodStart, periodEnd)));
   if (
     pending &&
     pending.accountReference === accountReference &&
@@ -61,9 +64,23 @@ export function pendingFor(
 }
 
 export function savePending(storage: Storage, operation: PendingOperation): void {
-  storage.setItem(KEY, JSON.stringify(operation));
+  storage.setItem(
+    keyFor(operation.accountReference, operation.periodStart, operation.periodEnd),
+    JSON.stringify(operation),
+  );
 }
 
-export function clearPending(storage: Storage): void {
-  storage.removeItem(KEY);
+/** Clear a pending intent only when the stored operation is the same one
+ * that just finished — a delayed callback can never erase a newer or
+ * unrelated identity. */
+export function clearPending(storage: Storage, operationId: string): void {
+  for (let i = storage.length - 1; i >= 0; i--) {
+    const key = storage.key(i);
+    if (key?.startsWith(`${PREFIX}.`)) {
+      const pending = parse(storage.getItem(key));
+      if (pending && pending.operationId === operationId) {
+        storage.removeItem(key);
+      }
+    }
+  }
 }

@@ -279,7 +279,7 @@ def test_replay_is_deterministic():
     ]
 
 
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 def test_published_rating_evidence_is_immutable():
     """Rating runs, lines and their source records are calculation
     evidence — the database rejects mutation, not just convention."""
@@ -292,6 +292,12 @@ def test_published_rating_evidence_is_immutable():
         RatingRun.objects.filter(pk=run.pk).update(total=0)
     with pytest.raises(DbError), transaction.atomic():
         IntervalRecord.objects.filter(channel__supply_point__account=account).update(value=0)
+    # Membership is sealed too: a published run cannot gain lines.
+    clone = run.lines.first()
+    clone.pk = None
+    clone.sequence = 999
+    with pytest.raises(DbError), transaction.atomic():
+        clone.save(force_insert=True)
 
 
 @pytest.mark.django_db
@@ -314,3 +320,37 @@ def test_input_snapshot_reconstructs_historical_run():
         hashlib.sha256(json.dumps(run.input_snapshot, sort_keys=True).encode()).hexdigest()
         == run.input_digest
     )
+
+
+@pytest.mark.django_db
+def test_calculation_affecting_inputs_change_the_digest():
+    """Time-band windows control interval allocation; changing them must
+    change the digest even when names and prices are unchanged."""
+    from dataclasses import replace
+    from datetime import time
+
+    from taryx.core.pricing.tariffs import TariffSpec
+
+    account = make_account([("E1", "import")], [("T-TOU", date(2026, 1, 1), None)])
+    ingest_nem12_content(load("e1_flat.nem12"), "e1_flat.nem12")
+    run = rate_account(account, date(2026, 3, 2), date(2026, 3, 3), **KWARGS)
+    changed = {
+        code: TariffSpec(
+            **{
+                **spec.__dict__,
+                "import_bands": tuple(
+                    replace(b, window=(time(1), time(2))) for b in spec.import_bands
+                ),
+            }
+        )
+        for code, spec in TARIFFS.items()
+    }
+    other = compute_input_digest(
+        account,
+        date(2026, 3, 2),
+        date(2026, 3, 3),
+        tariffs=changed,
+        gst_rate=GST_RATE,
+        policy_identity=POLICY_IDENTITY,
+    )
+    assert other != run.input_digest
