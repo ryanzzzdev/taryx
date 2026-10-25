@@ -12,8 +12,8 @@ Task sections own status; index icons mirror them. See the [documentation guide]
 - ✅ [TAR-004 — Freeze domain and measurement profiles](#tar-004)
 - ✅ [TAR-005 — Implement versioned meter ingestion and fixtures](#tar-005)
 - ✅ [TAR-006 — Implement deterministic itemised rating](#tar-006)
-- 📋 [TAR-007 — Implement durable issuance and balanced posting](#tar-007)
-- 📋 [TAR-008 — Implement successive corrections and adjustments](#tar-008)
+- ✅ [TAR-007 — Implement durable issuance and balanced posting](#tar-007)
+- 🟢 [TAR-008 — Implement successive corrections and adjustments](#tar-008)
 - 📋 [TAR-009 — Deliver the core operator journey](#tar-009)
 - 📋 [TAR-010 — Build independent legacy characterisation](#tar-010)
 - 📋 [TAR-011 — Implement isolated shadow comparison and gates](#tar-011)
@@ -27,7 +27,7 @@ Task sections own status; index icons mirror them. See the [documentation guide]
 
 ## Delivery notes
 
-Next action: TAR-006 — deterministic itemised rating against the frozen profile and reference cases (M2). The independent review findings are remediated and M1 restored. Later tasks remain Backlog until their dependencies and detailed contracts are ready. Portal/API slices can develop alongside their backend tasks; TAR-009 and TAR-012 own integrated acceptance. Observability hooks and correctness tests accompany implementation; TAR-016 owns the full cross-service campaign, not the first tests.
+Next action: TAR-008 — successive corrections and adjustments against recognised liability (M2). TAR-006 and TAR-007 are implemented and verified; TAR-008's dependencies pass. Later tasks remain Backlog until their dependencies and detailed contracts are ready. Portal/API slices can develop alongside their backend tasks; TAR-009 and TAR-012 own integrated acceptance. Observability hooks and correctness tests accompany implementation; TAR-016 owns the full cross-service campaign, not the first tests.
 
 The architecture and functional scope are the planning baseline; exact schemas, dependency versions and open profiles are refined in their named tasks. Split large tasks into new IDs before starting if necessary; preserve existing history. Next unused ID: TAR-019. M1 implementation remediated and re-verified.
 
@@ -233,7 +233,7 @@ Implemented: pure engine in src/taryx/core/pricing/engine.py (separately testabl
 - Area: billing
 - Milestone: M2
 - Priority: High
-- Status: Backlog 📋
+- Status: Done ✅
 - Depends on: TAR-006
 - References: [Contract](features/billing-and-ledger.md)
 
@@ -250,11 +250,11 @@ Admit billing durably and atomically issue one invoice/journal per business gene
 
 ### Completion evidence
 
-Not started; no implementation or verification evidence.
+Implemented: BillingOperation admission (durable, idempotent by operation_id, conflicting payload reuse rejected), outbox event per operation, atomic issuance of one Invoice + JournalEntry + Postings per account/period generation, Postgres triggers enforcing journal balance and financial-document immutability (raw-SQL delete/update rejected at the database boundary, independent of ORM PROTECT), staleness precondition via pinned rating input digest. 11 tests in tests/test_billing.py cover idempotent admission, conflict rejection, racing operation IDs, duplicate delivery, outbox recovery, changed-input staleness, trigger balance/immutability rejection, and a real-subprocess worker-kill-before-commit leaving no financial effect. make check green (77 tests). Verified live in Compose: bill_account admission -> Celery worker issuance via RabbitMQ (INV-000001, total 8.75, balanced 9.23 Dr = 9.23 Cr across receivables/revenue/export-credit/GST), idempotent retry returned existing outcome, outbox drained safely.
 
 ### Notes
 
-Refine and mark Ready once dependencies pass; record relevant gate resolutions before dependent implementation.
+Runtime permission boundary is Postgres triggers plus transaction-scoped issuance; the Celery task enqueues at admission and the drain_outbox command relays pending events after outage. Next action: TAR-008.
 
 <a id="tar-008"></a>
 
@@ -264,7 +264,7 @@ Refine and mark Ready once dependencies pass; record relevant gate resolutions b
 - Area: billing
 - Milestone: M2
 - Priority: High
-- Status: Backlog 📋
+- Status: Ready 🟢
 - Depends on: TAR-007
 - References: [Contract](features/billing-and-ledger.md)
 

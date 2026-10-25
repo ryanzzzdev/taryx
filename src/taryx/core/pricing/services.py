@@ -88,6 +88,60 @@ def _input_digest(
     return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
 
 
+def _gather_inputs(
+    account: Account, period_start: date, period_end: date
+) -> tuple[list[AgreementSpan], list[tuple[MeterChannel, list[CurrentInterval]]]]:
+    """Selected interval rows and agreement spans pinning a rating period."""
+    channel_rows: list[tuple[MeterChannel, list[CurrentInterval]]] = []
+    for channel in MeterChannel.objects.filter(supply_point__account=account).order_by("id"):
+        start_utc = nem_interval_end_utc(period_start, 0, channel.interval_minutes)
+        end_utc = nem_interval_end_utc(period_end, 0, channel.interval_minutes)
+        rows = list(
+            CurrentInterval.objects.filter(
+                channel=channel,
+                interval_end_utc__gt=start_utc,
+                interval_end_utc__lte=end_utc,
+            )
+            .select_related("source_record")
+            .order_by("interval_end_utc")
+        )
+        channel_rows.append((channel, rows))
+    agreements = [
+        AgreementSpan(
+            agreement_id=a.id,
+            tariff_code=a.tariff_code,
+            version=a.version,
+            effective_from=a.effective_from,
+            effective_to=a.effective_to,
+        )
+        for a in account.tariff_agreements.all()
+    ]
+    return agreements, channel_rows
+
+
+def compute_input_digest(
+    account: Account,
+    period_start: date,
+    period_end: date,
+    *,
+    tariffs: dict[str, TariffSpec],
+    gst_rate: Decimal,
+    policy_identity: str,
+) -> str:
+    """Digest of the inputs a rating over this period would consume now."""
+    agreements, channel_rows = _gather_inputs(account, period_start, period_end)
+    return _input_digest(
+        account=account,
+        period_start=period_start,
+        period_end=period_end,
+        agreements=agreements,
+        tariffs=tariffs,
+        channels=channel_rows,
+        gst_rate=gst_rate,
+        policy_identity=policy_identity,
+    )
+
+
 def rate_account(
     account: Account,
     period_start: date,
@@ -102,9 +156,10 @@ def rate_account(
     if not days:
         raise RatingError("empty_period", "period must cover at least one day")
 
-    channels: list[tuple[MeterChannel, list[CurrentInterval]]] = []
+    agreements, channel_rows = _gather_inputs(account, period_start, period_end)
+
     slices: list[ChannelSlice] = []
-    for channel in MeterChannel.objects.filter(supply_point__account=account).order_by("id"):
+    for channel, rows in channel_rows:
         coverage = channel_coverage(channel, period_start, period_end)
         if not coverage.complete:
             raise RatingError(
@@ -112,18 +167,6 @@ def rate_account(
                 f"{channel}: {coverage.selected}/{coverage.expected} intervals, "
                 f"{coverage.quarantined} quarantined",
             )
-        start_utc = nem_interval_end_utc(period_start, 0, channel.interval_minutes)
-        end_utc = nem_interval_end_utc(period_end, 0, channel.interval_minutes)
-        rows = list(
-            CurrentInterval.objects.filter(
-                channel=channel,
-                interval_end_utc__gt=start_utc,
-                interval_end_utc__lte=end_utc,
-            )
-            .select_related("source_record")
-            .order_by("interval_end_utc")
-        )
-        channels.append((channel, rows))
         slices.append(
             ChannelSlice(
                 channel_id=channel.id,
@@ -140,17 +183,6 @@ def rate_account(
             )
         )
 
-    agreements = [
-        AgreementSpan(
-            agreement_id=a.id,
-            tariff_code=a.tariff_code,
-            version=a.version,
-            effective_from=a.effective_from,
-            effective_to=a.effective_to,
-        )
-        for a in account.tariff_agreements.all()
-    ]
-
     calc = rate(
         days=days,
         agreements=agreements,
@@ -165,7 +197,7 @@ def rate_account(
         period_end=period_end,
         agreements=agreements,
         tariffs=tariffs,
-        channels=channels,
+        channels=channel_rows,
         gst_rate=gst_rate,
         policy_identity=policy_identity,
     )
