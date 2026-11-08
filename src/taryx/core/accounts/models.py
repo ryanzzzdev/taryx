@@ -10,8 +10,19 @@ class Account(models.Model):
 
 
 class SupplyPoint(models.Model):
+    class MarketState(models.TextChoices):
+        NONE = "none"
+        PENDING = "pending"
+        REGISTERED = "registered"
+
     nmi = models.CharField("NMI", max_length=10, unique=True)
     account = models.ForeignKey(Account, on_delete=models.CASCADE, related_name="supply_points")
+    # Written only by the market adapter's admission path and its
+    # transactional outbox consumer — never by the counterparty-facing
+    # code directly (decision 005).
+    market_state = models.CharField(
+        max_length=16, choices=MarketState.choices, default=MarketState.NONE
+    )
 
     def __str__(self) -> str:
         return self.nmi

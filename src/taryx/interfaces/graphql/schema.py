@@ -17,7 +17,7 @@ from graphene_django import DjangoObjectType
 from graphql import GraphQLError
 
 from taryx.composition.policy import policy as _policy
-from taryx.composition.tasks import process_billing_operation
+from taryx.composition.tasks import market_submit, process_billing_operation
 from taryx.core.accounts.models import Account, MeterChannel, SupplyPoint
 from taryx.core.audit.models import record as audit_record
 from taryx.core.billing.models import (
@@ -28,6 +28,8 @@ from taryx.core.billing.models import (
     Posting,
 )
 from taryx.core.billing.services import AdmissionError, admit_issue
+from taryx.core.market.models import MarketException, TransferWorkflow
+from taryx.core.market.services import request_transfer
 from taryx.core.metering.ingestion import (
     ResolutionError,
     ingest_nem12_content,
@@ -378,6 +380,54 @@ class BillingOperationType(DjangoObjectType):
         )
 
 
+class MarketInboxType(graphene.ObjectType):
+    correlation_id = graphene.String(required=True)
+    seq = graphene.Int(required=True)
+    outcome = graphene.String(required=True)
+    note = graphene.String(required=True)
+    received_at = graphene.DateTime(required=True)
+
+
+class TransferWorkflowType(DjangoObjectType):
+    correlation_id = graphene.String(required=True)
+    nmi = graphene.String(required=True)
+    inbox = graphene.List(MarketInboxType, required=True)
+
+    class Meta:
+        model = TransferWorkflow
+        fields = (
+            "state",
+            "effective_date",
+            "request_digest",
+            "last_applied_seq",
+            "attempts",
+            "deadline_at",
+            "last_counterparty_status",
+            "detail",
+            "created_at",
+        )
+
+    def resolve_correlation_id(workflow, info):
+        return str(workflow.correlation_id)
+
+    def resolve_nmi(workflow, info):
+        return workflow.supply_point.nmi
+
+    def resolve_inbox(workflow, info):
+        return workflow.inbox.order_by("received_at")
+
+
+class MarketExceptionType(DjangoObjectType):
+    correlation_id = graphene.String()
+
+    class Meta:
+        model = MarketException
+        fields = ("reason", "raw", "created_at")
+
+    def resolve_correlation_id(exc, info):
+        return str(exc.correlation_id) if exc.correlation_id else None
+
+
 class DecisionType(graphene.ObjectType):
     fingerprint = graphene.String(required=True)
     classification = graphene.String(required=True)
@@ -541,6 +591,16 @@ class Query(graphene.ObjectType):
         CohortEventType, required=True, cohort_id=graphene.Int(required=True)
     )
 
+    market_workflows = graphene.List(
+        TransferWorkflowType, required=True, limit=graphene.Int(default_value=50)
+    )
+    market_workflow = graphene.Field(
+        TransferWorkflowType, correlation_id=graphene.String(required=True)
+    )
+    market_exceptions = graphene.List(
+        MarketExceptionType, required=True, limit=graphene.Int(default_value=50)
+    )
+
     def resolve_cohorts(root, info):
         _require_auth(info)
         return Cohort.objects.order_by("name")
@@ -555,6 +615,18 @@ class Query(graphene.ObjectType):
     def resolve_cohort_events(root, info, cohort_id):
         _require_auth(info)
         return CohortEvent.objects.filter(cohort_id=cohort_id).order_by("-created_at")[:50]
+
+    def resolve_market_workflows(root, info, limit=50):
+        _require_auth(info)
+        return _bounded(TransferWorkflow.objects.order_by("-created_at"), limit)
+
+    def resolve_market_workflow(root, info, correlation_id):
+        _require_auth(info)
+        return TransferWorkflow.objects.filter(correlation_id=correlation_id).first()
+
+    def resolve_market_exceptions(root, info, limit=50):
+        _require_auth(info)
+        return _bounded(MarketException.objects.order_by("-created_at"), limit)
 
     def resolve_ping(root, info):
         return "pong"
@@ -942,6 +1014,40 @@ class TransitionCohort(graphene.Mutation):
         return TransitionPayload(ok=True, cohort=cohort)
 
 
+class TransferPayload(graphene.ObjectType):
+    ok = graphene.Boolean(required=True)
+    code = graphene.String()
+    message = graphene.String()
+    workflow = graphene.Field(TransferWorkflowType)
+
+
+class RequestTransfer(graphene.Mutation):
+    """Admit a synthetic taryx-market/1 transfer request durably and
+    kick the submit task; the workflow is the idempotency boundary —
+    one correlation per row, retries resume it."""
+
+    class Arguments:
+        nmi = graphene.String(required=True)
+        effective_date = graphene.Date(required=True)
+
+    Output = TransferPayload
+
+    def mutate(root, info, nmi, effective_date):
+        _require_group(info, "operator")
+        supply_point = SupplyPoint.objects.filter(nmi=nmi).first()
+        if supply_point is None:
+            return TransferPayload(ok=False, code="not_found", message="unknown NMI")
+        workflow = request_transfer(supply_point, effective_date)
+        market_submit.delay(str(workflow.correlation_id))
+        audit_record(
+            _actor(info),
+            "market.transfer_request",
+            nmi,
+            correlation_id=str(workflow.correlation_id),
+        )
+        return TransferPayload(ok=True, workflow=workflow)
+
+
 class Mutation(graphene.ObjectType):
     login = Login.Field()
     logout = Logout.Field()
@@ -952,6 +1058,7 @@ class Mutation(graphene.ObjectType):
     run_shadow_comparison = RunShadowComparison.Field()
     decide_discrepancy = DecideDiscrepancy.Field()
     transition_cohort = TransitionCohort.Field()
+    request_transfer = RequestTransfer.Field()
 
 
 schema = graphene.Schema(query=Query, mutation=Mutation)

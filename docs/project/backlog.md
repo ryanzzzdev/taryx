@@ -20,7 +20,7 @@ Task sections own status; index icons mirror them. See the [documentation guide]
 - 🚧 [TAR-012 — Deliver operator migration and cutover](#tar-012)
 - ✅ [TAR-013 — Demonstrate two isolated client instances](#tar-013)
 - ✅ [TAR-014 — Freeze the bounded market workflow](#tar-014)
-- 📋 [TAR-015 — Implement market adapter and counterparty simulator](#tar-015)
+- ✅ [TAR-015 — Implement market adapter and counterparty simulator](#tar-015)
 - 📋 [TAR-016 — Verify recovery and correlated diagnostics](#tar-016)
 - 📋 [TAR-017 — Package and verify Kubernetes delivery](#tar-017)
 - 📋 [TAR-018 — Measure and present the portfolio release](#tar-018)
@@ -575,9 +575,9 @@ Contract-only task — no runtime code yet; TAR-015 implements the coordinator s
 - Area: integration
 - Milestone: M4
 - Priority: Normal
-- Status: Backlog 📋
+- Status: Done ✅
 - Depends on: TAR-013, TAR-014
-- References: [Contract](features/market-integration.md)
+- References: [Contract](features/market-integration.md), [Decision 005](decisions/005-market-workflow-contract.md)
 
 ### Outcome
 
@@ -591,11 +591,21 @@ Complete one durable market workflow across owned adapter and external test doub
 
 ### Completion evidence
 
-Not started; no implementation or verification evidence.
+Implemented and verified 2026-11-08 against the decision-005 frozen contract:
+
+- `market-sim/` — independent coordinator subprocess/container (stdlib HTTP + own sqlite), no shared code with core. Idempotent `/transfers` (correlation dedup, 409 on digest conflict), `GET /transfers/{id}` reconcile poll, nine deterministic scenario scripts and fault modes via `/_admin/*`.
+- `taryx.core.market` — `TransferWorkflow` (durable draft→submitted→reconciling→terminal, attempts, deadlines, last counterparty status), `MarketInbox` ((correlation_id, seq) dedup with applied/duplicate/late notes), `MarketException` (unknown-correlation/malformed parking), `MarketOutbox` (transactional delivery → `supply_point.market_state=registered`). The adapter never writes billing/account tables outside the outbox consumer path.
+- Ingress `POST /callbacks/transfers` — bearer token + version header before any state; malformed bodies parked and 400'd. Celery tasks `market.submit`, `market.sweep` (retry/deadline/reconcile), `market.drain`; beat schedule drives sweep+drain every 10s. GraphQL `requestTransfer` mutation (operator role) and `marketWorkflow(s)`/`marketExceptions` queries.
+- Deployment: `market`/`market-sg` services per client with own volumes; both workers run embedded beat.
+- Live E2E on aurora: `requestTransfer(4102000001)` → submitted → happy callback → completed → drain → `market_state: registered`; a discarded submit task was recovered by the sweep (lost-submit path exercised live).
+- tests/test_market.py — 19 tests: full transition table (happy, duplicate, late/lower-seq, reject, unknown correlation, malformed, lost-response→failed, reconcile-resolves, budget exhaustion, retry exhaustion, 409), real-sim subprocess (idempotent resubmit, 409, HTTP callback, auth/version rejection, four scenario delivery patterns), endpoint auth/malformed.
+- `make check` green — 197 backend, 6 frontend, lint/format, mypy, import contracts (3 kept; deliberate probe rejected), build; `docker compose config` valid.
+
+Limits: scenarios are deterministic scripts, not real market timing; `callback_url` in submit is simulator plumbing (decision record updated); single-beat-per-worker scheduling is the local driver, not a clustered scheduler.
 
 ### Notes
 
-Refine and mark Ready once dependencies pass; record relevant gate resolutions before dependent implementation.
+The adapter's market outbox is separate from `billing.OutboxEvent` (operation-linked) — a deliberate parallel mechanism for non-billing events.
 
 <a id="tar-016"></a>
 

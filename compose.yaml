@@ -11,6 +11,8 @@ x-taryx-env: &taryx-env
   DJANGO_DEBUG: "true"
   TARYX_CLIENT: aurora_energy
   LEGACY_BASE_URL: http://legacy:8090
+  MARKET_BASE_URL: http://market:8091
+  MARKET_CALLBACK_URL: http://api:8000/callbacks/transfers
 
 x-southgrid-env: &southgrid-env
   POSTGRES_HOST: db
@@ -22,6 +24,8 @@ x-southgrid-env: &southgrid-env
   DJANGO_DEBUG: "true"
   TARYX_CLIENT: southgrid_retail
   LEGACY_BASE_URL: http://legacy-sg:8090
+  MARKET_BASE_URL: http://market-sg:8091
+  MARKET_CALLBACK_URL: http://api-sg:8000/callbacks/transfers
 
 services:
   db:
@@ -107,7 +111,7 @@ services:
 
   worker:
     build: .
-    command: celery -A taryx.config.celery:app worker --loglevel=INFO --without-gossip --without-mingle --without-heartbeat
+    command: celery -A taryx.config.celery:app worker -B --loglevel=INFO --without-gossip --without-mingle --without-heartbeat
     environment:
       <<: *taryx-env
     depends_on:
@@ -133,7 +137,7 @@ services:
 
   worker-sg:
     build: .
-    command: celery -A taryx.config.celery:app worker --loglevel=INFO --without-gossip --without-mingle --without-heartbeat
+    command: celery -A taryx.config.celery:app worker -B --loglevel=INFO --without-gossip --without-mingle --without-heartbeat
     environment:
       <<: *southgrid-env
     depends_on:
@@ -181,6 +185,36 @@ services:
       timeout: 3s
       retries: 12
 
+  market:
+    build: ./market-sim
+    environment:
+      MARKET_TOKEN: taryx-market-token
+    command: python market_sim.py --port 8091 --db /data/market_sim.db
+    ports:
+      - "18092:8091"
+    volumes:
+      - taryx-market:/data
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request;urllib.request.urlopen(\"http://localhost:8091/healthz\")'"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  market-sg:
+    build: ./market-sim
+    environment:
+      MARKET_TOKEN: taryx-market-token
+    command: python market_sim.py --port 8091 --db /data/market_sim.db
+    ports:
+      - "18093:8091"
+    volumes:
+      - taryx-market-sg:/data
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request;urllib.request.urlopen(\"http://localhost:8091/healthz\")'"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
   web:
     build: ./web
     environment:
@@ -195,3 +229,5 @@ volumes:
   taryx-broker:
   taryx-legacy:
   taryx-legacy-sg:
+  taryx-market:
+  taryx-market-sg:

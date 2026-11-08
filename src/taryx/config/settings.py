@@ -28,6 +28,7 @@ INSTALLED_APPS = [
     "taryx.core.pricing",
     "taryx.core.billing",
     "taryx.core.migration",
+    "taryx.core.market",
     "taryx.composition",
 ]
 
@@ -87,6 +88,25 @@ CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "amqp://taryx:taryx@loca
 
 # Independently deployed legacy calculator (satellite service, own schema).
 LEGACY_BASE_URL = os.environ.get("LEGACY_BASE_URL", "http://localhost:18090")
+
+# Bounded market integration (decision 005): synthetic taryx-market/1
+# coordinator, one token in each direction, durable workflow + inbox +
+# outbox. Deadlines are short for the local demo.
+MARKET_BASE_URL = os.environ.get("MARKET_BASE_URL", "http://localhost:18092")
+MARKET_TOKEN = os.environ.get("MARKET_TOKEN", "taryx-market-token")
+MARKET_CALLBACK_TOKEN = os.environ.get("MARKET_CALLBACK_TOKEN", "taryx-market-token")
+MARKET_CALLBACK_URL = os.environ.get(
+    "MARKET_CALLBACK_URL", "http://localhost:8001/callbacks/transfers"
+)
+MARKET_OUTCOME_DEADLINE_SECONDS = int(os.environ.get("MARKET_OUTCOME_DEADLINE_SECONDS", "30"))
+MARKET_RECONCILE_BUDGET_SECONDS = int(os.environ.get("MARKET_RECONCILE_BUDGET_SECONDS", "120"))
+MARKET_MAX_ATTEMPTS = int(os.environ.get("MARKET_MAX_ATTEMPTS", "5"))
+MARKET_RETRY_SECONDS = int(os.environ.get("MARKET_RETRY_SECONDS", "5"))
+
+CELERY_BEAT_SCHEDULE = {
+    "market-sweep": {"task": "taryx.market.sweep", "schedule": 10.0},
+    "market-drain": {"task": "taryx.market.drain", "schedule": 10.0},
+}
 LEGACY_TIMEOUT_SECONDS = float(os.environ.get("LEGACY_TIMEOUT_SECONDS", "5"))
 CELERY_IMPORTS = ["taryx.interfaces.tasks"]
 CELERY_TASK_TRACK_STARTED = True

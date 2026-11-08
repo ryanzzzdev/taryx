@@ -1,7 +1,7 @@
 # Bounded market integration
 
 Date: 2026-10-25
-Status: Workflow contract frozen 2026-11-08 — synthetic `taryx-market/1` supply-point transfer, transition table and fault scripts in [decision 005](../decisions/005-market-workflow-contract.md) (resolves BLK-002). Implementation pending TAR-015.
+Status: Implemented and verified 2026-11-08 (TAR-015) — synthetic `taryx-market/1` per [decision 005](../decisions/005-market-workflow-contract.md): `market-sim` coordinator service, `taryx.core.market` adapter (durable workflow/inbox/exception/outbox), `/callbacks/transfers` ingress, `market.submit|sweep|drain` tasks, GraphQL admission + inspection, live E2E to `market_state: registered`. 19 tests including real-sim subprocess and four scenario delivery patterns.
 Tasks: [TAR-014](../backlog.md#tar-014), [TAR-015](../backlog.md#tar-015).
 
 ## Boundary

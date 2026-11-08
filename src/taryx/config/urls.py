@@ -4,6 +4,8 @@ from django.urls import path
 from django.views.decorators.csrf import ensure_csrf_cookie
 from graphene_django.views import GraphQLView
 
+from taryx.interfaces.callbacks import transfer_callback
+
 
 def healthz(request):
     try:
@@ -20,4 +22,6 @@ urlpatterns = [
     # lets GET/GraphiQL responses carry the csrftoken cookie the portal
     # echoes back as X-CSRFToken on mutations.
     path("graphql", ensure_csrf_cookie(GraphQLView.as_view(graphiql=True))),
+    # Synthetic taryx-market/1 inbound edge (decision 005).
+    path("callbacks/transfers", transfer_callback),
 ]

@@ -24,7 +24,7 @@ Messages:
 
 | Message | Direction | Shape (v1) | Notes |
 | --- | --- | --- | --- |
-| `POST /transfers` | adapter → coordinator | `{correlation_id, nmi, effective_date, request_digest}` | Idempotent submit: the coordinator dedups on `correlation_id`; a retried submit returns the same ack, never a second workflow. `request_digest` is sha256 of the canonical request body — a resubmission with a different digest under the same correlation is a `409` conflict. |
+| `POST /transfers` | adapter → coordinator | `{correlation_id, nmi, effective_date, request_digest, callback_url?}` | Idempotent submit: the coordinator dedups on `correlation_id`; a retried submit returns the same ack, never a second workflow. `request_digest` is sha256 of `{correlation_id, nmi, effective_date}` — a resubmission with a different digest under the same correlation is a `409` conflict. `callback_url` is optional simulator plumbing (falls back to a configured default); it is delivery routing, not part of the signed digest. |
 | `transfer.ack` | synchronous response | `{correlation_id, status: "submitted", seq: 0}` | Transport-level ack only. |
 | `POST /callbacks/transfers` | coordinator → adapter | `{correlation_id, seq, outcome, occurred_at, detail?}` | `outcome ∈ {completed, rejected}`; `seq` is a strictly increasing counterparty-side sequence per correlation. |
 | `GET /transfers/{correlation_id}` | adapter → coordinator | → `{correlation_id, status, last_seq}` | Reconciliation poll: returns the coordinator's last-known status (`submitted`, `completed`, `rejected`) without inventing an outcome. |

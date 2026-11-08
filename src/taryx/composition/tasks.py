@@ -9,6 +9,11 @@ from taryx.core.billing.services import (
     drain_outbox,
     process_operation,
 )
+from taryx.core.market.services import (
+    drain_market_outbox,
+    submit_workflow,
+    sweep,
+)
 from taryx.core.migration.legacy_adapter import LegacyFailure
 from taryx.core.migration.services import calculate_for_billing, routing_for
 from taryx.core.pricing.services import compute_input_digest
@@ -54,3 +59,18 @@ def drain_outbox_task() -> int:
             legacy_calculator=legacy_calculator,
         )
     )
+
+
+@shared_task(name="taryx.market.submit")
+def market_submit(correlation_id: str) -> str:
+    return submit_workflow(correlation_id).state
+
+
+@shared_task(name="taryx.market.sweep")
+def market_sweep() -> dict:
+    return sweep()
+
+
+@shared_task(name="taryx.market.drain")
+def market_drain() -> int:
+    return drain_market_outbox()
