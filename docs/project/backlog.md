@@ -672,5 +672,21 @@ Simplified approach chosen 2026-11-08: Devin drives the loop in-session
 via `codex exec resume` against the existing review thread — see
 docs/agent-notes/codex-review-loop.md. `codex exec` smoke-tested;
 `codex exec resume` reaches the thread but conflicts on the app
-writer-lock while the thread is open. Remaining verification:
-first real review round end-to-end (writes, verdict, HEAD check).
+writer-lock while the thread is open. M3 dry-run (4 rounds) showed the
+thread's managed restricted profile is read-only with an unrelated
+cwd — findings arrive via `-o` (saved as .md) but Codex cannot write
+docs or run DB tests. Resolved design 2026-11-08: dedicated `codex exec`
+session as the review thread — created with `--approve-for-me` +
+network access; resume inherits workspace-write (writes verified on
+create and resume). Remaining: one full write-capable review round
+end-to-end, including DB access.
+
+Audit follow-up (2026-11-08): [CLI/process audit](../agent-notes/codex-review-loop-audit.md) distinguishes writable sandbox access from retained automatic approvals. Existing `/tmp` probes do not establish repository writes or DB access. CLI 0.153.4 exposes schema output on resume/fork; live schema and permission behavior remain to be verified. Recommendations are not yet adopted or implemented.
+
+Pilot doc reconciled after the audit (2026-11-08): per-milestone
+sessions, git-status tree gate, schema-constrained verdict JSON
+(docs/project/evidence/verdict.schema.json created), flag ordering,
+and corrected permission claims. Codex's own audit run wrote into the
+repo under --approve-for-me — first live repo-write evidence.
+Remaining: provision the M4 review session, one full schema-verdict
+round including DB access.

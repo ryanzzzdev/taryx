@@ -1,0 +1,65 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "reviewed_sha",
+    "verdict",
+    "findings",
+    "checks",
+    "verification_gaps",
+    "artifacts",
+    "summary"
+  ],
+  "properties": {
+    "reviewed_sha": {
+      "type": "string",
+      "description": "Full commit SHA that was reviewed. Must equal the candidate SHA supplied in the prompt."
+    },
+    "verdict": {
+      "enum": ["APPROVED", "CHANGES_REQUESTED", "BLOCKED"]
+    },
+    "summary": {
+      "type": "string"
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "severity", "location", "explanation"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Stable finding id, e.g. F1 or CODE-NEW-src-file-L42, carried across rounds."
+          },
+          "severity": { "enum": ["high", "medium", "low"] },
+          "location": { "type": "string" },
+          "explanation": { "type": "string" }
+        }
+      }
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["command", "outcome"],
+        "properties": {
+          "command": { "type": "string" },
+          "outcome": { "enum": ["passed", "failed", "unavailable"] },
+          "evidence_path": { "type": "string" }
+        }
+      }
+    },
+    "verification_gaps": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Checks the reviewer could not perform and why."
+    },
+    "artifacts": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Repo-relative paths the reviewer wrote (review doc, probes, record updates)."
+    }
+  }
+}

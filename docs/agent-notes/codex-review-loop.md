@@ -1,6 +1,8 @@
 # Devin-driven Codex review loop (simplified process)
 
-Status: pilot convention, agreed 2026-11-08.
+Status: pilot convention, agreed 2026-11-08; revised same day after a
+Codex self-audit (`codex-review-loop-audit.md` — its findings are
+adopted selectively here; recommendations there are not all binding).
 Predecessors: `multi-agent-handoff-problem.md` (problem framing),
 `multi-agent-orchestrator-research.md` (what takt/ccbridge do).
 
@@ -18,19 +20,30 @@ review thread, so review context accumulates across milestones.
 
 - **Implementer / driver**: Devin, inside this Devin Desktop session.
   Implements, commits, remediates, and invokes the reviewer.
-- **Reviewer**: Codex thread `Taryx project review`
-  (`01a16e5a-546f-7850-8796-1484463b943f`), invoked headlessly via
-  `codex exec resume <thread-id>` from `/usr/lib/chatgpt/resources/codex`.
-- **Mutual exclusion**: structural — while `codex exec` runs, Devin is
-  blocked waiting on the subprocess. One active agent at a time.
+- **Reviewer**: a dedicated Codex *exec session* per milestone, invoked
+  via `codex exec resume <session-id>` from
+  `/usr/lib/chatgpt/resources/codex`. A fresh session is created for
+  each milestone and resumed across that milestone's remediation
+  rounds — a perpetual thread accumulates bias toward its own earlier
+  verdicts and compacts away qualifications, so context beyond one
+  milestone lives in the repo (review docs, probes), not the session.
+  (The desktop-app thread `Taryx project review`,
+  `01a16e5a-546f-7850-8796-1484463b943f`, was evaluated and rejected —
+  its managed profile is read-only; see "Reviewer permissions".)
+- **Mutual exclusion**: between the two agents, structural — while
+  `codex exec` runs, Devin is blocked waiting on the subprocess. This
+  is *not* an OS lock: other processes (a human editor, a second
+  `codex` attach) can still touch the tree. The git-state gate in step
+  2 is what detects outside interference.
 - **Turn boundary**: the `codex exec` process exit.
 
 ### Hard thread rule
 
 `codex exec resume` fails with `thread ... already has an active writer`
-if the Codex app holds the thread open. During a loop run, do **not** open
-`Taryx project review` in the Codex desktop app. On a lock conflict Devin
-stops and asks rather than retrying.
+if the session is held open elsewhere — e.g. the thread open in the
+Codex desktop app, or another `codex` process attached to it. During a
+loop run the review session must not be open anywhere else; on a lock
+conflict Devin stops and asks rather than retrying.
 
 ## The loop
 
@@ -39,25 +52,72 @@ For each milestone M{N}, after implementation and its commit:
 1. **Review invocation** — Devin runs:
 
    ```bash
-   /usr/lib/chatgpt/resources/codex exec resume \
-     01a16e5a-546f-7850-8796-1484463b943f \
+   /usr/lib/chatgpt/resources/codex exec -C "$REPO" --approve-for-me \
+     resume <session-id> \
+     --output-schema docs/project/evidence/verdict.schema.json \
+     --json \
+     -o docs/project/evidence/m{N}-verdict-r{R}.json \
      "M{N} implementation is committed at <sha>. Review per our
       conventions: write findings to
       docs/project/evidence/m{N}-independent-review.md plus runnable
-      pytest probes, and update affected project records. Do not commit.
-      End your reply with exactly one of:
-      verdict: APPROVED | verdict: CHANGES_REQUESTED" \
-     -o docs/project/evidence/m{N}-verdict-r{R}.txt
+      pytest probes, and update affected project records. Do not
+      commit."
    ```
 
+   Exec-level options (`-C`, `--approve-for-me`, `-c`) go **before**
+   `resume` — they are not resume's own options. `--json` tees the
+   event stream to stdout (capture it into
+   `m{N}-events-r{R}.jsonl`); `--output-schema` constrains the final
+   message, which `-o` saves — the verdict is a JSON artifact, not a
+   prose marker. The human-readable review lives in the repo files
+   Codex writes, not in `-o`.
+
+   The review session is provisioned **once per milestone**, before
+   its first round:
+
+   ```bash
+   /usr/lib/chatgpt/resources/codex exec -C "$REPO" --approve-for-me \
+     -c 'sandbox_workspace_write.network_access=true' \
+     "You are the independent reviewer for Taryx milestone M{N}.
+      Review conventions live in docs/project/documentation-guide.md
+      and docs/agent-notes/. Reply READY." \
+     -o docs/project/evidence/m{N}-session-bootstrap.md
+   ```
+
+   Record the new session id (from the `--json` event stream or
+   `session_index.jsonl`) in `handoff/state` or the journal — never
+   use `--last` in automation.
+
+   `--approve-for-me` selects workspace-write plus automatic review of
+   approval requests. Verified 2026-11-08: sandboxed file writes work
+   on both the create call and later `exec resume` rounds, and the
+   audit run itself wrote docs/backlog/journal inside this repo.
+   Whether automatic *escalation* (approval requests above the
+   sandbox) survives resume is unverified — `approval_policy` drops
+   to `never` on resume, which means "cannot ask", not "approve all".
+   `network_access=true` enables broad command networking (not just
+   localhost) and is needed for the dockerised Postgres on
+   localhost:55432 — DB reachability on resume still needs a live
+   round.
+
    Long reviews run as a backgrounded exec; Devin polls until exit.
-   Record `git rev-parse HEAD` before the call.
+   Record `git rev-parse HEAD` **and** `git status --porcelain`
+   before the call.
 
 2. **Gate checks on exit** — Devin verifies:
 
-   - HEAD unchanged (Codex never commits — checked, not trusted).
-   - The verdict file exists and ends with a verdict marker.
-   - If either fails, the turn counts as incomplete, not approved.
+   - HEAD unchanged *and* the working tree matches its pre-call state
+     except for allowed paths (`docs/`, probe files, `handoff/`).
+     An unchanged HEAD does **not** prove the source is unchanged —
+     staged, unstaged, and untracked writes must all be checked, and
+     unexpected-path writes make the round fail, not approved.
+   - The verdict JSON parses against the schema **and** its semantics:
+     `reviewed_sha` equals the candidate SHA, verdict ∈
+     `APPROVED | CHANGES_REQUESTED | BLOCKED`, required checks are
+     present. `APPROVED` with missing checks or a SHA mismatch is
+     rejected — schema compliance is not review correctness.
+   - A crash, timeout, missing verdict, or unexpected write counts as
+     an incomplete round, not an approval.
 
 3. **Commit the docs first** — Codex's working-tree output (review doc,
    probes, record updates) is reviewed by Devin and committed as the
@@ -68,11 +128,15 @@ For each milestone M{N}, after implementation and its commit:
    for the next round. The resumed thread carries prior-round context.
 
 5. **Termination** — proceed to the next milestone only on
-   `verdict: APPROVED` **and** the preserved probes green.
+   `verdict: APPROVED` in the schema output **and** the preserved
+   probes plus required project checks green. `BLOCKED` also ends the
+   loop — straight to escalation.
 
 6. **Escalation** — stop to the user after **3 rounds** without
-   approval, or on any ambiguous state (lock conflict, unparsable
-   verdict, Codex blocked needing input). Do not loop indefinitely.
+   approval, on `verdict: BLOCKED`, or on any ambiguous state (lock
+   conflict, unparsable verdict, unexpected writes, Codex blocked
+   needing input). Do not loop indefinitely; an authorized extra round
+   is recorded in loop state, not just conversation.
 
 ## Standing rules (unchanged)
 
@@ -81,16 +145,60 @@ For each milestone M{N}, after implementation and its commit:
 - Review docs, preserved probes, and record updates follow
   `docs/project/documentation-guide.md`.
 
+## Reviewer permissions
+
+Observed 2026-11-08 (M3 loop, rounds 1–4): the `Taryx project review`
+desktop thread runs a **managed restricted** profile — filesystem
+read-only, `network: restricted`, `approval_policy: never`, and `cwd`
+pinned to an unrelated project directory. It could source-review and
+report findings via `-o`, but could not write docs/probes or run the
+database tests.
+
+**Why interactive chat feels fully-permitted**: the app thread answers
+approval requests through `approvals_reviewer: auto_review` — an
+automated reviewer grants scoped elevation per action. That is the
+same thing `--approve-for-me` selects on the CLI; it is *not* the
+`--dangerously-bypass-approvals-and-sandbox` mode.
+
+**Why `exec resume` on that thread is read-only**: resume inherits the
+*session's* profile. "Managed" does not prove every override is
+ignored — admin requirements constrain overrides, but exact precedence
+for that thread is unverified. The reliable fix is to resume a session
+that was *created* with a writable profile.
+
+Verified 2026-11-08 on this machine:
+
+- `codex exec --approve-for-me` → `approval: on-request` (routed to
+  auto-review), `sandbox: workspace-write [workdir, /tmp, $TMPDIR]` —
+  wrote files and ran commands. The early probes wrote `/tmp` only.
+- `codex exec resume <that-session>` → keeps `workspace-write`,
+  `approval: never` — wrote files with no flags needed.
+- The self-audit run (`codex exec -C taryx --approve-for-me
+  -c 'sandbox_workspace_write.network_access=true'`) wrote
+  `codex-review-loop-audit.md`, backlog, and journal entries directly
+  into this repo — first live *repo* write evidence, not just `/tmp`.
+- Still unverified: approval escalation above the sandbox on resume,
+  and Postgres connectivity through the resumed session.
+
+Options, in preference order:
+
+1. **Dedicated exec session per milestone (adopted)** — fresh session
+   per milestone, resumed across that milestone's rounds.
+   Write/exec verified including repo paths. Not an app thread, so the
+   writer-lock rule does not apply.
+2. **New chat in the Codex "Taryx" project** on a trusted, writable
+   project profile — equivalent permissions via the app profile, plus
+   the transcript stays in the desktop UI. Writer-lock rule applies.
+3. **`--dangerously-bypass-approvals-and-sandbox`** — disables Codex
+   sandboxing and confirmations *where permitted*; it does not
+   override OS, container, or admin-enforced restrictions. Emergency
+   only — not required for the ordinary loop.
+4. **Fallback (verified)** — restricted thread + `-o` verdict `.md`
+   committed as the review artifact; Devin authors record updates.
+
 ## Known limitations
 
 - **Thread lock**: app-open thread breaks `exec resume` (above).
-- **Permission profile (observed, round 1)**: the thread runs
-  read-only with `approval_policy: never` — findings arrive in the
-  verdict file via `-o` but Codex cannot write review docs, probes or
-  record updates into the tree. Devin writes the remediation addendum
-  and record updates itself; if authored docs are required, create a
-  dedicated review thread with a writable profile or fall back to
-  per-round `codex exec -C $REPO --sandbox workspace-write` (stateless).
 - **Context growth**: resumed threads compact over many milestones; if
   the reviewer loses conventions, pin the review prompt text above or
   fall back to stateless rounds with the review doc as the contract.
