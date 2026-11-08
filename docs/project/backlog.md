@@ -10,8 +10,8 @@ Task sections own status; index icons mirror them. See the [documentation guide]
 - ✅ [TAR-002 — Establish the planning baseline](#tar-002)
 - ✅ [TAR-003 — Bootstrap the development workspace](#tar-003)
 - ✅ [TAR-004 — Freeze domain and measurement profiles](#tar-004)
-- ✅ [TAR-005 — Implement versioned meter ingestion and fixtures](#tar-005)
-- ✅ [TAR-006 — Implement deterministic itemised rating](#tar-006)
+- 🚧 [TAR-005 — Implement versioned meter ingestion and fixtures](#tar-005)
+- 🚧 [TAR-006 — Implement deterministic itemised rating](#tar-006)
 - ✅ [TAR-007 — Implement durable issuance and balanced posting](#tar-007)
 - ✅ [TAR-008 — Implement successive corrections and adjustments](#tar-008)
 - ✅ [TAR-009 — Deliver the core operator journey](#tar-009)
@@ -28,11 +28,13 @@ Task sections own status; index icons mirror them. See the [documentation guide]
 
 ## Delivery notes
 
+M1 metering review (2026-11-08): **changes requested** for TAR-005/TAR-006; [four findings](evidence/m1-metering-independent-review.md). This supersedes older M1 completion claims below and does not reopen the approved billing scope.
+
 Foundation review **approved** at `2704f119c5eba16c284fe93ffd5f86ba5d832847` after the explicitly authorised, resumed fourth round. F1–F4 resolved; 155 backend/6 frontend tests and all 25 preserved probes pass. See [scope, evidence and retained verification gaps](evidence/m1-independent-review.md). Earlier completion and reopening statements below are historical.
 
 M2 re-review findings are remediated and verified (both follow-up probes pass; see the [review](evidence/m2-independent-review.md)). Independent M3 re-review of `f9f21df` found F1–F4; all resolved and re-verified (13/13 preserved probes pass). Next action: close the remaining F2 cutover race in TAR-011/TAR-012 before M4. Later tasks remain Backlog until their dependencies and detailed contracts are ready. Portal/API slices can develop alongside their backend tasks; TAR-009 and TAR-012 own integrated acceptance. Observability hooks and correctness tests accompany implementation; TAR-016 owns the full cross-service campaign, not the first tests.
 
-The architecture and functional scope are the planning baseline; exact schemas, dependency versions and open profiles are refined in their named tasks. Split large tasks into new IDs before starting if necessary; preserve existing history. Next unused ID: TAR-020. M1 remains verified; M2 remediation is re-verified.
+The architecture and functional scope are the planning baseline; exact schemas, dependency versions and open profiles are refined in their named tasks. Split large tasks into new IDs before starting if necessary; preserve existing history. Next unused ID: TAR-020. M1 metering completion is reopened by the review above; prior M2 billing approval is retained.
 
 Re-review of `db18588` found one remaining F2 commit-window race; resolved by a shared cohort advisory-lock protocol between cutover and all gate-affecting writers — see the [third remediation addendum](evidence/m3-independent-review.md#third-remediation-addendum--2026-10-25).
 
@@ -173,7 +175,7 @@ Corrected after the [independent M1 review](evidence/m1-exit-review.md): QMM qua
 - Area: metering
 - Milestone: M1
 - Priority: High
-- Status: Done ✅
+- Status: In progress 🚧
 - Depends on: TAR-003, TAR-004
 - References: [Contract](features/metering-and-rating.md)
 
@@ -200,6 +202,9 @@ Ingest reproducible synthetic batches into versioned PostgreSQL metering history
 
 Remediated after the [independent M1 review](evidence/m1-exit-review.md): two-phase selection with per-interval locked re-evaluation, savepoint duplicate recovery (published and rejected), encoding/lexical/row-shape validation, and quarantine resolution by unambiguous newer winners. All ten review probes pass; regressions folded into tests/. Next action: TAR-006.
 
+
+2026-11-08 metering review: reopened at `230dc0f1078243e3448ecc145c842228b22cca8c`; see [M1 findings and probes](evidence/m1-metering-independent-review.md). Resolve M1-F1–F3 ingestion/selection failures and rerun independent probes before completion. Previous evidence above is historical.
+
 <a id="tar-006"></a>
 
 ## TAR-006 — Implement deterministic itemised rating
@@ -208,7 +213,7 @@ Remediated after the [independent M1 review](evidence/m1-exit-review.md): two-ph
 - Area: pricing
 - Milestone: M2
 - Priority: High
-- Status: Done ✅
+- Status: In progress 🚧
 - Depends on: TAR-005
 - References: [Contract](features/metering-and-rating.md)
 
@@ -224,7 +229,7 @@ Calculate supported supply/import/export charges from immutable snapshots.
 
 ### Completion evidence
 
-Not started; no implementation or verification evidence.
+Implementation and historical verification are recorded below. Current independent metering review: M1-F4 remains open; see the [review and reproduction](evidence/m1-metering-independent-review.md).
 
 ### Notes
 
@@ -237,6 +242,9 @@ Remediated 2026-10-25 (R5): RatingRun.input_snapshot now retains the exact diges
 Independent re-review of `de0e08d`: reopened for remaining R5 findings; see [review](evidence/m2-independent-review.md). Original checks pass; two follow-up rating probes failed.
 
 Re-remediated 2026-10-25: RatingLine membership is sealed via the same transaction-local open-flag mechanism as journals (pricing 0003) — a published run cannot gain lines; tariff band time-windows (and other calculation-affecting inputs) are serialised into the digest payload/snapshot so a window-only change repins. Both follow-up probes pass; regressions folded into tests/test_pricing.py.
+
+
+2026-11-08 metering review: reopened at `230dc0f1078243e3448ecc145c842228b22cca8c`; see [M1 findings and probes](evidence/m1-metering-independent-review.md). Resolve M1-F4 inconsistent rating snapshot coverage and rerun independent probes before completion. Previous evidence above is historical.
 
 <a id="tar-007"></a>
 
