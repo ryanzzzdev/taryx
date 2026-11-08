@@ -138,6 +138,28 @@ For each milestone M{N}, after implementation and its commit:
    needing input). Do not loop indefinitely; an authorized extra round
    is recorded in loop state, not just conversation.
 
+### Interruption and stop state
+
+Quota and other process deaths (usage limits, timeouts, crashes) are
+**incomplete rounds** — never approvals, never findings. Codex quota
+(5-hour and weekly windows on the ChatGPT plan) is a shared
+environmental constraint: a multi-milestone campaign can exhaust a
+window mid-round, as happened at foundation R4 on 2026-11-08.
+
+On any interrupted turn:
+
+1. Keep the partial `m{N}-events-r{R}.jsonl` — it records how far the
+   turn got, and the `turn.failed` payload carries the error and any
+   suggested retry time.
+2. Record the stop state in the journal: milestone, session id, round,
+   candidate SHA, reason, retry time. This is what makes a later
+   session resumable rather than archaeological.
+3. Inspect — never blindly keep or discard — working-tree writes the
+   died turn made; it may have been mid-review. Commit retained
+   partial artifacts labelled as interrupted output.
+4. Resume with `codex exec resume <same session id>` after the quota
+   window resets — the session's context survives the failed turn.
+
 ## Standing rules (unchanged)
 
 - Devin makes every commit; Codex makes none.

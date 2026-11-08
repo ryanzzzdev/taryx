@@ -83,3 +83,23 @@ def test_f4_authoritative_issued_evidence_rejects_mutation():
         LegacyCalculation.objects.using("shadow").filter(pk=invoice.legacy_calculation_id).update(
             response_json={"lines": []}, total=Decimal("999.00")
         )
+
+
+def test_f4_authoritative_issued_evidence_rejects_raw_delete():
+    """Exercise the new DELETE trigger through the restricted credential,
+    bypassing ORM protection and retaining the invoice's reference."""
+    from django.db import connections
+
+    invoice = issue_persisted_legacy()
+    with (
+        pytest.raises(DatabaseError, match="immutable"),
+        transaction.atomic(using="shadow"),
+        connections["shadow"].cursor() as cursor,
+    ):
+        cursor.execute(
+            "DELETE FROM migration_legacycalculation WHERE id = %s",
+            [invoice.legacy_calculation_id],
+        )
+    assert (
+        LegacyCalculation.objects.using("shadow").filter(pk=invoice.legacy_calculation_id).exists()
+    )
