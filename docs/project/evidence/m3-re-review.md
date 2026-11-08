@@ -115,3 +115,41 @@ container rebuild, or deployment/process-kill campaign was performed. Frontend
 verification is the existing tests/typecheck/build plus source review; earlier
 manual portal evidence remains historical. This is not release-readiness or
 production regulatory verification.
+
+---
+
+## Remediation — 2026-11-08 (Devin)
+
+Both findings resolved; the three preserved probes pass and are folded
+into `tests/test_migration.py` as regressions.
+
+- **M3-RR-F1 (incomplete output)** — `calculate` now reconciles usage
+  completeness against the request: import lines must bill exactly the
+  metered kWh across import-direction channels. An empty `lines` array
+  or a supply-only response raises `LegacyFailure("malformed")`, which
+  `run_comparison` persists as INCONCLUSIVE evidence and the billing
+  path rejects before issuance. Export credit is deliberately not
+  quantity-reconciled: catalogues legitimately truncate or omit
+  feed-in tariffs (the seeded FIT-TRUNC-2003 defect), and that
+  divergence is comparison evidence rather than a protocol defect.
+- **M3-RR-F2 (malformed line identity)** — `_parse_line` strictly
+  validates every protocol field's type: `element`, `tariff_code`,
+  `unit`, `basis`, `band`, `tariff_version` must be strings of the
+  right shape, `segment` must be exactly two ISO date strings, and
+  `lines` itself must be a list. `element: []` and similar malformed
+  identities now raise `LegacyFailure("malformed")` inside the parse
+  boundary instead of escaping as TypeError during comparison, so the
+  attempt persists INCONCLUSIVE and supersedes earlier success.
+
+A terminal outcome was also needed on the billing path: a malformed
+authoritative response is deterministic — retrying the same request
+reproduces it — so `process_operation` now finishes the operation as
+`FAILED` (new status) with the rejection detail rather than leaving it
+PENDING for unbounded outbox retries. Transient codes (timeout,
+unavailable, legacy_error) keep the existing retry semantics.
+
+Verification: preserved probes `m3_re_review_probes.py` **3 passed**;
+all 17 earlier M3 probes pass; migration suite **39 tests** including
+the three folded regressions; `make check` green — ruff lint/format,
+mypy, 3 import contracts, **164 backend tests**, 6 frontend tests,
+TypeScript check and production build.

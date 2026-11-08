@@ -17,6 +17,7 @@ class BillingOperation(models.Model):
         PENDING = "pending"
         COMPLETE = "complete"
         STALE = "stale"
+        FAILED = "failed"
 
     operation_id = models.CharField(max_length=64, unique=True)
     account = models.ForeignKey(Account, on_delete=models.PROTECT, related_name="billing_ops")

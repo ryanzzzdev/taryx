@@ -1,9 +1,10 @@
 # Legacy comparison and cohort migration
 
-Latest verification (2026-11-08): **changes requested** at `7d6c633`.
-TAR-010–012 reopened for missing-output acceptance and malformed line identities
-that leave earlier gate evidence eligible (M3-RR-F1/F2). The contract below is
-unchanged; implementation does not yet satisfy it. [Fresh independent review](../evidence/m3-re-review.md).
+Latest verification (2026-11-08): **changes requested** at `7d6c633`;
+M3-RR-F1/F2 remediated the same day — strict per-field line validation and
+import-usage completeness reconciliation route malformed responses through
+INCONCLUSIVE evidence and a terminal FAILED operation rather than issuing
+partial invoices or retrying forever. [Fresh independent review](../evidence/m3-re-review.md).
 Earlier verification statements below are historical.
 
 Current independent verification at `db18588`: one cutover evidence-update race remains (F2); see [review](../evidence/m3-independent-review.md). Other prior finding probes pass.

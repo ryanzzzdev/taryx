@@ -1148,3 +1148,105 @@ def test_pinned_legacy_evidence_is_immutable(legacy):
         LegacyCalculation.objects.using(SHADOW_ALIAS).filter(
             pk=op.invoice.legacy_calculation_id
         ).update(total=Decimal("999.00"))
+
+
+def _empty_legacy_response(run):
+    """A 200 body that reconciles arithmetically but bills nothing."""
+    from unittest.mock import MagicMock
+
+    response = MagicMock()
+    response.__enter__.return_value = response
+    response.status = 200
+    response.read.return_value = json.dumps(
+        {
+            "protocol": "taryx-legacy/1",
+            "engine": "legacy-sim",
+            "engine_version": "1.0.0",
+            "catalogue_version": "L-2003.4",
+            "snapshot_hash": run.input_digest,
+            "request_id": "missing-output",
+            "lines": [],
+            "net": "0",
+            "gst": "0",
+            "total": "0",
+        }
+    ).encode()
+    return response
+
+
+@pytest.mark.django_db(databases=["default", "shadow"], transaction=True)
+def test_missing_legacy_outputs_are_inconclusive():
+    """An arithmetically valid response that bills nothing for a nonempty
+    snapshot is incomplete output — inconclusive evidence, not parity."""
+    from unittest.mock import patch
+
+    cohort = _cohort(None, refs=("ACC-001",))
+    account, run = _rated(None)
+    assert run.total > 0 and run.lines.exists()
+    with patch("urllib.request.urlopen", return_value=_empty_legacy_response(run)):
+        comparison = run_comparison(run)
+    assert comparison.status == ComparisonRun.Status.INCONCLUSIVE
+    assert any(b.startswith("inconclusive:") for b in evaluation_blockers(cohort, **GATE))
+
+
+@pytest.mark.django_db(databases=["default", "shadow"], transaction=True)
+def test_partial_legacy_outputs_cannot_issue_incomplete_invoice(legacy):
+    """A supply-only legacy response cannot become an authoritative
+    invoice — the operation fails instead of issuing a partial bill."""
+    from unittest.mock import patch
+
+    from taryx.core.migration.legacy_adapter import build_request, calculate
+
+    cohort = _cohort(None, refs=("ACC-001",))
+    account, run = _rated(None)
+    op = _admit(account, run, cohort, "missing-output-bill")
+    complete = calculate(build_request(run.input_snapshot, run.input_digest), base_url=legacy)
+    payload = json.loads(_empty_legacy_response(run).read.return_value)
+    supply = [line for line in complete.lines if line.element == "supply"]
+    assert supply and len(supply) < len(complete.lines)
+    payload["lines"] = [
+        {**vars(line), "segment": [str(line.segment_from), str(line.segment_to)]} for line in supply
+    ]
+    payload["net"] = sum(line.amount for line in supply)
+    payload["gst"] = sum(line.gst for line in supply)
+    payload["total"] = payload["net"] + payload["gst"]
+    response = _empty_legacy_response(run)
+    response.read.return_value = json.dumps(payload, default=str).encode()
+    with patch("urllib.request.urlopen", return_value=response):
+        result = _process(op.operation_id, "http://legacy.invalid")
+    assert result.status == BillingOperation.Status.FAILED
+    assert result.invoice_id is None
+
+
+@pytest.mark.django_db(databases=["default", "shadow"], transaction=True)
+def test_invalid_line_identity_supersedes_prior_success(legacy):
+    """A malformed line identity routes through the failure taxonomy and
+    persists INCONCLUSIVE evidence that supersedes an earlier pass."""
+    from unittest.mock import patch
+
+    cohort = _cohort(None, refs=("ACC-001",))
+    account, run = _rated(None)
+    first = run_comparison(run, base_url=legacy)
+    _approve_all(cohort, first)
+    assert evaluation_blockers(cohort, **GATE) == []
+    calc = first.legacy_calculation
+    payload = dict(calc.response_json)
+    payload.update(
+        {
+            "protocol": "taryx-legacy/1",
+            "engine": "legacy-sim",
+            "engine_version": calc.engine_version,
+            "catalogue_version": calc.catalogue_version,
+            "snapshot_hash": run.input_digest,
+            "request_id": "invalid-line-identity",
+        }
+    )
+    for line in payload["lines"]:
+        line["segment"] = [line.pop("segment_from"), line.pop("segment_to")]
+    payload["lines"][0]["element"] = []
+    response = _empty_legacy_response(run)
+    response.read.return_value = json.dumps(payload).encode()
+    with patch("urllib.request.urlopen", return_value=response):
+        latest = run_comparison(run)
+    assert latest.status == ComparisonRun.Status.INCONCLUSIVE
+    assert any(b.startswith("inconclusive:") for b in evaluation_blockers(cohort, **GATE))

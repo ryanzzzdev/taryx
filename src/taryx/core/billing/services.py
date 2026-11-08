@@ -335,7 +335,19 @@ def process_operation(
         # BEFORE lock_inputs: the shadow connection's FK checks wait on
         # FOR UPDATE locks held by this transaction (account lock →
         # deadlock the database cannot detect cross-connection).
-        amounts = _authoritative_amounts(op, legacy_calculator)
+        try:
+            amounts = _authoritative_amounts(op, legacy_calculator)
+        except CalculationUnavailable as exc:
+            if exc.code != "malformed":
+                raise
+            # A malformed authoritative response is deterministic —
+            # retrying the identical request reproduces it, so the op
+            # fails terminally rather than retrying forever.
+            return _finish(
+                op,
+                BillingOperation.Status.FAILED,
+                f"authoritative response rejected: {exc}",
+            )
 
         # Commit-safe revalidation: lock the account and every row feeding
         # the digest, then recompute under those locks. Any input change

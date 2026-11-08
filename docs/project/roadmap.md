@@ -66,10 +66,12 @@ Excludes legacy cutover, a second client and external market integration. Full p
 ## M3 — Safe legacy migration
 
 Latest verdict (2026-11-08): **changes requested** at
-`7d6c633285d98ed7afd0ed42c8c873a55c4f9faf`. M3 remains **In progress**;
-TAR-010–012 reopened for M3-RR-F1/F2. Existing checks and 17 prior probes pass,
-but three new response-validation probes fail. [Fresh review](evidence/m3-re-review.md)
-supersedes the historical completion statements below.
+`7d6c633285d98ed7afd0ed42c8c873a55c4f9faf`; M3-RR-F1/F2 (incomplete legacy output
+and malformed line identities) remediated the same day — strict per-field line
+validation plus import-usage completeness reconciliation route both defect
+classes through `malformed` → INCONCLUSIVE evidence / terminal FAILED operation.
+All three probes folded into `tests/`; full checks pass (164 backend/6 frontend).
+[Fresh review](evidence/m3-re-review.md) — a re-review round is pending.
 
 Current verdict: Complete. The last F2 commit-window race is remediated — the commit-window probe and all 13 preserved M3 probes pass; see the [third remediation addendum](evidence/m3-independent-review.md#third-remediation-addendum--2026-10-25). Earlier verdicts below are historical.
 
