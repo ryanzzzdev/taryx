@@ -95,7 +95,7 @@ Excludes migration of an entire historical accounting database. Routing rollback
 
 ## M4 — Client variation and market boundary
 
-2026-11-08 independent review: **changes requested** at `2dbc5b0`. TAR-013 and TAR-015 reopened for M4-F1–F8; TAR-014 remains Done. M4 remains In progress. [Findings and probes](evidence/m4-independent-review.md). Earlier implementation verification below does not establish exit acceptance.
+2026-11-08 independent review: **changes requested** at `2dbc5b0`; TAR-013 and TAR-015 reopened for M4-F1–F8. 2026-11-08 R1 remediation applied all eight findings (credential isolation, bounded recovery, guarded transitions, protocol/envelope validation) — probes folded into `tests/test_market.py`, `make check` green (205 backend/6 frontend). M4 remains In progress pending independent re-review. [Findings, probes and remediation](evidence/m4-independent-review.md).
 
 Scope: TAR-013–015. Same-image isolated retailers, sourced or explicitly synthetic market workflow, durable adapter and deterministic counterparty simulator.
 

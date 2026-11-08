@@ -2,9 +2,10 @@ x-taryx-env: &taryx-env
   POSTGRES_HOST: db
   POSTGRES_PORT: "5432"
   POSTGRES_DB: taryx
-  # Non-superuser application role (member of the bootstrap owner, so it
-  # keeps owner privileges on aurora objects but is subject to ACLs
-  # elsewhere). Provisioning keeps the `taryx` superuser to itself.
+  # Non-superuser application role holding direct owner-equivalent
+  # grants on aurora objects; never a member of the bootstrap
+  # superuser (SET ROLE would bypass the ACLs). Provisioning keeps
+  # the `taryx` superuser to itself.
   POSTGRES_USER: taryx_app
   POSTGRES_PASSWORD: taryx_app
   CELERY_BROKER_URL: amqp://taryx:taryx@broker:5672/taryx
@@ -13,6 +14,8 @@ x-taryx-env: &taryx-env
   LEGACY_BASE_URL: http://legacy:8090
   MARKET_BASE_URL: http://market:8091
   MARKET_CALLBACK_URL: http://api:8000/callbacks/transfers
+  MARKET_TOKEN: taryx-market-token
+  MARKET_CALLBACK_TOKEN: taryx-market-token
 
 x-southgrid-env: &southgrid-env
   POSTGRES_HOST: db
@@ -27,6 +30,8 @@ x-southgrid-env: &southgrid-env
   LEGACY_BASE_URL: http://legacy-sg:8090
   MARKET_BASE_URL: http://market-sg:8091
   MARKET_CALLBACK_URL: http://api-sg:8000/callbacks/transfers
+  MARKET_TOKEN: taryx-market-sg-token
+  MARKET_CALLBACK_TOKEN: taryx-market-sg-token
 
 services:
   db:
@@ -67,8 +72,10 @@ services:
   broker:
     image: rabbitmq:4.3.7-management-alpine
     environment:
-      RABBITMQ_DEFAULT_USER: taryx
-      RABBITMQ_DEFAULT_PASS: taryx
+      # Provisioner-only administrator on fresh volumes; application
+      # users are non-administrator accounts scoped to their vhost.
+      RABBITMQ_DEFAULT_USER: taryx_admin
+      RABBITMQ_DEFAULT_PASS: taryx_admin
       RABBITMQ_DEFAULT_VHOST: taryx
     ports:
       - "5673:5672"
@@ -88,8 +95,8 @@ services:
     command: python /init/provision.py
     environment:
       BROKER_API: http://broker:15672
-      BROKER_USER: taryx
-      BROKER_PASS: taryx
+      BROKER_USER: taryx_admin
+      BROKER_PASS: taryx_admin
     volumes:
       - ./broker/init:/init:ro
     depends_on:
@@ -204,7 +211,7 @@ services:
   market-sg:
     build: ./market-sim
     environment:
-      MARKET_TOKEN: taryx-market-token
+      MARKET_TOKEN: taryx-market-sg-token
     command: python market_sim.py --port 8091 --db /data/market_sim.db
     ports:
       - "18093:8091"

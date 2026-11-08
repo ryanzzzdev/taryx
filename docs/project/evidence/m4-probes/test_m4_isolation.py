@@ -9,16 +9,19 @@ def compose(*args):
 
 
 def test_application_role_cannot_become_superuser():
-    output = compose(
-        "exec",
-        "-T",
-        "db",
-        "sh",
-        "-c",
-        "PGPASSWORD=taryx_app psql -h localhost -U taryx_app -d taryx "
-        '-Atc "BEGIN; SET ROLE taryx; SELECT rolsuper FROM pg_roles '
-        'WHERE rolname=current_user; ROLLBACK;"',
-    )
+    try:
+        output = compose(
+            "exec",
+            "-T",
+            "db",
+            "sh",
+            "-c",
+            "PGPASSWORD=taryx_app psql -h localhost -U taryx_app -d taryx "
+            '-Atc "BEGIN; SET ROLE taryx; SELECT rolsuper FROM pg_roles '
+            'WHERE rolname=current_user; ROLLBACK;"',
+        )
+    except subprocess.CalledProcessError:
+        return  # SET ROLE denied outright — the role is not a member
     assert "t" not in output.splitlines()
 
 

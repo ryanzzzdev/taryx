@@ -126,3 +126,53 @@ Probe: `test_outbox_validates_envelope`.
 - Same-image digest comparison, fresh-volume deployment, browser verification,
   hosted CI and real market conformance were not performed. No implementation
   changes, commits or pushes are part of this review.
+
+## Remediation — round 1 (2026-11-08)
+
+All eight findings remediated; runnable probes pass (7/7 service, 3/3 live
+isolation with the F1 probe accepting the stricter denial outcome).
+
+- **M4-F1** — `taryx_app` is no longer a member of `taryx` at all:
+  `REVOKE taryx FROM taryx_app` plus owner-equivalent grants on the existing
+  aurora objects (`WITH GRANT OPTION` so migration-time shadow grants still
+  work). `SET ROLE` is denied outright — stronger than the probe's
+  "succeeds but non-superuser" check; `test_application_role_cannot_become_superuser`
+  was amended to accept `CalledProcessError` (permission denied) as passing.
+  `taryx` must remain superuser: `taryx_southgrid` is owned by `taryx_sg`, so
+  only a superuser can manage its CONNECT grants — the superuser stays
+  confined to `db-init` provisioning. `taryx_sg` gains `CREATEROLE` for the
+  migration-time shadow-role creation when it migrates first on a fresh cluster.
+- **M4-F2** — `taryx` is demoted to a plain vhost-scoped user; a separate
+  `taryx_admin` administrator is confined to `broker-init` provisioning
+  (fresh volumes create it as `RABBITMQ_DEFAULT_USER`; existing volumes
+  bootstrap it through the legacy `taryx` admin, which is then demoted).
+- **M4-F3** — per-client market credentials: southgrid gets
+  `MARKET_TOKEN`/`MARKET_CALLBACK_TOKEN` `taryx-market-sg-token` on both the
+  adapter env and its simulator; aurora tokens are declared explicitly.
+- **M4-F4** — non-409 `MarketHttpError` submits count toward the attempt
+  budget; exhaustion transitions to `failed` instead of parking a draft the
+  sweep can never pick up again.
+- **M4-F5** — `submit_workflow` polls `GET /transfers/{correlation_id}`
+  before resending when `attempts > 0` (decision-005 in-flight recovery):
+  `submitted` re-arms the deadline, a terminal outcome applies through the
+  normal callback path, anything else falls through to resubmit.
+- **M4-F6** — the expiry→`reconciling` transition is a state-guarded
+  `UPDATE ... WHERE state='submitted'` (stale reads can't overwrite a
+  committed callback); the reconcile loop re-checks state under its lock
+  before the `unknown`→`failed` write.
+- **M4-F7** — callback fields are strictly validated (`seq` must be a
+  non-negative `int`, `occurred_at` must parse as ISO); submit acks and
+  reconcile responses must echo the workflow `correlation_id` or route to
+  reconciliation/ignored detail instead of transitioning.
+- **M4-F8** — the drain validates the outbox envelope (topic
+  `market.transfer_completed`, `version: "1"`, matching `correlation_id`,
+  `nmi`, `effective_date`, `occurred_at`) before touching core state;
+  invalid events record `attempts`/`last_error` and deliver nothing.
+
+Probe handling: the seven service probes are folded into
+`tests/test_market.py` (`TestReviewProbes`); the three live isolation
+probes remain in `m4-probes/` (they require a running Docker deployment,
+like the earlier live verification artifacts). Verification: probes 10/10;
+`make check` green — 205 backend, 6 frontend, lint/format, mypy, import
+contracts, TypeScript/build. Live: both workers reconnected on non-admin
+credentials; `taryx_app` retains full read/write on aurora objects.

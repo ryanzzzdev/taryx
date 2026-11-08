@@ -61,10 +61,13 @@ class FakeClient:
         item = self.posts.pop(0)
         if isinstance(item, Exception):
             raise item
+        item.setdefault("correlation_id", body["correlation_id"])
         return item
 
     def get(self, path):
         self.get_calls.append(path)
+        if not self.gets:
+            raise MarketTransport("no scripted response")
         item = self.gets.pop(0)
         if isinstance(item, Exception):
             raise item
@@ -76,7 +79,7 @@ def _callback(workflow, seq=1, outcome="completed"):
         "correlation_id": str(workflow.correlation_id),
         "seq": seq,
         "outcome": outcome,
-        "occurred_at": "2026-03-02t00:00:00Z",
+        "occurred_at": "2026-03-02T00:00:00Z",
     }
 
 
@@ -222,6 +225,106 @@ class TestSubmit:
         assert workflow.state == "failed"
         supply_point.refresh_from_db()
         assert supply_point.market_state == "none"
+
+
+class TestReviewProbes:
+    """Independent-review regressions (m4-probes folded in)."""
+
+    def test_http_failures_exhaust_to_terminal(self, db, supply_point, t0):
+        """Non-409 HTTP failures count toward the attempt budget — a
+        draft must not be excluded from the sweep permanently."""
+        from taryx.core.market.client import MarketHttpError
+
+        workflow = request_transfer(supply_point, t0.date())
+        client = FakeClient(posts=[MarketHttpError(503, "unavailable")] * 5)
+        for _ in range(5):
+            submit_workflow(workflow.correlation_id, client=client, now=t0)
+        sweep(client=client, now=t0 + timedelta(minutes=1))
+        workflow.refresh_from_db()
+        assert workflow.state == "failed"
+
+    def test_uncertain_submit_polls_before_retry(self, db, supply_point, t0):
+        """A resend after an uncertain submit polls last-known status
+        first — it must not blindly post a second request."""
+
+        class LostAck(FakeClient):
+            def post(self, path, body):
+                self.post_calls.append((path, body))
+                raise MarketTransport("ack lost")
+
+        workflow = request_transfer(supply_point, t0.date())
+        client = LostAck(
+            gets=[
+                {
+                    "correlation_id": str(workflow.correlation_id),
+                    "status": "completed",
+                    "last_seq": 1,
+                }
+            ]
+        )
+        submit_workflow(workflow.correlation_id, client=client, now=t0)
+        sweep(client=client, now=t0 + timedelta(seconds=10))
+        assert len(client.get_calls) >= 1
+        assert len(client.post_calls) == 1
+
+    @pytest.mark.parametrize("field,value", [("seq", 1.5), ("occurred_at", None)])
+    def test_invalid_callback_cannot_complete(self, db, submitted, field, value):
+        payload = _callback(submitted)
+        payload[field] = value
+        with pytest.raises(ValueError):
+            apply_callback(payload)
+
+    def test_terminal_callback_during_expiry_cannot_be_overwritten(
+        self, db, submitted, monkeypatch
+    ):
+        """A callback committing between the sweep's read and its state
+        change must not be overwritten by a stale in-memory state."""
+        from django.db.models.query import QuerySet
+
+        from taryx.core.market.models import TransferWorkflow
+
+        TransferWorkflow.objects.filter(pk=submitted.pk).update(
+            deadline_at=timezone.now() - timedelta(seconds=1)
+        )
+        original = QuerySet.__iter__
+        fired = False
+
+        def interleaved(queryset):
+            nonlocal fired
+            rows = original(queryset)
+            if (
+                not fired
+                and queryset.model is TransferWorkflow
+                and "deadline_at" in str(queryset.query)
+            ):
+                rows = iter(list(rows))
+                fired = True
+                apply_callback(_callback(submitted))
+            return rows
+
+        monkeypatch.setattr(QuerySet, "__iter__", interleaved)
+        sweep(client=FakeClient())
+        assert fired
+        submitted.refresh_from_db()
+        assert submitted.state == "completed"
+
+    def test_outbox_validates_envelope(self, db, submitted):
+        """A corrupt or foreign envelope must not mutate core state."""
+        apply_callback(_callback(submitted))
+        MarketOutbox.objects.filter(workflow=submitted).update(topic="invalid", payload={})
+        drain_market_outbox()
+        submitted.supply_point.refresh_from_db()
+        assert submitted.supply_point.market_state != "registered"
+
+    def test_ack_must_match_correlation(self, db, supply_point, t0):
+        """An ack for a different correlation must not mark submitted."""
+        workflow = request_transfer(supply_point, t0.date())
+        client = FakeClient(
+            posts=[{"correlation_id": str(uuid4()), "status": "submitted", "seq": 0}]
+        )
+        submit_workflow(workflow.correlation_id, client=client, now=t0)
+        workflow.refresh_from_db()
+        assert workflow.state != "submitted"
 
 
 def _free_port() -> int:

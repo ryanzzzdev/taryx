@@ -27,8 +27,18 @@ REVOKE CONNECT ON DATABASE taryx_southgrid FROM PUBLIC;
 GRANT CONNECT ON DATABASE taryx_southgrid TO taryx_sg;
 GRANT CONNECT ON DATABASE taryx_southgrid TO taryx_shadow;
 
--- Aurora's application role is a member of the bootstrap owner, so it
--- holds owner privileges on every taryx-owned object — but membership
--- never inherits SUPERUSER, so it stays subject to the ACLs above.
--- CREATEROLE covers the migration-time CREATE ROLE for taryx_shadow.
-GRANT taryx TO taryx_app;
+-- Aurora's application role must NOT be a member of the bootstrap
+-- superuser: SET ROLE would restore full power and bypass every ACL
+-- above. Grant owner-equivalent privileges on the existing objects
+-- directly instead; objects created later (migrations running as
+-- taryx_app) are owned by it. CREATEROLE covers the migration-time
+-- CREATE ROLE for taryx_shadow.
+REVOKE taryx FROM taryx_app;
+GRANT USAGE, CREATE ON SCHEMA public TO taryx_app;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO taryx_app WITH GRANT OPTION;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO taryx_app;
+GRANT ALL ON ALL FUNCTIONS IN SCHEMA public TO taryx_app;
+
+-- The southgrid app role needs CREATEROLE for the same migration-time
+-- shadow-role creation when it migrates first on a fresh cluster.
+ALTER ROLE taryx_sg CREATEROLE;

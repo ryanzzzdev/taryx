@@ -8,7 +8,7 @@ always resumes from durable state. Callbacks dedup on
 
 import hashlib
 import json
-from datetime import timedelta
+from datetime import datetime, timedelta
 from uuid import UUID
 
 from django.conf import settings
@@ -99,49 +99,86 @@ def _clear_pending(supply_point: SupplyPoint) -> None:
 def submit_workflow(correlation_id, *, client=None, now=None) -> TransferWorkflow:
     """Send (or resend) the durable request. Idempotent: the coordinator
     dedups on correlation_id, so a retry after an uncertain submit is
-    safe. 409 means the same correlation carries a different digest —
-    a caller bug, terminal."""
+    safe — but a resend first polls last-known status so a lost ack
+    never causes a blind duplicate. 409 means the same correlation
+    carries a different digest — a caller bug, terminal."""
     client = client or _client()
     now = now or timezone.now()
     conf = _conf()
+    recovered = None
     with transaction.atomic():
         workflow = TransferWorkflow.objects.select_for_update().get(correlation_id=correlation_id)
         if workflow.state != State.DRAFT:
             return workflow
         workflow.attempts += 1
-        try:
-            response = client.post("/transfers", _request_body(workflow))
-        except MarketTransport as exc:
-            workflow.detail = str(exc)[:500]
-            if workflow.attempts >= conf["max_attempts"]:
-                return _fail(workflow, f"submit attempts exhausted: {exc}")
+        if workflow.attempts > 1:
+            # Uncertain submit: ask the counterparty for last-known
+            # status before resending (decision 005 recovery).
+            try:
+                polled = client.get(f"/transfers/{correlation_id}")
+            except (MarketTransport, MarketHttpError, MarketMalformed):
+                polled = None
+            if polled and str(polled.get("correlation_id")) == str(correlation_id):
+                status = str(polled.get("status"))
+                last_seq = polled.get("last_seq")
+                if status in OUTCOMES and isinstance(last_seq, int) and last_seq >= 0:
+                    recovered = {"seq": last_seq, "outcome": status}
+                    workflow.detail = "recovered via status poll"
+                    workflow.save()
+                elif status == "submitted":
+                    # The lost ack was accepted — arm the outcome
+                    # deadline instead of resubmitting.
+                    workflow.state = State.SUBMITTED
+                    workflow.deadline_at = now + conf["outcome_deadline"]
+                    workflow.last_counterparty_status = "submitted"
+                    workflow.detail = "recovered via status poll"
+                    workflow.save()
+                    return workflow
+        if recovered is not None:
+            pass  # applied after this atomic commits
+        else:
+            try:
+                response = client.post("/transfers", _request_body(workflow))
+            except (MarketTransport, MarketHttpError) as exc:
+                if isinstance(exc, MarketHttpError) and exc.status == 409:
+                    return _fail(workflow, f"digest conflict under same correlation: {exc}")
+                workflow.detail = str(exc)[:500]
+                if workflow.attempts >= conf["max_attempts"]:
+                    return _fail(workflow, f"submit attempts exhausted: {exc}")
+                workflow.save()
+                return workflow
+            except MarketMalformed as exc:
+                # Malformed ack — outcome uncertain; reconcile asks the
+                # counterparty for last-known status instead of resubmitting.
+                workflow.state = State.RECONCILING
+                workflow.reconcile_deadline_at = now + conf["reconcile_budget"]
+                workflow.detail = f"malformed ack: {exc}"
+                workflow.save()
+                return workflow
+            if response.get("status") != "submitted" or str(response.get("correlation_id")) != str(
+                correlation_id
+            ):
+                workflow.state = State.RECONCILING
+                workflow.reconcile_deadline_at = now + conf["reconcile_budget"]
+                workflow.detail = f"unexpected ack: {response!r}"[:500]
+                workflow.save()
+                return workflow
+            workflow.state = State.SUBMITTED
+            workflow.deadline_at = now + conf["outcome_deadline"]
+            workflow.last_counterparty_status = "submitted"
+            workflow.detail = ""
             workflow.save()
-            return workflow
-        except MarketHttpError as exc:
-            if exc.status == 409:
-                return _fail(workflow, f"digest conflict under same correlation: {exc}")
-            workflow.detail = str(exc)[:500]
-            workflow.save()
-            return workflow
-        except MarketMalformed as exc:
-            # Malformed ack — outcome uncertain; reconcile asks the
-            # counterparty for last-known status instead of resubmitting.
-            workflow.state = State.RECONCILING
-            workflow.reconcile_deadline_at = now + conf["reconcile_budget"]
-            workflow.detail = f"malformed ack: {exc}"
-            workflow.save()
-            return workflow
-        if response.get("status") != "submitted":
-            workflow.state = State.RECONCILING
-            workflow.reconcile_deadline_at = now + conf["reconcile_budget"]
-            workflow.detail = f"unexpected ack: {response!r}"[:500]
-            workflow.save()
-            return workflow
-        workflow.state = State.SUBMITTED
-        workflow.deadline_at = now + conf["outcome_deadline"]
-        workflow.last_counterparty_status = "submitted"
-        workflow.detail = ""
-        workflow.save()
+    if recovered is not None:
+        apply_callback(
+            {
+                "correlation_id": str(correlation_id),
+                "seq": recovered["seq"],
+                "outcome": recovered["outcome"],
+                "occurred_at": now.isoformat(),
+            },
+            now=now,
+        )
+        return TransferWorkflow.objects.get(correlation_id=correlation_id)
     return workflow
 
 
@@ -155,9 +192,14 @@ def apply_callback(payload: dict, *, now=None) -> dict:
     now = now or timezone.now()
     try:
         correlation_id = UUID(str(payload["correlation_id"]))
-        seq = int(payload["seq"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError(f"malformed callback: {exc}") from exc
+    seq = payload.get("seq")
+    if not isinstance(seq, int) or isinstance(seq, bool) or seq < 0:
+        raise ValueError(f"malformed callback: seq {seq!r}")
+    try:
         outcome = str(payload["outcome"])
-        occurred_at = str(payload["occurred_at"])
+        occurred_at = datetime.fromisoformat(str(payload["occurred_at"])).isoformat()
     except (KeyError, TypeError, ValueError) as exc:
         raise ValueError(f"malformed callback: {exc}") from exc
     if outcome not in OUTCOMES:
@@ -201,6 +243,7 @@ def apply_callback(payload: dict, *, now=None) -> dict:
             MarketOutbox.objects.create(
                 workflow=workflow,
                 payload={
+                    "version": "1",
                     "correlation_id": str(correlation_id),
                     "nmi": workflow.supply_point.nmi,
                     "effective_date": workflow.effective_date.isoformat(),
@@ -232,10 +275,14 @@ def sweep(*, client=None, now=None) -> dict:
 
     expired = TransferWorkflow.objects.filter(state=State.SUBMITTED, deadline_at__lt=now)
     for workflow in expired:
-        workflow.state = State.RECONCILING
-        workflow.reconcile_deadline_at = now + conf["reconcile_budget"]
-        workflow.save()
-        counts["reconciling"] += 1
+        # State-guarded update: a callback that committed after this row
+        # was read must not be overwritten by a stale in-memory state.
+        counts["reconciling"] += TransferWorkflow.objects.filter(
+            pk=workflow.pk, state=State.SUBMITTED
+        ).update(
+            state=State.RECONCILING,
+            reconcile_deadline_at=now + conf["reconcile_budget"],
+        )
 
     ids = list(
         TransferWorkflow.objects.filter(state=State.RECONCILING).values_list("pk", flat=True)
@@ -243,6 +290,8 @@ def sweep(*, client=None, now=None) -> dict:
     for pk in ids:
         with transaction.atomic():
             workflow = TransferWorkflow.objects.select_for_update().get(pk=pk)
+            if workflow.state != State.RECONCILING:
+                continue
             if workflow.reconcile_deadline_at and workflow.reconcile_deadline_at < now:
                 _fail(workflow, "reconcile budget exhausted")
                 counts["failed"] += 1
@@ -254,13 +303,24 @@ def sweep(*, client=None, now=None) -> dict:
                 workflow.save()
                 continue
             status = str(response.get("status"))
+            correlation = response.get("correlation_id")
+            if correlation is not None and str(correlation) != str(workflow.correlation_id):
+                workflow.detail = "reconcile response for wrong correlation"
+                workflow.save()
+                continue
             workflow.last_counterparty_status = status
             workflow.save()
-        if status in OUTCOMES:
+        last_seq = response.get("last_seq")
+        if (
+            status in OUTCOMES
+            and isinstance(last_seq, int)
+            and not isinstance(last_seq, bool)
+            and last_seq >= 0
+        ):
             result = apply_callback(
                 {
                     "correlation_id": str(workflow.correlation_id),
-                    "seq": int(response.get("last_seq", 0)),
+                    "seq": last_seq,
                     "outcome": status,
                     "occurred_at": now.isoformat(),
                 },
@@ -270,8 +330,9 @@ def sweep(*, client=None, now=None) -> dict:
         elif status == "unknown":
             with transaction.atomic():
                 workflow = TransferWorkflow.objects.select_for_update().get(pk=pk)
-                _fail(workflow, "counterparty reports unknown correlation")
-            counts["failed"] += 1
+                if workflow.state == State.RECONCILING:
+                    _fail(workflow, "counterparty reports unknown correlation")
+                    counts["failed"] += 1
     return counts
 
 
@@ -289,6 +350,16 @@ def drain_market_outbox(*, now=None) -> int:
             with transaction.atomic():
                 workflow = event.workflow
                 supply_point = workflow.supply_point
+                payload = event.payload
+                if (
+                    event.topic != "market.transfer_completed"
+                    or payload.get("version") != "1"
+                    or payload.get("correlation_id") != str(workflow.correlation_id)
+                    or payload.get("nmi") != supply_point.nmi
+                    or not payload.get("effective_date")
+                    or not payload.get("occurred_at")
+                ):
+                    raise ValueError("invalid outcome envelope")
                 if (
                     workflow.state == State.COMPLETED
                     and supply_point.market_state != SupplyPoint.MarketState.REGISTERED
