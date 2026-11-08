@@ -18,7 +18,7 @@ Task sections own status; index icons mirror them. See the [documentation guide]
 - ✅ [TAR-010 — Build independent legacy characterisation](#tar-010)
 - ✅ [TAR-011 — Implement isolated shadow comparison and gates](#tar-011)
 - ✅ [TAR-012 — Deliver operator migration and cutover](#tar-012)
-- 🚧 [TAR-013 — Demonstrate two isolated client instances](#tar-013)
+- ✅ [TAR-013 — Demonstrate two isolated client instances](#tar-013)
 - ✅ [TAR-014 — Freeze the bounded market workflow](#tar-014)
 - 🚧 [TAR-015 — Implement market adapter and counterparty simulator](#tar-015)
 - 📋 [TAR-016 — Verify recovery and correlated diagnostics](#tar-016)
@@ -513,7 +513,7 @@ Re-review of `db18588` reopened this task for the remaining F2 commit-window rac
 - Area: deployment
 - Milestone: M4
 - Priority: High
-- Status: In progress 🚧
+- Status: Done ✅
 - Depends on: TAR-012
 - References: [Contract](features/operator-and-clients.md)
 
@@ -528,6 +528,8 @@ Run two fictional retailers from one core image with independent state and polic
 - Import contracts enforce client independence; shared physical infrastructure limits are documented.
 
 ### Completion evidence
+
+Round 5 at `98fad76`: approved remediation; live same-image and imported account/market code freshness verified in all four app containers. TAR-013 closed. [Evidence](evidence/m4-review-r5.md).
 
 Authorised round 4 at `853842c9ba24c92aa7d487ca3546910eef7107e1`: F11 same-image discrepancy resolved by live inspection; preserved isolation probes pass. Runtime market code differs from the candidate, so deployment verification remains qualified and this task stays In progress pending candidate-image verification. [Review](evidence/m4-review-r4.md).
 
@@ -610,6 +612,8 @@ Complete one durable market workflow across owned adapter and external test doub
 - Uncertain outcomes reconcile; unrelated core work stays responsive; M4 exit evidence is recorded.
 
 ### Completion evidence
+
+Round 5 at `98fad76`: **approved** remediation; M4-F8 resolved, 28 preserved/31 expanded probes pass and live imported modules match. Remains In progress for explicit market-outage billing availability and live adapter-restart exit evidence (or accepted allocation to TAR-016). No new code finding. [Review](evidence/m4-review-r5.md).
 
 Authorised round 4 at `853842c9ba24c92aa7d487ca3546910eef7107e1`: F7/F10 reported cases resolved; F8 remains open: a consumer using a stale supply-point instance can register a newer pending transfer. Keep In progress; make correlation validation/update atomic and retain the new interleaving probe. [Review](evidence/m4-review-r4.md).
 

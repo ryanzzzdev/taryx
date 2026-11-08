@@ -516,3 +516,9 @@ mypy, import contracts, TypeScript/build. Live: `taryx-app:latest`
 rebuilt; all four app containers recreated on digest `0e92fe3f…` and
 verified to import the atomic consumer (closes the round-4 gap where
 the running image predated the candidate).
+
+## Round 5 — authorised independent review
+
+Candidate `98fad76c78bb463200116ab3fc6bf0f20f3458bc`: **APPROVED** remediation.
+M4-F8 and live imported-code freshness gap resolved; 28 preserved and 31 expanded
+probes pass. [Full results and remaining milestone evidence](m4-review-r5.md).

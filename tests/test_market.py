@@ -28,7 +28,7 @@ from django.utils import timezone
 from taryx.core.accounts import services as account_services
 from taryx.core.accounts.models import SupplyPoint
 from taryx.core.accounts.seed import seed_demo_data
-from taryx.core.market.client import MarketClient, MarketTransport
+from taryx.core.market.client import MarketClient, MarketHttpError, MarketTransport
 from taryx.core.market.models import (
     MarketException,
     MarketInbox,
@@ -534,6 +534,56 @@ class TestReviewProbes:
         point.refresh_from_db()
         assert point.pending_transfer_id == newer.correlation_id
         assert point.market_state == "pending"
+
+    @pytest.mark.parametrize("ending", ["rejected", "failed"])
+    def test_superseded_terminal_cannot_clear_new_pending(self, db, ending, supply_point, t0):
+        """A terminal outcome for a superseded transfer must not release
+        the pending mark of the transfer that replaced it."""
+        old = request_transfer(supply_point, t0.date())
+        newer = request_transfer(supply_point, old.effective_date)
+        if ending == "rejected":
+            apply_callback(
+                {
+                    "correlation_id": str(old.correlation_id),
+                    "seq": 1,
+                    "outcome": "rejected",
+                    "occurred_at": t0.isoformat(),
+                }
+            )
+        else:
+
+            class Conflict:
+                def post(self, *args):
+                    raise MarketHttpError(409, "conflict")
+
+            submit_workflow(old.correlation_id, client=Conflict())
+        supply_point.refresh_from_db()
+        assert supply_point.market_state == "pending"
+        assert supply_point.pending_transfer_id == newer.correlation_id
+
+    def test_clear_and_replay_use_database_state(self, db, supply_point, t0):
+        """Correlation-scoped clear acts on current DB state; replaying
+        the registering outcome is a no-op and cannot re-open state."""
+        stale = SupplyPoint.objects.get(pk=supply_point.pk)
+        workflow = request_transfer(supply_point, t0.date())
+        account_services.clear_pending_transfer(stale, workflow.correlation_id)
+        supply_point.refresh_from_db()
+        assert supply_point.market_state == "none"
+        assert supply_point.pending_transfer_id is None
+        account_services.begin_transfer(stale, workflow.correlation_id)
+        payload = {
+            "version": "1",
+            "nmi": supply_point.nmi,
+            "correlation_id": str(workflow.correlation_id),
+            "effective_date": workflow.effective_date.isoformat(),
+            "occurred_at": t0.isoformat(),
+        }
+        account_services.apply_transfer_outcome(stale, payload)
+        account_services.apply_transfer_outcome(stale, payload)
+        account_services.clear_pending_transfer(stale, workflow.correlation_id)
+        supply_point.refresh_from_db()
+        assert supply_point.market_state == "registered"
+        assert supply_point.pending_transfer_id == workflow.correlation_id
 
 
 def _free_port() -> int:

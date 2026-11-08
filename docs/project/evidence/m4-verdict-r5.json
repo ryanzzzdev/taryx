@@ -1,0 +1,40 @@
+{
+  "reviewed_sha": "98fad76c78bb463200116ab3fc6bf0f20f3458bc",
+  "verdict": "APPROVED",
+  "summary": "M4-F8 resolved; no new findings. Live image and imported service code match. Records updated without committing. M4 remains in progress for outstanding operational exit evidence.",
+  "findings": [],
+  "checks": [
+    {
+      "command": "uv run pytest -q docs/project/evidence/m4-probes",
+      "outcome": "passed",
+      "evidence_path": "docs/project/evidence/m4-probes-r5-expanded.txt"
+    },
+    {
+      "command": "make check",
+      "outcome": "passed",
+      "evidence_path": "docs/project/evidence/m4-check-r5.txt"
+    },
+    {
+      "command": "uv run python docs/project/evidence/m4-probes/check_live_source.py",
+      "outcome": "passed",
+      "evidence_path": "docs/project/evidence/m4-live-source-r5.txt"
+    }
+  ],
+  "verification_gaps": [
+    "Live adapter restart and billing-under-market-outage were not exercised; TAR-015/M4 remain In progress.",
+    "No fresh-volume bootstrap, browser journey, hosted CI or real-market conformance campaign."
+  ],
+  "artifacts": [
+    "docs/project/evidence/m4-review-r5.md",
+    "docs/project/evidence/m4-probes/test_m4_round5.py",
+    "docs/project/evidence/m4-probes/check_live_source.py",
+    "docs/project/evidence/m4-probes-r5.txt",
+    "docs/project/evidence/m4-probes-r5-expanded.txt",
+    "docs/project/evidence/m4-check-r5.txt",
+    "docs/project/evidence/m4-live-source-r5.txt",
+    "docs/project/evidence/m4-independent-review.md",
+    "docs/project/backlog.md",
+    "docs/project/roadmap.md",
+    "docs/project/journal/2026-11.md"
+  ]
+}

@@ -1,0 +1,105 @@
+uv run ruff check src tests manage.py
+All checks passed!
+uv run ruff format --check src tests manage.py
+122 files already formatted
+uv run mypy src
+Success: no issues found in 107 source files
+./scripts/check-import-boundaries.sh
+
+╔══╗─────────▶╔╗ ╔╗      ╔╗◀───┐
+╚╣╠╝◀─────┐  ╔╝╚╗║║────▶╔╝╚╗   │
+ ║║   ╔══╦══╦╩╗╔╝║║  ╔╦═╩╗╔╝╔═╦══╗
+ ║║╔══╣╔╗║╔╗║╔╣║ ║║ ╔╬╣╔╗║║ ║│║╔═╝
+╔╣╠╣║║║╚╝║╚╝║║║╚╗║╚═╝║║║║║╚╗║═╣║
+╚══╩╩╩╣╔═╩══╩╝╚═╝╚═══╩╩╝╚╩═╩╩═╩╝
+  └──▶║║                    ▲ 
+      ╚╝────────────────────┘
+
+
+---------
+Contracts
+---------
+
+Analyzed 107 files, 90 dependencies.
+------------------------------------
+
+Domain layers: clients over territories over core KEPT
+Client packages are independent KEPT
+Core cannot import outer wiring KEPT
+
+Contracts: 3 kept, 0 broken.
+
+╔══╗─────────▶╔╗ ╔╗      ╔╗◀───┐
+╚╣╠╝◀─────┐  ╔╝╚╗║║────▶╔╝╚╗   │
+ ║║   ╔══╦══╦╩╗╔╝║║  ╔╦═╩╗╔╝╔═╦══╗
+ ║║╔══╣╔╗║╔╗║╔╣║ ║║ ╔╬╣╔╗║║ ║│║╔═╝
+╔╣╠╣║║║╚╝║╚╝║║║╚╗║╚═╝║║║║║╚╗║═╣║
+╚══╩╩╩╣╔═╩══╩╝╚═╝╚═══╩╩╝╚╩═╩╩═╩╝
+  └──▶║║                    ▲ 
+      ╚╝────────────────────┘
+
+
+---------
+Contracts
+---------
+
+Analyzed 108 files, 91 dependencies.
+------------------------------------
+
+Domain layers: clients over territories over core KEPT
+Client packages are independent KEPT
+Core cannot import outer wiring BROKEN
+
+Contracts: 2 kept, 1 broken.
+
+
+----------------
+Broken contracts
+----------------
+
+Core cannot import outer wiring
+-------------------------------
+
+taryx.core is not allowed to import taryx.interfaces:
+
+-   taryx.core._boundary_violation_probe -> taryx.interfaces.tasks (l.2)
+
+
+OK: deliberate core -> interfaces violation was rejected.
+uv run pytest -q
+........................................................................ [ 32%]
+........................................................................ [ 64%]
+........................................................................ [ 97%]
+......                                                                   [100%]
+222 passed in 175.95s (0:02:55)
+cd web && npm test && npm run typecheck && npm run build
+
+> test
+> vitest run
+
+
+ RUN  v5.0.5 /home/ryan/work/code/personal/taryx/web
+
+
+ Test Files  1 passed (1)
+      Tests  6 passed (6)
+   Start at  07:17:12
+   Duration  116ms (import 33%, transform 31%, tests 29%, worker 7%)
+
+
+> typecheck
+> tsc --noEmit
+
+
+> build
+> vite build
+
+vite v8.3.5 building client environment for production...
+transforming...
+✓ 16 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                  0.33 kB │ gzip:  0.23 kB
+dist/assets/index-Bzkj_dx3.js  233.62 kB │ gzip: 73.24 kB
+
+✓ built in 228ms
