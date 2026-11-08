@@ -6,8 +6,15 @@ accounts) is produced by `docker compose up`; these tests keep the
 declarations that produce it honest.
 """
 
+import base64
+import json
 import re
+import runpy
+import urllib.error
 from pathlib import Path
+from unittest.mock import patch
+
+import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 COMPOSE = (ROOT / "compose.yaml").read_text()
@@ -88,3 +95,61 @@ def test_second_stack_services_and_provisioning_order():
     assert "broker-init" in api_sg
     # Each client keeps its own legacy evidence store.
     assert "taryx-legacy-sg" in COMPOSE
+
+
+def test_shadow_credentials_are_client_scoped():
+    """M4-F9: the shared shadow role must never reach another client's
+    database — each deployment resolves its own shadow credential."""
+    assert "POSTGRES_SHADOW_USER: taryx_shadow_sg" in _env_anchor("southgrid")
+    assert "POSTGRES_SHADOW_USER: taryx_shadow\n" in _env_anchor("taryx")
+    assert "REVOKE CONNECT ON DATABASE taryx_southgrid FROM taryx_shadow" in DB_INIT
+    assert "GRANT CONNECT ON DATABASE taryx_southgrid TO taryx_shadow_sg" in DB_INIT
+    assert "taryx_shadow_sg" in DB_INIT
+    # Migration 0005 resolves the per-database shadow role from the GUC.
+    m5 = next((ROOT / "src/taryx/core/migration/migrations").glob("0005_*.py"))
+    assert "taryx.shadow_role" in m5.read_text()
+
+
+@pytest.mark.parametrize("legacy", [False, True])
+def test_broker_bootstrap_and_repeat(legacy, monkeypatch):
+    """The provisioner bootstrap works on a legacy volume (taryx admin)
+    and a fresh volume (taryx_admin), and re-running is idempotent."""
+    monkeypatch.setenv("BROKER_USER", "taryx_admin")
+    monkeypatch.setenv("BROKER_PASS", "taryx_admin")
+    monkeypatch.setenv("BROKER_BOOTSTRAP_USER", "taryx")
+    monkeypatch.setenv("BROKER_BOOTSTRAP_PASS", "taryx")
+    users = {"taryx" if legacy else "taryx_admin": "administrator"}
+    grants = set()
+
+    class Response:
+        status = 204
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+    def request(req):
+        user, password = (
+            base64.b64decode(req.get_header("Authorization").split()[1]).decode().split(":")
+        )
+        if users.get(user) != "administrator" or user != password:
+            raise urllib.error.HTTPError(req.full_url, 401, "unauthorized", {}, None)
+        path = req.full_url.split("/api/")[1]
+        method = req.get_method()
+        if method == "PUT" and path.startswith("users/"):
+            users[path.split("/")[1]] = json.loads(req.data)["tags"]
+        elif method == "PUT" and path.startswith("permissions/"):
+            grants.add(path)
+        elif method == "DELETE":
+            if path not in grants:
+                raise urllib.error.HTTPError(req.full_url, 404, "absent", {}, None)
+            grants.remove(path)
+        return Response()
+
+    with patch("urllib.request.urlopen", side_effect=request):
+        runpy.run_path(str(ROOT / "broker" / "init" / "provision.py"))
+        runpy.run_path(str(ROOT / "broker" / "init" / "provision.py"))
+    assert users == {"taryx": "", "taryx_admin": "administrator", "taryx_sg": ""}
+    assert grants == {"permissions/taryx/taryx", "permissions/taryx-sg/taryx_sg"}

@@ -95,7 +95,7 @@ Excludes migration of an entire historical accounting database. Routing rollback
 
 ## M4 — Client variation and market boundary
 
-Round 2 (2026-11-08): **changes requested** at `d1831219`; M4-F5/F7/F8 remain and M4-F9 identifies a shared runtime shadow credential crossing client boundaries. TAR-013/TAR-015 reopened, TAR-014 Done; M4 remains In progress. [Review](evidence/m4-independent-review.md#round-2--independent-verification-2026-11-08).
+Round 2 (2026-11-08): **changes requested** at `d1831219`; M4-F5/F7/F8 remain and M4-F9 identifies a shared runtime shadow credential crossing client boundaries. R2 remediation applied all four (durable submit markers, strict correlation/transport validation, core-owned outcome consumer, per-client shadow roles) — probes folded, `make check` green (216 backend/6 frontend). M4 remains In progress pending independent re-review. [Review and remediation](evidence/m4-independent-review.md).
 
 2026-11-08 independent review: **changes requested** at `2dbc5b0`; TAR-013 and TAR-015 reopened for M4-F1–F8. 2026-11-08 R1 remediation applied all eight findings (credential isolation, bounded recovery, guarded transitions, protocol/envelope validation) — probes folded into `tests/test_market.py`, `make check` green (205 backend/6 frontend). M4 remains In progress pending independent re-review. [Findings, probes and remediation](evidence/m4-independent-review.md).
 

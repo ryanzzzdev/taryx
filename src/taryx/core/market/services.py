@@ -13,8 +13,10 @@ from uuid import UUID
 
 from django.conf import settings
 from django.db import IntegrityError, transaction
+from django.db.models import F
 from django.utils import timezone
 
+from taryx.core.accounts import services as account_services
 from taryx.core.accounts.models import SupplyPoint
 from taryx.core.market.client import (
     MarketClient,
@@ -77,8 +79,7 @@ def request_transfer(supply_point: SupplyPoint, effective_date) -> TransferWorkf
             json.dumps(_request_fields(workflow), sort_keys=True).encode()
         ).hexdigest()
         workflow.save(update_fields=["request_digest"])
-        supply_point.market_state = SupplyPoint.MarketState.PENDING
-        supply_point.save(update_fields=["market_state"])
+        account_services.begin_transfer(supply_point)
     return workflow
 
 
@@ -86,14 +87,12 @@ def _fail(workflow: TransferWorkflow, detail: str) -> TransferWorkflow:
     workflow.state = State.FAILED
     workflow.detail = detail[:500]
     workflow.save()
-    _clear_pending(workflow.supply_point)
+    account_services.clear_pending_transfer(workflow.supply_point)
     return workflow
 
 
 def _clear_pending(supply_point: SupplyPoint) -> None:
-    if supply_point.market_state == SupplyPoint.MarketState.PENDING:
-        supply_point.market_state = SupplyPoint.MarketState.NONE
-        supply_point.save(update_fields=["market_state"])
+    account_services.clear_pending_transfer(supply_point)
 
 
 def submit_workflow(correlation_id, *, client=None, now=None) -> TransferWorkflow:
@@ -105,12 +104,20 @@ def submit_workflow(correlation_id, *, client=None, now=None) -> TransferWorkflo
     client = client or _client()
     now = now or timezone.now()
     conf = _conf()
+    # Durable intent marker BEFORE the network call: a crash after the
+    # counterparty accepted but before the state transaction commits
+    # must still leave evidence that a request may be in flight, so the
+    # next attempt polls instead of trusting a rolled-back counter.
+    marked = TransferWorkflow.objects.filter(
+        correlation_id=correlation_id, state=State.DRAFT
+    ).update(attempts=F("attempts") + 1)
+    if not marked:
+        return TransferWorkflow.objects.get(correlation_id=correlation_id)
     recovered = None
     with transaction.atomic():
         workflow = TransferWorkflow.objects.select_for_update().get(correlation_id=correlation_id)
         if workflow.state != State.DRAFT:
             return workflow
-        workflow.attempts += 1
         if workflow.attempts > 1:
             # Uncertain submit: ask the counterparty for last-known
             # status before resending (decision 005 recovery).
@@ -134,17 +141,15 @@ def submit_workflow(correlation_id, *, client=None, now=None) -> TransferWorkflo
                     workflow.detail = "recovered via status poll"
                     workflow.save()
                     return workflow
-        if recovered is not None:
-            pass  # applied after this atomic commits
-        else:
+        if recovered is None:
+            if workflow.attempts >= conf["max_attempts"]:
+                return _fail(workflow, "submit attempts exhausted")
             try:
                 response = client.post("/transfers", _request_body(workflow))
             except (MarketTransport, MarketHttpError) as exc:
                 if isinstance(exc, MarketHttpError) and exc.status == 409:
                     return _fail(workflow, f"digest conflict under same correlation: {exc}")
                 workflow.detail = str(exc)[:500]
-                if workflow.attempts >= conf["max_attempts"]:
-                    return _fail(workflow, f"submit attempts exhausted: {exc}")
                 workflow.save()
                 return workflow
             except MarketMalformed as exc:
@@ -264,9 +269,11 @@ def sweep(*, client=None, now=None) -> dict:
     conf = _conf()
     counts = {"retried": 0, "reconciling": 0, "resolved": 0, "failed": 0}
 
+    # At-cap drafts are included: submit polls last-known status first,
+    # so a stranded draft still recovers a terminal outcome instead of
+    # failing blind — and exhausts only when nothing comes back.
     drafts = TransferWorkflow.objects.filter(
         state=State.DRAFT,
-        attempts__lt=conf["max_attempts"],
         updated_at__lte=now - conf["retry_after"],
     ).values_list("correlation_id", flat=True)
     for correlation_id in drafts:
@@ -303,9 +310,8 @@ def sweep(*, client=None, now=None) -> dict:
                 workflow.save()
                 continue
             status = str(response.get("status"))
-            correlation = response.get("correlation_id")
-            if correlation is not None and str(correlation) != str(workflow.correlation_id):
-                workflow.detail = "reconcile response for wrong correlation"
+            if str(response.get("correlation_id")) != str(workflow.correlation_id):
+                workflow.detail = "reconcile response missing or wrong correlation"
                 workflow.save()
                 continue
             workflow.last_counterparty_status = status
@@ -351,21 +357,22 @@ def drain_market_outbox(*, now=None) -> int:
                 workflow = event.workflow
                 supply_point = workflow.supply_point
                 payload = event.payload
+                try:
+                    occurred_ok = bool(datetime.fromisoformat(str(payload["occurred_at"])))
+                except (TypeError, ValueError):
+                    occurred_ok = False
                 if (
                     event.topic != "market.transfer_completed"
-                    or payload.get("version") != "1"
                     or payload.get("correlation_id") != str(workflow.correlation_id)
-                    or payload.get("nmi") != supply_point.nmi
-                    or not payload.get("effective_date")
-                    or not payload.get("occurred_at")
+                    or payload.get("effective_date") != workflow.effective_date.isoformat()
+                    or not occurred_ok
                 ):
                     raise ValueError("invalid outcome envelope")
-                if (
-                    workflow.state == State.COMPLETED
-                    and supply_point.market_state != SupplyPoint.MarketState.REGISTERED
-                ):
-                    supply_point.market_state = SupplyPoint.MarketState.REGISTERED
-                    supply_point.save(update_fields=["market_state"])
+                if workflow.state == State.COMPLETED:
+                    # The validating core consumer owns the mutation —
+                    # it verifies the envelope's signature fields
+                    # (version, nmi) against the supply point.
+                    account_services.apply_transfer_outcome(supply_point, payload)
                 event.delivered_at = now
                 event.save(update_fields=["delivered_at"])
                 delivered += 1

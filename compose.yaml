@@ -8,6 +8,8 @@ x-taryx-env: &taryx-env
   # the `taryx` superuser to itself.
   POSTGRES_USER: taryx_app
   POSTGRES_PASSWORD: taryx_app
+  POSTGRES_SHADOW_USER: taryx_shadow
+  POSTGRES_SHADOW_PASSWORD: taryx_shadow
   CELERY_BROKER_URL: amqp://taryx:taryx@broker:5672/taryx
   DJANGO_DEBUG: "true"
   TARYX_CLIENT: aurora_energy
@@ -23,6 +25,10 @@ x-southgrid-env: &southgrid-env
   POSTGRES_DB: taryx_southgrid
   POSTGRES_USER: taryx_sg
   POSTGRES_PASSWORD: taryx_sg
+  # Client-scoped shadow credential — the shared taryx_shadow role is
+  # denied CONNECT on this database.
+  POSTGRES_SHADOW_USER: taryx_shadow_sg
+  POSTGRES_SHADOW_PASSWORD: taryx_shadow_sg
   CELERY_BROKER_URL: amqp://taryx_sg:taryx_sg@broker:5672/taryx-sg
   DJANGO_DEBUG: "true"
   DJANGO_CSRF_TRUSTED_ORIGINS: http://localhost:5175,http://127.0.0.1:5175

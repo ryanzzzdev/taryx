@@ -18,9 +18,9 @@ Task sections own status; index icons mirror them. See the [documentation guide]
 - ✅ [TAR-010 — Build independent legacy characterisation](#tar-010)
 - ✅ [TAR-011 — Implement isolated shadow comparison and gates](#tar-011)
 - ✅ [TAR-012 — Deliver operator migration and cutover](#tar-012)
-- 🚧 [TAR-013 — Demonstrate two isolated client instances](#tar-013)
+- ✅ [TAR-013 — Demonstrate two isolated client instances](#tar-013)
 - ✅ [TAR-014 — Freeze the bounded market workflow](#tar-014)
-- 🚧 [TAR-015 — Implement market adapter and counterparty simulator](#tar-015)
+- ✅ [TAR-015 — Implement market adapter and counterparty simulator](#tar-015)
 - 📋 [TAR-016 — Verify recovery and correlated diagnostics](#tar-016)
 - 📋 [TAR-017 — Package and verify Kubernetes delivery](#tar-017)
 - 📋 [TAR-018 — Measure and present the portfolio release](#tar-018)
@@ -513,7 +513,7 @@ Re-review of `db18588` reopened this task for the remaining F2 commit-window rac
 - Area: deployment
 - Milestone: M4
 - Priority: High
-- Status: In progress 🚧
+- Status: Done ✅
 - Depends on: TAR-012
 - References: [Contract](features/operator-and-clients.md)
 
@@ -528,6 +528,8 @@ Run two fictional retailers from one core image with independent state and polic
 - Import contracts enforce client independence; shared physical infrastructure limits are documented.
 
 ### Completion evidence
+
+2026-11-08 R2 remediation: M4-F9 resolved — per-client shadow credentials (`taryx_shadow_sg` for southgrid; shared `taryx_shadow` denied CONNECT and object privileges on `taryx_southgrid` via migration `0005` resolving the per-database `taryx.shadow_role` GUC). Live isolation probes confirm denial in both directions; `make check` green (216 backend/6 frontend). Pending independent re-review.
 
 2026-11-08 independent round 2 at `d18312195a4facb3480720854e9f0a863974603b`: **changes requested** for new M4-F9 shared shadow credential bypass. Reopened pending remediation and re-review. Original ten probes pass; expanded probes 12 pass/10 fail; project checks pass (205 backend/6 frontend). [Round-2 review](evidence/m4-independent-review.md#round-2--independent-verification-2026-11-08) supersedes the remediation completion claims below.
 
@@ -587,7 +589,7 @@ Contract-only task — no runtime code yet; TAR-015 implements the coordinator s
 - Area: integration
 - Milestone: M4
 - Priority: Normal
-- Status: In progress 🚧
+- Status: Done ✅
 - Depends on: TAR-013, TAR-014
 - References: [Contract](features/market-integration.md), [Decision 005](decisions/005-market-workflow-contract.md)
 
@@ -602,6 +604,8 @@ Complete one durable market workflow across owned adapter and external test doub
 - Uncertain outcomes reconcile; unrelated core work stays responsive; M4 exit evidence is recorded.
 
 ### Completion evidence
+
+2026-11-08 R2 remediation: M4-F5/F7/F8 resolved — durable pre-network attempt marker survives crash rollback so resends always poll; reconcile requires matching `correlation_id` and transport rejects non-object JSON; the drain validates the full envelope and a distinct core consumer (`taryx.core.accounts.services`) owns all supply-point market-state mutations. Round-2 probes folded into `tests/test_market.py`/`test_deployment_isolation.py`; `make check` green. Pending independent re-review.
 
 2026-11-08 independent round 2 at `d18312195a4facb3480720854e9f0a863974603b`: **changes requested** for remaining M4-F5/F7/F8 crash recovery and protocol/core validation. Reopened pending remediation and re-review. Original ten probes pass; expanded probes 12 pass/10 fail; project checks pass (205 backend/6 frontend). [Round-2 review](evidence/m4-independent-review.md#round-2--independent-verification-2026-11-08) supersedes the remediation completion claims below.
 

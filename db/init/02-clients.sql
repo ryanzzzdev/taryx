@@ -9,6 +9,11 @@ BEGIN
   IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'taryx_app') THEN
     CREATE ROLE taryx_app LOGIN PASSWORD 'taryx_app' CREATEROLE;
   END IF;
+  -- Per-client shadow credential (M4-F9): the shared taryx_shadow role
+  -- must never reach another client's database.
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'taryx_shadow_sg') THEN
+    CREATE ROLE taryx_shadow_sg LOGIN PASSWORD 'taryx_shadow_sg';
+  END IF;
 END $$;
 
 SELECT 'CREATE DATABASE taryx_southgrid OWNER taryx_sg'
@@ -21,11 +26,16 @@ GRANT CONNECT ON DATABASE taryx TO taryx_app;
 GRANT CONNECT ON DATABASE taryx TO taryx_shadow;
 
 -- Symmetric closure: taryx_southgrid is reachable only by its owner
--- and by the shared shadow-evidence role (its privileges inside the
--- database are granted per-database by the migration grants).
+-- and by its own shadow-evidence role. The shared taryx_shadow role
+-- is an aurora credential and is denied CONNECT here.
 REVOKE CONNECT ON DATABASE taryx_southgrid FROM PUBLIC;
+REVOKE CONNECT ON DATABASE taryx_southgrid FROM taryx_shadow;
 GRANT CONNECT ON DATABASE taryx_southgrid TO taryx_sg;
-GRANT CONNECT ON DATABASE taryx_southgrid TO taryx_shadow;
+GRANT CONNECT ON DATABASE taryx_southgrid TO taryx_shadow_sg;
+
+-- Per-database resolution used by migration 0005: the southgrid
+-- database's shadow role is taryx_shadow_sg, not the aurora one.
+ALTER DATABASE taryx_southgrid SET taryx.shadow_role TO 'taryx_shadow_sg';
 
 -- Aurora's application role must NOT be a member of the bootstrap
 -- superuser: SET ROLE would restore full power and bypass every ACL

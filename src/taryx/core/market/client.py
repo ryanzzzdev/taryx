@@ -60,9 +60,12 @@ class MarketClient:
         except (urllib.error.URLError, ConnectionError, OSError) as exc:
             raise MarketTransport(str(exc)) from exc
         try:
-            return json.loads(raw)
+            parsed = json.loads(raw)
         except ValueError as exc:
             raise MarketMalformed("response is not JSON") from exc
+        if not isinstance(parsed, dict):
+            raise MarketMalformed(f"response is not a JSON object: {type(parsed).__name__}")
+        return parsed
 
     def post(self, path: str, body: dict) -> dict:
         return self._call("POST", path, body)

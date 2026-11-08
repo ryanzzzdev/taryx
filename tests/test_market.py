@@ -5,6 +5,7 @@ spawns the real `market_sim.py` subprocess over HTTP to prove the wire
 shapes, idempotent resubmission and callback delivery agree.
 """
 
+import io
 import json
 import socket
 import subprocess
@@ -16,6 +17,7 @@ import urllib.request
 from datetime import timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from unittest.mock import patch
 from uuid import uuid4
 
 import pytest
@@ -71,6 +73,7 @@ class FakeClient:
         item = self.gets.pop(0)
         if isinstance(item, Exception):
             raise item
+        item.setdefault("correlation_id", path.rsplit("/", 1)[-1])
         return item
 
 
@@ -325,6 +328,107 @@ class TestReviewProbes:
         submit_workflow(workflow.correlation_id, client=client, now=t0)
         workflow.refresh_from_db()
         assert workflow.state != "submitted"
+
+    def test_crash_after_remote_acceptance_requires_poll(self, db, supply_point, t0, monkeypatch):
+        """A crash after the counterparty accepted rolls the state
+        transaction back — but the durable attempt marker commits
+        first, so the resend polls instead of reposting blindly."""
+
+        class ProcessDied(BaseException):
+            pass
+
+        workflow = request_transfer(supply_point, t0.date())
+        client = FakeClient(
+            posts=[{"correlation_id": str(workflow.correlation_id), "status": "submitted"}],
+            gets=[
+                {
+                    "correlation_id": str(workflow.correlation_id),
+                    "status": "completed",
+                    "last_seq": 1,
+                }
+            ],
+        )
+
+        def accepted_then_died(path, body):
+            client.post_calls.append((path, body))
+            raise ProcessDied()
+
+        monkeypatch.setattr(client, "post", accepted_then_died)
+        with pytest.raises(ProcessDied):
+            submit_workflow(workflow.correlation_id, client=client, now=t0)
+        sweep(client=client, now=t0 + timedelta(seconds=10))
+        assert len(client.get_calls) == 1
+        assert len(client.post_calls) == 1
+
+    def test_recovered_terminal_at_budget_survives_crash(self, db, supply_point, t0):
+        """A crash between terminal recovery and its application must
+        not strand an at-budget draft — the sweep still polls it."""
+        from taryx.core.market import services as s
+
+        class ProcessDied(BaseException):
+            pass
+
+        workflow = request_transfer(supply_point, t0.date())
+        workflow.attempts = 4
+        workflow.save(update_fields=["attempts"])
+        client = FakeClient(
+            gets=[
+                {
+                    "correlation_id": str(workflow.correlation_id),
+                    "status": "completed",
+                    "last_seq": 1,
+                }
+            ]
+            * 2
+        )
+        with (
+            patch.object(s, "apply_callback", side_effect=ProcessDied),
+            pytest.raises(ProcessDied),
+        ):
+            submit_workflow(workflow.correlation_id, client=client, now=t0)
+        sweep(client=client, now=t0 + timedelta(seconds=10))
+        workflow.refresh_from_db()
+        assert workflow.state == "completed"
+
+    def test_reconcile_missing_correlation_cannot_complete(self, db, submitted, t0):
+        """A reconcile response without the workflow's correlation_id
+        must not complete it — it records detail and stays reconciling."""
+        from taryx.core.market.models import TransferWorkflow
+
+        TransferWorkflow.objects.filter(pk=submitted.pk).update(
+            state="reconciling",
+            reconcile_deadline_at=t0 + timedelta(minutes=1),
+        )
+        client = FakeClient()
+        client.get = lambda path: {"status": "completed", "last_seq": 1}
+        sweep(client=client, now=t0 + timedelta(seconds=31))
+        submitted.refresh_from_db()
+        assert submitted.state == "reconciling"
+
+    @pytest.mark.parametrize("raw", [b"[]", b"null", b'"submitted"'])
+    def test_transport_rejects_nonobject_json(self, raw):
+        from unittest.mock import patch
+
+        from taryx.core.market.client import MarketClient, MarketMalformed
+
+        with (
+            patch("urllib.request.urlopen", return_value=io.BytesIO(raw)),
+            pytest.raises(MarketMalformed),
+        ):
+            MarketClient("http://unused", "token").get("/transfers/unused")
+
+    @pytest.mark.parametrize(
+        "field,value",
+        [("effective_date", "wrong-date"), ("occurred_at", "not-a-timestamp")],
+    )
+    def test_outbox_rejects_invalid_contract_fields(self, db, submitted, field, value):
+        apply_callback(_callback(submitted))
+        event = MarketOutbox.objects.get(workflow=submitted)
+        event.payload[field] = value
+        event.save(update_fields=["payload"])
+        assert drain_market_outbox() == 0
+        event.refresh_from_db()
+        assert event.delivered_at is None
 
 
 def _free_port() -> int:

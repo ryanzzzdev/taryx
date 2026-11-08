@@ -290,3 +290,41 @@ Probe: both `test_shadow_credential_cannot_read_other_client` cases fail.
   billing-under-market-outage, interactive browser or hosted CI verification.
   Broker bootstrap is model-tested; live probes only inspect current services.
   These limits remain distinct from the demonstrated failures above.
+
+## Remediation — round 2 (2026-11-08)
+
+All remaining findings plus new M4-F9 remediated; all 22 preserved probes pass.
+
+- **M4-F5** — the attempt marker is now a durable `UPDATE` committed in
+  its own transaction BEFORE the network call, so a crash after remote
+  acceptance still leaves evidence: the next attempt always polls
+  `GET /transfers/{correlation_id}` before resending (`attempts > 1`),
+  and the sweep no longer excludes at-cap drafts — a stranded draft gets
+  a final recovery poll instead of being ignored forever.
+- **M4-F7** — reconcile responses must carry the workflow's
+  `correlation_id` (a missing or foreign one is recorded and ignored);
+  the transport rejects non-object JSON (`[]`, `null`, scalars) as
+  `MarketMalformed` instead of crashing downstream.
+- **M4-F8** — the outbox envelope is fully validated: `effective_date`
+  must equal the workflow's, `occurred_at` must parse, and the
+  versioned signature fields (`version`, `nmi`) are verified by a
+  distinct validating core consumer — `taryx.core.accounts.services`
+  owns all supply-point market-state mutations (`begin_transfer`,
+  `clear_pending_transfer`, `apply_transfer_outcome`); the market
+  adapter no longer writes core tables itself.
+- **M4-F9** — per-client shadow credentials: new `taryx_shadow_sg`
+  role, `taryx_shadow` denied CONNECT on `taryx_southgrid`, per-database
+  `taryx.shadow_role` GUC, and migration `0005_client_shadow_role`
+  strips the shared role's object privileges inside a client database
+  resolving its own role and re-issues the 0001 evidence grant set.
+  `POSTGRES_SHADOW_USER/PASSWORD` is declared per deployment.
+
+Probe handling: the four round-2 service probes and the broker
+bootstrap model test are folded into `tests/test_market.py` and
+`tests/test_deployment_isolation.py`; the live isolation probes stay in
+`m4-probes/`. Also generated the missing `billing.0010` migration for
+the M3-era `BillingOperation.failed` choice (model/migration drift,
+choices-only). Verification: 22/22 probes; `make check` green —
+216 backend, 6 frontend, lint/format, mypy, import contracts,
+TypeScript/build. Live: migration 0005 applied on `taryx_southgrid`,
+images rebuilt and all four app services recreated.
