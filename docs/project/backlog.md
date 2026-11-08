@@ -18,9 +18,9 @@ Task sections own status; index icons mirror them. See the [documentation guide]
 - ✅ [TAR-010 — Build independent legacy characterisation](#tar-010)
 - ✅ [TAR-011 — Implement isolated shadow comparison and gates](#tar-011)
 - ✅ [TAR-012 — Deliver operator migration and cutover](#tar-012)
-- ✅ [TAR-013 — Demonstrate two isolated client instances](#tar-013)
+- 🚧 [TAR-013 — Demonstrate two isolated client instances](#tar-013)
 - ✅ [TAR-014 — Freeze the bounded market workflow](#tar-014)
-- ✅ [TAR-015 — Implement market adapter and counterparty simulator](#tar-015)
+- 🚧 [TAR-015 — Implement market adapter and counterparty simulator](#tar-015)
 - 📋 [TAR-016 — Verify recovery and correlated diagnostics](#tar-016)
 - 📋 [TAR-017 — Package and verify Kubernetes delivery](#tar-017)
 - 📋 [TAR-018 — Measure and present the portfolio release](#tar-018)
@@ -513,7 +513,7 @@ Re-review of `db18588` reopened this task for the remaining F2 commit-window rac
 - Area: deployment
 - Milestone: M4
 - Priority: High
-- Status: Done ✅
+- Status: In progress 🚧
 - Depends on: TAR-012
 - References: [Contract](features/operator-and-clients.md)
 
@@ -528,6 +528,8 @@ Run two fictional retailers from one core image with independent state and polic
 - Import contracts enforce client independence; shared physical infrastructure limits are documented.
 
 ### Completion evidence
+
+2026-11-08 independent round 2 at `d18312195a4facb3480720854e9f0a863974603b`: **changes requested** for new M4-F9 shared shadow credential bypass. Reopened pending remediation and re-review. Original ten probes pass; expanded probes 12 pass/10 fail; project checks pass (205 backend/6 frontend). [Round-2 review](evidence/m4-independent-review.md#round-2--independent-verification-2026-11-08) supersedes the remediation completion claims below.
 
 2026-11-08 R1 remediation: M4-F1–F3 resolved — `taryx_app` is no longer a member of the `taryx` superuser (SET ROLE denied outright; direct owner-equivalent grants on aurora objects); application broker users are non-administrator accounts (`taryx_admin` confined to `broker-init`); per-client market/callback tokens on both adapters and simulators. All 3 live isolation probes pass; `make check` green (205 backend/6 frontend). Pending independent re-review. [Remediation detail](evidence/m4-independent-review.md#remediation--round-1-2026-11-08)
 
@@ -585,7 +587,7 @@ Contract-only task — no runtime code yet; TAR-015 implements the coordinator s
 - Area: integration
 - Milestone: M4
 - Priority: Normal
-- Status: Done ✅
+- Status: In progress 🚧
 - Depends on: TAR-013, TAR-014
 - References: [Contract](features/market-integration.md), [Decision 005](decisions/005-market-workflow-contract.md)
 
@@ -600,6 +602,8 @@ Complete one durable market workflow across owned adapter and external test doub
 - Uncertain outcomes reconcile; unrelated core work stays responsive; M4 exit evidence is recorded.
 
 ### Completion evidence
+
+2026-11-08 independent round 2 at `d18312195a4facb3480720854e9f0a863974603b`: **changes requested** for remaining M4-F5/F7/F8 crash recovery and protocol/core validation. Reopened pending remediation and re-review. Original ten probes pass; expanded probes 12 pass/10 fail; project checks pass (205 backend/6 frontend). [Round-2 review](evidence/m4-independent-review.md#round-2--independent-verification-2026-11-08) supersedes the remediation completion claims below.
 
 2026-11-08 R1 remediation: M4-F4–F8 resolved — HTTP-failure submits exhaust to `failed`; uncertain resends poll `GET /transfers/{correlation_id}` first; the expiry→`reconciling` move is a state-guarded update; callback/ack/reconcile fields and correlations are strictly validated; the outbox drain validates the versioned `market.transfer_completed` envelope before mutating core. 7/7 service probes pass and are folded into `tests/test_market.py` (`TestReviewProbes`); `make check` green. Pending independent re-review. [Remediation detail](evidence/m4-independent-review.md#remediation--round-1-2026-11-08)
 

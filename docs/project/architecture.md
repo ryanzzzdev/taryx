@@ -106,3 +106,5 @@ AWS EKS, Terraform, ArgoCD and public hosting are future options. They are Krake
 ## M4 independent verification — 2026-11-08
 
 At `2dbc5b0`, client policy composition is present, but credential isolation and the market adapter ownership/recovery contracts are not yet satisfied. TAR-013/TAR-015 reopened for [M4-F1–F8](evidence/m4-independent-review.md); intended boundaries above remain the contract, not verified implementation guarantees. M3 approval is unchanged.
+
+M4 round 2 at `d1831219` (2026-11-08): the reported superuser and broker-admin escalation paths are resolved, but shared runtime shadow credentials still cross databases (M4-F9). Crash recovery and validated core outcomes remain incomplete (M4-F5/F7/F8). [Independent evidence](evidence/m4-independent-review.md#round-2--independent-verification-2026-11-08); intended architecture is not yet fully verified.

@@ -1,0 +1,68 @@
+{
+  "reviewed_sha": "d18312195a4facb3480720854e9f0a863974603b",
+  "verdict": "CHANGES_REQUESTED",
+  "summary": "F1/F2/F3/F4/F6 resolved; F5/F7/F8 remain, with new F9. Tightened F1 probe confirms actual SET ROLE denial. Original probes pass; expanded probes report 12 passed, 10 failed. Project checks pass. Records updated; no commits.",
+  "findings": [
+    {
+      "id": "M4-F5",
+      "severity": "high",
+      "location": "src/taryx/core/market/services.py:109-182",
+      "explanation": "A crash during submission rolls back the attempt marker, causing recovery to resend without polling. A crash between terminal poll recovery and callback application can strand an exhausted draft permanently."
+    },
+    {
+      "id": "M4-F7",
+      "severity": "high",
+      "location": "src/taryx/core/market/services.py:299-306; src/taryx/core/market/client.py:70-73",
+      "explanation": "Reconciliation accepts missing correlation IDs and can complete workflows from uncorrelated responses. Transport still accepts non-object JSON, allowing downstream attribute errors to abort processing."
+    },
+    {
+      "id": "M4-F8",
+      "severity": "high",
+      "location": "src/taryx/core/market/services.py:354-368",
+      "explanation": "Invalid effective dates and timestamps still register supply points. Required signature validation and the core consumer ownership boundary remain unimplemented."
+    },
+    {
+      "id": "M4-F9",
+      "severity": "high",
+      "location": "src/taryx/config/settings.py:65-72; db/init/02-clients.sql:23-31",
+      "explanation": "Both applications share the runtime shadow credential, which can connect to and read the other client's account tables. Live read-only probes confirm access in both directions."
+    }
+  ],
+  "checks": [
+    {
+      "command": "Preserved candidate probes",
+      "outcome": "passed",
+      "evidence_path": "docs/project/evidence/m4-probes-r2.txt"
+    },
+    {
+      "command": "uv run pytest -q docs/project/evidence/m4-probes",
+      "outcome": "failed",
+      "evidence_path": "docs/project/evidence/m4-probes-r2-expanded.txt"
+    },
+    {
+      "command": "UV_CACHE_DIR=/tmp/taryx-uv-cache make check",
+      "outcome": "passed",
+      "evidence_path": "docs/project/evidence/m4-check-r2.txt"
+    }
+  ],
+  "verification_gaps": [
+    "Crash probes simulate transaction boundaries; no live process-kill campaign performed.",
+    "Broker bootstrap was model-tested; no fresh-volume deployment performed.",
+    "Image-digest comparison, billing-under-market-outage, browser and hosted CI verification were not performed."
+  ],
+  "artifacts": [
+    "docs/project/evidence/m4-independent-review.md",
+    "docs/project/evidence/m4-probes/test_m4_isolation.py",
+    "docs/project/evidence/m4-probes/test_m4_round2.py",
+    "docs/project/evidence/m4-probes/test_m4_broker_bootstrap.py",
+    "docs/project/evidence/m4-probes-r2.txt",
+    "docs/project/evidence/m4-probes-r2-expanded.txt",
+    "docs/project/evidence/m4-check-r2.txt",
+    "docs/project/backlog.md",
+    "docs/project/roadmap.md",
+    "docs/project/architecture.md",
+    "docs/project/features/market-integration.md",
+    "docs/project/features/operator-and-clients.md",
+    "docs/project/journal/2026-11.md"
+  ]
+}

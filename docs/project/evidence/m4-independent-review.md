@@ -176,3 +176,117 @@ like the earlier live verification artifacts). Verification: probes 10/10;
 `make check` green — 205 backend, 6 frontend, lint/format, mypy, import
 contracts, TypeScript/build. Live: both workers reconnected on non-admin
 credentials; `taryx_app` retains full read/write on aurora objects.
+
+## Round 2 — independent verification (2026-11-08)
+
+Candidate and verified HEAD: `d18312195a4facb3480720854e9f0a863974603b`.
+Verdict: **CHANGES_REQUESTED**. M4-F1/F2/F3/F4/F6 are resolved for their reported
+cases; M4-F5/F7/F8 remain open, and M4-F9 is new. TAR-013/TAR-015 are reopened;
+TAR-014 remains Done, M4 In progress, and M3 approval unchanged. The remediation
+section above records implementer claims; this section supersedes its assertion
+that all eight findings are resolved.
+
+### Verification of resolved findings and probe integrity
+
+- **M4-F1:** the membership removal fixes the reported escalation. The amended
+  probe's intent (accept an actual SET ROLE denial) is valid, but catching every
+  `CalledProcessError` also accepted missing Docker, failed authentication or an
+  unavailable database. Tightened the preserved probe to require a successful
+  `SELECT current_user` as `taryx_app` and the exact permission-denied-to-set-role
+  diagnostic, with `ON_ERROR_STOP=1`. It passes against the live deployment.
+  This proves the actual denial, not merely a failing subprocess.
+- **M4-F2:** the live application broker user is no longer administrator. Reviewed
+  the fresh-admin and legacy-bootstrap branches in `broker/init/provision.py`;
+  isolated management-API model probes cover both branches and a second run,
+  including switching to the new admin after legacy demotion and handling DELETE
+  404. Both pass. These model tests do not claim a fresh RabbitMQ-volume boot.
+- **M4-F3:** Compose declares distinct adapter/callback and simulator credentials
+  for Southgrid; the preserved effective-Compose test passes.
+- **M4-F4:** HTTP failure exhaustion now reaches FAILED; preserved probe passes.
+- **M4-F6:** guarded expiry UPDATE and locked reconciliation state checks address
+  the reported stale transition windows; preserved interleaving probe passes.
+
+### M4-F5 — high — Crash recovery still loses durable submission knowledge
+
+Locations: `src/taryx/core/market/services.py:109-118,124-138,171-182,266-270`.
+Polling before resend works after an ordinary caught transport error, but not
+across the required crash boundaries:
+
+1. The attempt increment and network POST remain inside one database transaction.
+   A crash after remote acceptance rolls the increment back to zero. Recovery
+   sees a fresh draft and POSTs again without polling. The new probe injects a
+   process-death exception after simulated remote acceptance; GET count is zero
+   and POST count is two.
+2. Terminal poll recovery saves the incremented attempt count while leaving state
+   DRAFT, commits, then invokes `apply_callback` separately. If that application
+   is interrupted on attempt five, sweep excludes the draft forever via
+   `attempts__lt=max_attempts`. The new probe ends DRAFT instead of COMPLETED.
+
+Persist submit uncertainty before the external side effect and make recovered
+outcome application atomic or durably resumable independently of submit budget.
+Probes: `test_crash_after_remote_acceptance_requires_poll` and
+`test_recovered_terminal_at_budget_survives_crash`. These are deterministic
+transaction-boundary simulations, not a live process-kill campaign.
+
+### M4-F7 — high — Missing correlation and non-object JSON remain unvalidated
+
+Locations: `src/taryx/core/market/services.py:299-306` and
+`src/taryx/core/market/client.py:70-73`.
+Reconcile rejects an explicitly wrong correlation but accepts an absent/null one:
+`if correlation is not None ...` bypasses validation. A response containing only
+`status: completed, last_seq: 1` completes the workflow and creates an outbox event.
+The transport still returns JSON arrays/null/strings as if they were dictionaries;
+subsequent `.get` calls can abort a sweep, preventing later rows from progressing.
+Require a matching correlation and validated object shape on every response.
+Probes: `test_reconcile_missing_correlation_cannot_complete` and three
+`test_transport_rejects_nonobject_json` cases fail. R1 callback scalar validation
+and wrong-ack-correlation probes now pass, but do not close this broader finding.
+
+### M4-F8 — high — Core envelope validation remains incomplete
+
+Location: `src/taryx/core/market/services.py:354-368` (also admission and rejection
+at lines 76-96 and 258).
+Topic/version/correlation/NMI checks are improvements, but effective_date and
+occurred_at are only tested for truthiness. Replacing either with invalid text
+still registers the supply point and marks the event delivered. Effective date
+is not compared to the workflow, despite the remediation claim. There are still
+no signature fields/validation or distinct validating core consumer, and adapter
+admission/failure/rejection still directly mutate account state. Decision 005's
+ownership/signature requirements were not amended. Implement the complete
+accepted boundary and validation, or obtain an explicit contract change before
+claiming completion. Two `test_outbox_rejects_invalid_contract_fields` cases fail.
+
+### M4-F9 — high — Shared runtime shadow credential bypasses client isolation
+
+Locations: `src/taryx/config/settings.py:65-72`, `db/init/02-clients.sql:23-31`,
+and the missing per-client shadow overrides in `compose.yaml`.
+Both application deployments use `taryx_shadow` with the same credential. That
+role is explicitly allowed into both databases and has SELECT on their account
+tables. Read-only probes execute inside each API, load its configured shadow
+credential, connect to the other client's database, and check effective SELECT
+privilege on `accounts_account`: both return `readable`. Separate default DB
+roles therefore do not isolate the credentials actually available to each app.
+Use separate shadow roles/passwords and per-database grants; retain negative
+checks for every runtime credential. This is an M4 cross-client boundary finding,
+not a reopening of M3's within-deployment shadow financial-write restrictions.
+Probe: both `test_shadow_credential_cannot_read_other_client` cases fail.
+
+### Checks and limitations
+
+- Original candidate probes before reviewer tightening/additions: **10 passed**,
+  [m4-probes-r2.txt](m4-probes-r2.txt).
+- Final expanded probes: **12 passed, 10 failed**, all failures on intended
+  assertions, [m4-probes-r2-expanded.txt](m4-probes-r2-expanded.txt).
+  Run `UV_CACHE_DIR=/tmp/taryx-uv-cache uv run pytest -q docs/project/evidence/m4-probes`.
+  Added `test_m4_round2.py` and `test_m4_broker_bootstrap.py`; strengthened and
+  expanded `test_m4_isolation.py`. Database tests and project tests ran serially.
+- `UV_CACHE_DIR=/tmp/taryx-uv-cache make check`: **passed** (205 backend/6 frontend,
+  lint/format, mypy, import contracts including intentional negative check,
+  frontend typecheck/build), [m4-check-r2.txt](m4-check-r2.txt).
+- Probe lint/format and `git diff --check` pass; HEAD unchanged. Only review
+  artifacts and affected records changed; pre-existing `m4-events-r2.jsonl`
+  belongs to the driver. No commit or push.
+- No fresh-volume boot, image-digest comparison, live process-kill/restart,
+  billing-under-market-outage, interactive browser or hosted CI verification.
+  Broker bootstrap is model-tested; live probes only inspect current services.
+  These limits remain distinct from the demonstrated failures above.
