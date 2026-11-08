@@ -10,7 +10,7 @@ This is the initial delivery sequence, not a calendar commitment. The earlier 6�
 | Planning baseline | Architecture, feature contracts and evidence-driven backlog | Complete | Documentation setup |
 | M1 — Foundation and domain profile | Reproducible workspace, sourced profile and metering history | Complete | Planning baseline |
 | M2 — Explainable bills and corrections | End-to-end operator billing with financial integrity | Complete | M1 |
-| M3 — Safe legacy migration | Characterisation, shadow comparison and controlled cohort cutover | In progress | M2 |
+| M3 — Safe legacy migration | Characterisation, shadow comparison and controlled cohort cutover | Complete | M2 |
 | M4 — Client variation and market boundary | Second isolated client and bounded integration | In progress | M3 |
 | M5 — Operational portfolio delivery | Recovery evidence, Kubernetes and reproducible demonstration | Planned | M4 |
 
@@ -64,6 +64,12 @@ Exit criteria:
 Excludes legacy cutover, a second client and external market integration. Full process-fault and performance campaigns mature in M5, but tests necessary to establish financial correctness cannot be deferred.
 
 ## M3 — Safe legacy migration
+
+Latest independent verdict (2026-11-08 UTC): **approved** at `64ace7dda5a44ddede4a91f74d54eb85e03bfbe8`.
+M3 is **Complete**; TAR-010–012 completion confirmed. M3-RR-F1/F2 and the
+round-two boundary gaps are resolved; 25 preserved probes and full checks pass
+(197 backend/6 frontend). [Resumed review and limits](evidence/m3-re-review.md#round-two-resumed-independent-verification).
+The statements below are historical; M4 review remains separate.
 
 Latest verdict (2026-11-08): **changes requested** at
 `7d6c633285d98ed7afd0ed42c8c873a55c4f9faf`; M3-RR-F1/F2 (incomplete legacy output

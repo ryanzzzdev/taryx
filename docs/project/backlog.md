@@ -15,9 +15,9 @@ Task sections own status; index icons mirror them. See the [documentation guide]
 - ✅ [TAR-007 — Implement durable issuance and balanced posting](#tar-007)
 - ✅ [TAR-008 — Implement successive corrections and adjustments](#tar-008)
 - ✅ [TAR-009 — Deliver the core operator journey](#tar-009)
-- 🚧 [TAR-010 — Build independent legacy characterisation](#tar-010)
-- 🚧 [TAR-011 — Implement isolated shadow comparison and gates](#tar-011)
-- 🚧 [TAR-012 — Deliver operator migration and cutover](#tar-012)
+- ✅ [TAR-010 — Build independent legacy characterisation](#tar-010)
+- ✅ [TAR-011 — Implement isolated shadow comparison and gates](#tar-011)
+- ✅ [TAR-012 — Deliver operator migration and cutover](#tar-012)
 - ✅ [TAR-013 — Demonstrate two isolated client instances](#tar-013)
 - ✅ [TAR-014 — Freeze the bounded market workflow](#tar-014)
 - ✅ [TAR-015 — Implement market adapter and counterparty simulator](#tar-015)
@@ -422,6 +422,8 @@ Re-review at `db18588`: TAR-010 remediation verified by all original adapter and
 
 2026-11-08 fresh independent re-review at `7d6c633285d98ed7afd0ed42c8c873a55c4f9faf`: reopened for M3-RR-F1/F2 (missing legacy output and malformed line identities); remediated same day — strict per-field line validation and import-usage completeness reconciliation now route both defect classes through `malformed` → INCONCLUSIVE evidence / terminal FAILED operation. All three probes folded into `tests/`; [findings and remediation](evidence/m3-re-review.md).
 
+2026-11-08 resumed independent review: **approved** at `64ace7dda5a44ddede4a91f74d54eb85e03bfbe8`. M3-RR-F1/F2 and all round-two boundary gaps resolved; 25 preserved M3 probes and full checks pass (197 backend/6 frontend). Completion confirmed within the retained browser/deployment verification limits. [Resumed evidence](evidence/m3-re-review.md#round-two-resumed-independent-verification).
+
 <a id="tar-011"></a>
 
 ## TAR-011 — Implement isolated shadow comparison and gates
@@ -461,6 +463,8 @@ Re-review of `db18588` reopened this task for the remaining F2 commit-window rac
 
 2026-11-08 fresh independent re-review at `7d6c633285d98ed7afd0ed42c8c873a55c4f9faf`: reopened for M3-RR-F1/F2 (missing legacy output and malformed line identities); remediated same day — strict per-field line validation and import-usage completeness reconciliation now route both defect classes through `malformed` → INCONCLUSIVE evidence / terminal FAILED operation. All three probes folded into `tests/`; [findings and remediation](evidence/m3-re-review.md).
 
+2026-11-08 resumed independent review: **approved** at `64ace7dda5a44ddede4a91f74d54eb85e03bfbe8`. M3-RR-F1/F2 and all round-two boundary gaps resolved; 25 preserved M3 probes and full checks pass (197 backend/6 frontend). Completion confirmed within the retained browser/deployment verification limits. [Resumed evidence](evidence/m3-re-review.md#round-two-resumed-independent-verification).
+
 <a id="tar-012"></a>
 
 ## TAR-012 — Deliver operator migration and cutover
@@ -498,6 +502,8 @@ Independent re-review of `f9f21df` found F1–F4; all remediated with the five f
 Re-review of `db18588` reopened this task for the remaining F2 commit-window race; remediated with the cohort advisory-lock protocol — the commit-window probe now passes as a permanent regression. See the [third remediation addendum](evidence/m3-independent-review.md#third-remediation-addendum--2026-10-25).
 
 2026-11-08 fresh independent re-review at `7d6c633285d98ed7afd0ed42c8c873a55c4f9faf`: reopened for M3-RR-F1/F2 (missing legacy output and malformed line identities); remediated same day — strict per-field line validation and import-usage completeness reconciliation now route both defect classes through `malformed` → INCONCLUSIVE evidence / terminal FAILED operation. All three probes folded into `tests/`; [findings and remediation](evidence/m3-re-review.md).
+
+2026-11-08 resumed independent review: **approved** at `64ace7dda5a44ddede4a91f74d54eb85e03bfbe8`. M3-RR-F1/F2 and all round-two boundary gaps resolved; 25 preserved M3 probes and full checks pass (197 backend/6 frontend). Completion confirmed within the retained browser/deployment verification limits. [Resumed evidence](evidence/m3-re-review.md#round-two-resumed-independent-verification).
 
 <a id="tar-013"></a>
 

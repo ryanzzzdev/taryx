@@ -1,5 +1,13 @@
 # Legacy comparison and cohort migration
 
+Latest verification (2026-11-08 UTC): **approved** at `64ace7dda5a44ddede4a91f74d54eb85e03bfbe8`.
+TAR-010–012 are verified complete within the [review limits](../evidence/m3-re-review.md#round-two-resumed-independent-verification).
+Missing import usage or daily supply fails response validation. Malformed
+legacy billing responses terminate the operation as FAILED without issuance;
+SHADOW failures persist INCONCLUSIVE gate evidence before propagating. Timeout
+and unavailable remain PENDING/retryable. Export-credit differences remain
+comparison evidence. Earlier verification statements below are historical.
+
 Latest verification (2026-11-08): **changes requested** at `7d6c633`;
 M3-RR-F1/F2 remediated the same day — strict per-field line validation and
 import-usage completeness reconciliation route malformed responses through

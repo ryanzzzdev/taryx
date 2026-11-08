@@ -1,5 +1,10 @@
 # M3 independent re-review
 
+Latest verdict: **APPROVED** at `64ace7dda5a44ddede4a91f74d54eb85e03bfbe8` (2026-11-08,
+resumed round two). M3-RR-F1/F2 and the round-two boundary gaps are resolved.
+See [resumed verification](#round-two-resumed-independent-verification).
+Earlier findings and implementation assessments below remain historical.
+
 Candidate and verified HEAD: `7d6c633285d98ed7afd0ed42c8c873a55c4f9faf`.
 Date: 2026-11-08. Scope: TAR-010–012, safe legacy migration.
 Reviewer: Codex (GPT-6 family; exact variant unavailable).
@@ -183,3 +188,77 @@ keep PENDING/retry semantics — only `malformed` terminates FAILED.
 All five round-two probes pass and are folded into
 `tests/test_migration.py`; the full suite is green (169 backend,
 6 frontend).
+
+## Round two resumed independent verification
+
+Date: 2026-11-08 (UTC). Reviewer: Codex (GPT-6 family; exact variant unavailable).
+Reviewed SHA: `64ace7dda5a44ddede4a91f74d54eb85e03bfbe8`. Verdict: **APPROVED** for
+M3 / TAR-010–012. No outstanding findings in this review scope.
+
+The earlier round-two runs were interrupted by quota and produced no approval.
+This completed review uses the latest candidate explicitly supplied by the user.
+`git rev-parse HEAD` matched before and after verification. `git diff --quiet
+820d5db..HEAD -- src/taryx/core/migration src/taryx/core/billing
+tests/test_migration.py` passed: those paths are byte-identical to remediation
+commit `820d5dbbc42dff924de2433b8fbc920ec8ea0829`. Current task/GraphQL wiring
+was also inspected for the later policy-selection changes; the legacy failure
+adapter remains connected. This is not an independent M4 approval.
+
+### Finding disposition
+
+- **M3-RR-F1 resolved:** missing import output and omitted daily supply are
+  rejected before issuance. Import quantity reconciles to the requested usage;
+  supply quantity reconciles to the distinct requested record-day count.
+  The original empty/partial-output probes and the omitted-supply boundary
+  probe pass. Export credit remains comparison evidence, preserving the
+  intentionally characterised FIT truncation behaviour rather than requiring
+  new/legacy export parity at the protocol boundary.
+- **M3-RR-F2 resolved:** malformed line identities are rejected inside the
+  parser; `OverflowError` from `agreement_id: 1e309` becomes `malformed`.
+  Both original and overflow probes persist INCONCLUSIVE evidence that
+  supersedes earlier success and blocks the gate.
+- **Round-two SHADOW failure gap resolved:** `calculate_for_billing` invokes
+  the shared `_persist_inconclusive` path before propagating `LegacyFailure`
+  under SHADOW routing. The probe verifies that a malformed operation finishes
+  FAILED, its outbox event is delivered, and cutover is nevertheless rejected
+  for inconclusive evidence. The two transient-code probes confirm timeout
+  and unavailable leave the operation PENDING and outbox undelivered.
+
+### Checks on this candidate
+
+- `UV_CACHE_DIR=/tmp/taryx-review-uv make check` — **passed**: ruff lint/format,
+  mypy, all import contracts plus deliberate-violation rejection,
+  **197 backend tests** (98.39s), **6 frontend tests**, TypeScript and Vite build.
+  Counts include intervening M4 tests; passing them is not a substitute for M4
+  independent review.
+- All seven preserved M3 probe files — **25 passed** (24.11s): eight re-review
+  probes plus 17 earlier probes, including admission, rollback, deadlock and
+  commit-window regressions. No probes were changed or newly added this run.
+- Ruff check/format of both re-review probe files — **passed**.
+- Final `git diff --check`, UTF-8/local-link checks, M3 task index/status
+  consistency, candidate HEAD and allowed-path checks — **passed**.
+
+Reproduce the probe run:
+
+```bash
+.venv/bin/pytest -q \
+  docs/project/evidence/m3_re_review_probes.py \
+  docs/project/evidence/m3_re_review_r2_probes.py \
+  docs/project/evidence/m3_review_probes.py \
+  docs/project/evidence/m3_followup_probes.py \
+  docs/project/evidence/m3_commit_window_probe.py \
+  docs/project/evidence/m3_gate_deadlock_probe.py \
+  docs/project/evidence/m3_admission_cutover_probe.py
+```
+
+Checks used the existing virtual environment and local PostgreSQL/default and
+shadow roles, with approved local-service access for simulator sockets. Probe
+fault responses are injected while gate/persistence/billing paths use the real
+database. No fresh interactive browser journey, clean installation, hosted CI,
+container rebuild, deployment or process-kill campaign was performed; earlier
+manual portal evidence is retained as history. Approval is scoped to M3 and
+these recorded limits, not general release readiness.
+
+Only affected project records were edited. The pre-existing untracked driver
+log `docs/project/evidence/m3-events-r2c.jsonl` was preserved. No implementation
+changes or commits were made.

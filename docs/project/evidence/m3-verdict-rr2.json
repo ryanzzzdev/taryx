@@ -1,0 +1,41 @@
+{
+  "reviewed_sha": "64ace7dda5a44ddede4a91f74d54eb85e03bfbe8",
+  "verdict": "APPROVED",
+  "summary": "HEAD verified. M3-RR-F1/F2 and round-two boundary gaps are resolved. All 25 preserved probes and required checks pass. M3 records updated; no commit made. Approval excludes M4.",
+  "findings": [],
+  "checks": [
+    {
+      "command": "git rev-parse HEAD; git diff --quiet 820d5db..HEAD -- src/taryx/core/migration src/taryx/core/billing tests/test_migration.py",
+      "outcome": "passed",
+      "evidence_path": "docs/project/evidence/m3-re-review.md"
+    },
+    {
+      "command": "UV_CACHE_DIR=/tmp/taryx-review-uv make check",
+      "outcome": "passed",
+      "evidence_path": "docs/project/evidence/m3-re-review.md"
+    },
+    {
+      "command": "pytest: all seven preserved M3 probe files — 25 passed",
+      "outcome": "passed",
+      "evidence_path": "docs/project/evidence/m3-re-review.md"
+    },
+    {
+      "command": "Probe lint/format; git diff --check; documentation links, UTF-8, status and allowed-path checks",
+      "outcome": "passed",
+      "evidence_path": "docs/project/evidence/m3-re-review.md"
+    }
+  ],
+  "verification_gaps": [
+    "No fresh interactive browser journey; frontend tests, typecheck and build passed.",
+    "Clean installation, hosted CI, container rebuild, deployment and process-kill campaigns were outside this review."
+  ],
+  "artifacts": [
+    "docs/project/evidence/m3-re-review.md",
+    "docs/project/evidence/m3-exit-review.md",
+    "docs/project/backlog.md",
+    "docs/project/roadmap.md",
+    "docs/project/features/legacy-migration.md",
+    "docs/project/architecture.md",
+    "docs/project/journal/2026-11.md"
+  ]
+}

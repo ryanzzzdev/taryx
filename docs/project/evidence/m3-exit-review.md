@@ -1,5 +1,10 @@
 # M3 exit review — safe legacy migration
 
+Latest independent verdict (2026-11-08 UTC): **APPROVED** at `64ace7dda5a44ddede4a91f74d54eb85e03bfbe8`.
+M3-RR-F1/F2 and round-two boundary gaps resolved; 25 preserved probes and full
+checks pass. [Resumed verification and limits](m3-re-review.md#round-two-resumed-independent-verification).
+Earlier verdicts below are historical.
+
 Latest independent verdict (2026-11-08): **CHANGES_REQUESTED** at `7d6c633`;
 TAR-010–012 reopened for M3-RR-F1/F2. See the [fresh re-review](m3-re-review.md).
 The implementation assessments and completion statements below are historical.

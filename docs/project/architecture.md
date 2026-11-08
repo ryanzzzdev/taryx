@@ -70,6 +70,13 @@ A calculation is pinned to meter revision selection, tariff/agreement versions, 
 
 ## Legacy migration boundary
 
+Current verification (2026-11-08 UTC): M3 approved at `64ace7dda5a44ddede4a91f74d54eb85e03bfbe8`;
+[resumed independent review](evidence/m3-re-review.md#round-two-resumed-independent-verification).
+Malformed authoritative responses finish billing operations FAILED without
+financial issuance; SHADOW failures persist INCONCLUSIVE gate evidence through
+the same restricted writer as explicit comparison attempts. Transient failures
+remain PENDING for retry. Historical review statements below are superseded.
+
 Re-review at `f9f21df`: complete gate validation, successive source-change generations and malformed-value handling remain unverified/failed; see F1–F4 in the [review](evidence/m3-independent-review.md).
 
 Implementation review at `c06e1fc` leaves this contract partially verified: policy preservation, commit-safe gate freshness, legacy version identity, recovery and financial generation identity need remediation. See [independent M3 review](evidence/m3-independent-review.md).
