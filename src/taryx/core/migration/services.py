@@ -307,7 +307,7 @@ def transition_cohort(
     gate for any move to NEW_ONLY.
     """
     with transaction.atomic():
-        cohort = Cohort.objects.select_for_update().filter(pk=cohort_id).first()
+        cohort = Cohort.objects.select_for_update(no_key=True).filter(pk=cohort_id).first()
         if cohort is None:
             raise MigrationError("not_found", "no such cohort")
         if cohort.routing_revision != expected_revision:
@@ -338,7 +338,15 @@ def transition_cohort(
             # first evaluation are now visible (stale → reject); ones
             # still in flight block on the account lock and can only
             # commit after this transaction — i.e. after cutover.
-            members = list(Account.objects.filter(cohort=cohort).order_by("pk").select_for_update())
+            # FOR NO KEY UPDATE: blocks every input mutator (all take
+            # FOR UPDATE) but NOT the FOR KEY SHARE row locks that
+            # evidence writers' FK checks take implicitly — so a writer
+            # holding the gate lock never waits on a member row, which
+            # is the deadlock the gate-lock ordering would otherwise
+            # create (advisory → account vs account → advisory).
+            members = list(
+                Account.objects.filter(cohort=cohort).order_by("pk").select_for_update(no_key=True)
+            )
             # Hold the shared gate lock from the final re-read through
             # commit: writers of evidence/decisions/memberships either
             # committed before this point (re-evaluated above) or block
@@ -405,6 +413,10 @@ def decide_discrepancy(
     if source is None:
         raise MigrationError("diff_not_found", "no cohort evidence carries that fingerprint")
     with transaction.atomic():
+        # Parent-row lock before the gate lock: the decision insert's FK
+        # check would otherwise take FOR KEY SHARE on the cohort while
+        # the advisory lock is held, inverting the global ordering.
+        Cohort.objects.select_for_update().get(pk=cohort.pk)
         _gate_lock(cohort.id, using="default")
         return DiscrepancyDecision.objects.create(
             cohort=cohort,

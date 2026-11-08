@@ -84,11 +84,13 @@ For each milestone M{N}, after implementation and its commit:
 ## Known limitations
 
 - **Thread lock**: app-open thread breaks `exec resume` (above).
-- **Permission profile**: the thread runs a managed restricted
-  filesystem profile with `approval_policy: never`. If it cannot write
-  into `docs/` on the first real review, create a dedicated review
-  thread with a writable profile or fall back to per-round
-  `codex exec -C $REPO --sandbox workspace-write` (stateless).
+- **Permission profile (observed, round 1)**: the thread runs
+  read-only with `approval_policy: never` — findings arrive in the
+  verdict file via `-o` but Codex cannot write review docs, probes or
+  record updates into the tree. Devin writes the remediation addendum
+  and record updates itself; if authored docs are required, create a
+  dedicated review thread with a writable profile or fall back to
+  per-round `codex exec -C $REPO --sandbox workspace-write` (stateless).
 - **Context growth**: resumed threads compact over many milestones; if
   the reviewer loses conventions, pin the review prompt text above or
   fall back to stateless rounds with the review doc as the contract.

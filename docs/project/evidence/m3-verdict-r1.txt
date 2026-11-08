@@ -1,0 +1,7 @@
+**P2 — Cutover still deadlocks with new comparison evidence.** In [services.py:341](/home/ryan/work/code/personal/taryx/src/taryx/core/migration/services.py:341), cutover locks account rows before acquiring the advisory lock. Evidence writers acquire these locks in reverse order through foreign-key checks. PostgreSQL can abort either transaction with `deadlock detected`.
+
+This was reproduced during the preceding review; `c0c0c1f` makes no implementation changes to resolve it. The runnable [deadlock probe](/home/ryan/work/code/personal/taryx/docs/project/evidence/m3_gate_deadlock_probe.py) is already committed. Establish consistent lock ordering across cutover, evidence and decision writers.
+
+This session is **read-only with approvals disabled**. I could not update review records or rerun database tests. No files changed or commits created; the requested documentation closeout remains incomplete.
+
+verdict: CHANGES_REQUESTED

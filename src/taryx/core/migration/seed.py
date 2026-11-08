@@ -36,6 +36,10 @@ def seed_migration_cohort() -> Cohort:
     from taryx.core.migration.services import _gate_lock
 
     with transaction.atomic():
+        # Parent rows before the gate lock — the membership rows'
+        # FK checks take FOR KEY SHARE on both.
+        Cohort.objects.select_for_update().get(pk=cohort.pk)
+        list(members.order_by("pk").select_for_update())
         _gate_lock(cohort.id, using="default")
         cohort.members.set(members)
     return cohort

@@ -183,3 +183,14 @@ F2's remaining commit-window race is resolved by a shared serialization protocol
 An evidence write now either commits before the lock is held (then the complete re-evaluation sees and rejects it) or blocks until after the route commit — nothing can land inside the window. The `m3_commit_window_probe.py` case passes via blocked publication bounded by its statement timeout.
 
 Verification: the commit-window probe plus all 13 preserved M3 probes pass; the probe is folded into `tests/test_migration.py` alongside the updated F2 race case (32 migration tests); 146 pytest total; format/lint/mypy/import contracts clean. Verified live: a comparison write through the API container blocked 6.7s on a manually held cohort gate lock, then committed — the protocol serializes against the real database and credentials.
+
+
+## Fourth remediation addendum — 2026-11-08 (loop round 1)
+
+Codex round 1 (`codex exec resume`, read-only thread — verdict in `m3-verdict-r1.txt`): **CHANGES_REQUESTED**, one P2 — cutover locks member account rows `FOR UPDATE` before acquiring the advisory gate lock, while evidence writers acquire the same locks in reverse through foreign-key checks (`FOR KEY SHARE` on the account row after the advisory lock). PostgreSQL aborts either side with `deadlock detected` — reproduced by the preserved `m3_gate_deadlock_probe.py`.
+
+**Resolution**: the member account locks and the cohort row lock in `transition_cohort` are now `FOR NO KEY UPDATE`. That strength still blocks every input mutator (ingestion, `lock_inputs`, billing ops all take `FOR UPDATE`) and serializes concurrent transitions, but does NOT conflict with the `FOR KEY SHARE` locks that evidence/decision/membership inserts take implicitly through FK checks — so a writer holding the gate lock can never be queued behind a row lock the cutover holds. The earlier parent-lock-first alternative was rejected: the restricted `taryx_shadow` role has no privilege to take row locks on `accounts_account` at all, and the billing path intentionally persists evidence before `lock_inputs` runs.
+
+`decide_discrepancy` and the seeded membership `set` keep explicit parent-row locks before the gate lock (consistent cohort → accounts → advisory ordering on the default connection).
+
+Verification: `m3_gate_deadlock_probe.py` and `m3_commit_window_probe.py` pass unchanged in intent (the deadlock probe's instrumentation is restored — the writer can once again hold the advisory mid-window without deadlocking); 13/13 preserved probes + 32 migration tests + 146 pytest; format/lint/mypy/contracts green; live seed + comparison + gate re-verified.
