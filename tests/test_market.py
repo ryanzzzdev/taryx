@@ -25,6 +25,8 @@ from django.test import Client as HttpClient
 from django.test import override_settings
 from django.utils import timezone
 
+from taryx.core.accounts import services as account_services
+from taryx.core.accounts.models import SupplyPoint
 from taryx.core.accounts.seed import seed_demo_data
 from taryx.core.market.client import MarketClient, MarketTransport
 from taryx.core.market.models import (
@@ -500,6 +502,38 @@ class TestReviewProbes:
         sweep(client=client, now=t0 + timedelta(seconds=10))
         workflow.refresh_from_db()
         assert workflow.state != "completed"
+
+    def test_consumer_rechecks_correlation_after_concurrent_delivery(self, db):
+        """A consumer working from a supply-point instance read before a
+        competing delivery must validate against current database state:
+        the check lives in the conditional UPDATE, so a stale object can
+        never let an old outcome register a newer pending transfer."""
+        point = seed_demo_data()[0].supply_points.get()
+        old = request_transfer(point, timezone.now().date())
+        payload = {
+            "version": "1",
+            "correlation_id": str(old.correlation_id),
+            "nmi": point.nmi,
+            "effective_date": old.effective_date.isoformat(),
+            "occurred_at": timezone.now().isoformat(),
+        }
+        apply_callback(
+            {
+                "correlation_id": str(old.correlation_id),
+                "seq": 1,
+                "outcome": "completed",
+                "occurred_at": payload["occurred_at"],
+            }
+        )
+        stale = SupplyPoint.objects.get(pk=point.pk)
+        assert drain_market_outbox() == 1
+        point.refresh_from_db()
+        newer = request_transfer(point, old.effective_date)
+        with pytest.raises(ValueError, match="pending transfer"):
+            account_services.apply_transfer_outcome(stale, payload)
+        point.refresh_from_db()
+        assert point.pending_transfer_id == newer.correlation_id
+        assert point.market_state == "pending"
 
 
 def _free_port() -> int:

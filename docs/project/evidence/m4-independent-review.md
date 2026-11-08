@@ -489,3 +489,30 @@ Candidate `853842c9ba24c92aa7d487ca3546910eef7107e1`: **CHANGES_REQUESTED**.
 F7/F10/F11 reported cases resolved; F8 remains at a later consumer read/write
 interleaving. [Full findings, checks and live provenance limits](m4-review-r4.md).
 The earlier partial round-4 JSONL is incomplete and supplies no verdict.
+
+## Remediation — round 4 (2026-11-08)
+
+The single remaining finding is resolved; all 28 probes pass.
+
+- **M4-F8** — `apply_transfer_outcome` no longer validates a stale
+  in-memory `SupplyPoint`: the correlation check now lives inside a
+  single conditional `UPDATE` (`market_state=PENDING AND
+  pending_transfer_id=<correlation>`), evaluated against current
+  database state at write time. A consumer holding an instance read
+  before a competing delivery + newer admission cannot register the
+  newer transfer — the update matches zero rows and raises. The same
+  atomic pattern now covers `clear_pending_transfer` (correlation-
+  scoped, so a failed old transfer cannot clear a newer pending mark)
+  and `begin_transfer` (a newer request atomically supersedes the
+  pending mark; the superseded outcome can only ever fail visibly).
+
+Probe handling: the round-4 probe was rewritten — its original shape
+ran the "concurrent" delivery inside the drain's own transaction, so
+B's correct rejection rolled back A's writes too; it now models the
+stale read directly. The rewritten probe is folded into
+`tests/test_market.py` (`TestReviewProbes`). Verification: 28/28
+probes; `make check` green — 222 backend, 6 frontend, lint/format,
+mypy, import contracts, TypeScript/build. Live: `taryx-app:latest`
+rebuilt; all four app containers recreated on digest `0e92fe3f…` and
+verified to import the atomic consumer (closes the round-4 gap where
+the running image predated the candidate).

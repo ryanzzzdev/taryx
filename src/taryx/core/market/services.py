@@ -87,12 +87,12 @@ def _fail(workflow: TransferWorkflow, detail: str) -> TransferWorkflow:
     workflow.state = State.FAILED
     workflow.detail = detail[:500]
     workflow.save()
-    account_services.clear_pending_transfer(workflow.supply_point)
+    account_services.clear_pending_transfer(workflow.supply_point, workflow.correlation_id)
     return workflow
 
 
-def _clear_pending(supply_point: SupplyPoint) -> None:
-    account_services.clear_pending_transfer(supply_point)
+def _clear_pending(supply_point: SupplyPoint, transfer_id) -> None:
+    account_services.clear_pending_transfer(supply_point, transfer_id)
 
 
 def submit_workflow(correlation_id, *, client=None, now=None) -> TransferWorkflow:
@@ -263,7 +263,7 @@ def apply_callback(payload: dict, *, now=None) -> dict:
                 },
             )
         else:
-            _clear_pending(workflow.supply_point)
+            _clear_pending(workflow.supply_point, workflow.correlation_id)
     return {"status": outcome}
 
 
