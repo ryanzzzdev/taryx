@@ -3,6 +3,9 @@
 Status: pilot convention, agreed 2026-11-08; revised same day after a
 Codex self-audit (`codex-review-loop-audit.md` — its findings are
 adopted selectively here; recommendations there are not all binding).
+The project-agnostic mechanism now lives in the global
+`codex-review-loop` skill (linked from `campaign`); this document is
+the Taryx instance — session ids, evidence paths, and observed quirks.
 Predecessors: `multi-agent-handoff-problem.md` (problem framing),
 `multi-agent-orchestrator-research.md` (what takt/ccbridge do).
 
