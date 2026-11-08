@@ -15,6 +15,8 @@ M4 independent review (2026-11-08): implementation acceptance reopened for TAR-0
 
 Round-2 independent review at `d1831219` (2026-11-08): TAR-013 reopened for M4-F9: both runtime shadow credentials can read the other client database. [Evidence](../evidence/m4-independent-review.md#round-2--independent-verification-2026-11-08). Remediation completion claims above are superseded; M3 approval is unchanged.
 
+Round 3 at `4b65cf58` (2026-11-08): F9 cross-client shadow isolation verified resolved; F11 shows different running application image IDs, leaving TAR-013 incomplete. [Evidence](../evidence/m4-independent-review.md#round-3--independent-verification-2026-11-08) supersedes earlier M4 completion claims.
+
 ## Operator journeys
 
 The portal supports account/supply-point inspection, ingestion status and rejected data, bill/line-item provenance, original and revised liability, operation recovery, comparison reports and cohort cutover. Introduce these screens with their backend milestones rather than leaving all UI integration until the end.

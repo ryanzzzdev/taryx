@@ -75,3 +75,20 @@ else:
             print("readable" if cursor.fetchone()[0] else "denied")
 """
     assert compose("exec", "-T", service, "python", "-c", script).strip() == "denied"
+
+
+def test_clients_run_same_application_image():
+    output = subprocess.check_output(
+        [
+            "docker",
+            "inspect",
+            "taryx-api-1",
+            "taryx-api-sg-1",
+            "taryx-worker-1",
+            "taryx-worker-sg-1",
+            "--format",
+            "{{.Image}}",
+        ],
+        text=True,
+    )
+    assert len(set(output.splitlines())) == 1

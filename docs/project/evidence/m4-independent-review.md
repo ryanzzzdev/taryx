@@ -328,3 +328,112 @@ choices-only). Verification: 22/22 probes; `make check` green —
 216 backend, 6 frontend, lint/format, mypy, import contracts,
 TypeScript/build. Live: migration 0005 applied on `taryx_southgrid`,
 images rebuilt and all four app services recreated.
+
+## Round 3 — independent verification (2026-11-08)
+
+Candidate and verified HEAD: `4b65cf589537fbbfba449e5e82b80ccb5597c354`.
+Verdict: **CHANGES_REQUESTED**. M4-F5 and M4-F9 are resolved for the reported
+cases. M4-F7/F8 remain partially resolved; new M4-F10/F11 below. TAR-013/TAR-015
+remain In progress; TAR-014 remains Done; M4 is not complete. M3 approval is
+unchanged. This is the third round without approval: the driver must escalate
+under the review-loop convention rather than automatically starting round 4.
+
+### Resolved findings and architecture verification
+
+- **M4-F5:** durable pre-network attempt update and inclusion of at-cap drafts
+  resolve both preserved crash-window probes. A simulated crash after remote
+  acceptance now leaves a marker; an interrupted terminal recovery is revisited.
+- **M4-F9:** both live cross-client shadow probes now deny access. Inspected
+  migration 0005, provisioning, and deployment overrides. Live Southgrid GUC is
+  `taryx_shadow_sg`; its role has account SELECT and comparison INSERT, lacks
+  invoice INSERT; the old shared role lacks account SELECT and CONNECT there;
+  Southgrid's shadow role lacks CONNECT to Aurora. [Read-only grant output](m4-shadow-r3.txt)
+  lists those checks in that order. No cross-client business data was read.
+- The deliberate ownership change is present: all supply-point market-state
+  writes now live in `taryx.core.accounts.services`. Adapter admission and clearing
+  call those services; completion calls `apply_transfer_outcome`. That resolves
+  the direct-write portion of F8, but moving writes does not by itself supply the
+  consumer's complete validation or per-correlation deduplication (see below).
+- F1/F2/F3/F4/F6 regression probes continue to pass. No change to their prior
+  resolution. Broker fresh/legacy bootstrap model tests still pass.
+
+### M4-F7 — medium — Retry recovery accepts boolean sequence and aborts sweep
+
+Location: `src/taryx/core/market/services.py:133-135,181-192`.
+The retry-poll branch accepts `last_seq=True` because `bool` is an `int` in Python.
+It saves recovery state and calls `apply_callback`, whose stricter validation
+raises ValueError outside the error-handling path. The workflow stays draft and
+is retried repeatedly, aborting the sweep before later drafts/deadlines can run.
+Unlike the main reconcile path, this branch omits the boolean exclusion.
+Validate the full poll response consistently before recording recovery; malformed
+responses must not abort the sweep. `test_boolean_recovery_sequence_cannot_abort_sweep`
+fails with the uncaught ValueError. The prior missing-correlation and non-object
+JSON cases are fixed and pass; this remaining path prevents closing F7.
+
+### M4-F8 — high — Core consumer lacks full validation and durable deduplication
+
+Locations: `src/taryx/core/accounts/services.py:20-29` and
+`src/taryx/core/market/services.py:349-392`.
+
+- The new consumer accepts `{version: "1", nmi: <matching>}` and registers the
+  supply point without correlation, effective date or occurrence time. The
+  adapter validates those fields on the normal path, but decision 005 requires
+  the core boundary itself to validate schema and deduplicate the outcome.
+  `test_core_consumer_rejects_missing_schema_fields` demonstrates the omission.
+- Drain reads pending events without locking/rechecking delivered_at, while the
+  consumer equates deduplication with the supply point currently being registered.
+  Two drain workers can both materialize an event. After worker A delivers it and
+  a new transfer sets the point pending, worker B replays the already-delivered
+  old correlation and sets the point registered again. The new request has no
+  completion. `test_stale_outbox_delivery_does_not_reapply_old_correlation`
+  deterministically interleaves those steps and fails (registered vs pending).
+
+Implement the complete validating consumer contract and durable per-correlation
+application, with transactional locking/rechecks for delivery. This finding does
+not prescribe cryptographic authentication absent a specified cryptographic
+contract; it concerns the frozen schema, identity and one-transition-per-
+correlation requirements. The architecture move is acknowledged, not rejected.
+
+### M4-F10 — medium — Submission budget is exhausted before its last attempt
+
+Location: `src/taryx/core/market/services.py:113-115,149-151`.
+The counter is incremented before checking `attempts >= max_attempts`, so a
+configured budget of one marks a new draft FAILED without making any POST. The
+default budget of five permits only four POSTs. Separate recovery polling from
+submission accounting and allow the configured number of attempts.
+`test_one_attempt_budget_allows_initial_submission` fails with zero POST calls.
+This is a regression introduced while repairing F5, distinct from the now-fixed
+crash-marker problem.
+
+### M4-F11 — medium — Running client stacks do not use one image digest
+
+Location: `compose.yaml` — api, api-sg, worker and worker-sg each use `build: .`
+without a shared image reference.
+TAR-013 explicitly requires the same image digest. The four running containers
+report four different image IDs, confirmed with `docker inspect`, not merely
+repository tag names: [container image IDs](m4-container-images-r3.txt) and
+[Compose image inventory](m4-images-r3.json). This does not establish different
+source behaviour, but it disproves the required identical-image evidence.
+Build once and deploy that image reference/digest to both clients, then verify
+running identities (or explicitly accept a scope change). Earlier records'
+service-identity limitation is not evidence of the same-digest criterion.
+`test_clients_run_same_application_image` fails with four distinct IDs.
+
+### Checks and remaining verification limits
+
+- Candidate preserved probes: **22 passed**, [m4-probes-r3.txt](m4-probes-r3.txt).
+- Expanded probes: **22 passed, 5 failed**, all five on the expected boundary
+  failures above, [m4-probes-r3-expanded.txt](m4-probes-r3-expanded.txt).
+  Run `UV_CACHE_DIR=/tmp/taryx-uv-cache uv run pytest -q docs/project/evidence/m4-probes`.
+  Added `test_m4_round3.py` and a live image-identity probe; prior probes retained.
+- `UV_CACHE_DIR=/tmp/taryx-uv-cache make check`: **passed**, 216 backend/6 frontend,
+  lint/format, mypy, import contracts including intended negative probe,
+  frontend typecheck/build. [Output](m4-check-r3.txt). Test DB runs were serial.
+- Probe lint/format and `git diff --check` pass; HEAD remains the candidate.
+  Only review/probe artifacts and affected records changed; driver-owned
+  `m4-events-r3.jsonl` was present at entry. No commits or pushes.
+- Crash/concurrency probes simulate transaction interleavings. No new live
+  process-kill, fresh-volume migration/bootstrap, billing-under-market-outage,
+  interactive browser or hosted CI campaign. Migration 0005 was inspected and
+  its live resulting privileges verified; a fresh Southgrid installation was
+  not performed. Same-image verification was performed this round and failed.
