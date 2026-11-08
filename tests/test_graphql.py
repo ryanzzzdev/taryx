@@ -52,7 +52,7 @@ def login(client: Client, role: str) -> None:
         client,
         "mutation($u:String!,$p:String!){login(username:$u,password:$p){ok code user{role}}}",
         u=role,
-        p=f"taryx-{role}",
+        p="multipass",
     )
     assert result["data"]["login"]["ok"], result
 
@@ -389,7 +389,7 @@ def test_login_rotates_csrf_token(seeded):
     client.get("/graphql", {"query": "{__typename}"})
     old_token = client.cookies["csrftoken"].value
 
-    login_query = 'mutation{login(username:"operator",password:"taryx-operator"){ok}}'
+    login_query = 'mutation{login(username:"operator",password:"multipass"){ok}}'
     stale = client.post(
         "/graphql",
         data=json.dumps({"query": login_query}),

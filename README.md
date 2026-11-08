@@ -111,6 +111,8 @@ Endpoints once running: API `http://localhost:8001` (`/healthz`, `/graphql`), po
 
 Host-side commands (`uv run pytest`, `uv run python manage.py ...`) target these published ports by default. Celery worker remote control (inspect/revoke broadcasts) is disabled: kombu's pidbox mailbox declares transient non-exclusive queues that RabbitMQ 4 rejects.
 
+For the full two-client stack with seed data, demo logins, portal walkthrough and simulator fault injection, see [run-local.md](docs/run-local.md).
+
 ## Project documentation
 
 - [Agent workflow](AGENTS.md) and [documentation guide](docs/project/documentation-guide.md)

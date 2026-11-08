@@ -22,6 +22,7 @@ x-southgrid-env: &southgrid-env
   POSTGRES_PASSWORD: taryx_sg
   CELERY_BROKER_URL: amqp://taryx_sg:taryx_sg@broker:5672/taryx-sg
   DJANGO_DEBUG: "true"
+  DJANGO_CSRF_TRUSTED_ORIGINS: http://localhost:5175,http://127.0.0.1:5175
   TARYX_CLIENT: southgrid_retail
   LEGACY_BASE_URL: http://legacy-sg:8090
   MARKET_BASE_URL: http://market-sg:8091

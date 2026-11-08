@@ -79,9 +79,9 @@ def seed_demo_data(specs=None) -> list[Account]:
 
 # Development-only operator identities (decision 004). Never real customers.
 DEMO_USERS = {
-    "viewer": "taryx-viewer",
-    "operator": "taryx-operator",
-    "approver": "taryx-approver",
+    "viewer": "multipass",
+    "operator": "multipass",
+    "approver": "multipass",
 }
 
 

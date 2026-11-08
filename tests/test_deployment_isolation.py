@@ -54,6 +54,10 @@ def test_southgrid_environment_is_fully_separate():
     assert "taryx_sg:taryx_sg@broker:5672/taryx-sg" in env
     assert "TARYX_CLIENT: southgrid_retail" in env
     assert "LEGACY_BASE_URL: http://legacy-sg:8090" in env
+    # The settings default only trusts the aurora portal origin; each
+    # client's portal origin must be declared or logins 403 on Origin.
+    assert "DJANGO_CSRF_TRUSTED_ORIGINS" in env
+    assert "localhost:5175" in env
     # No shared secret with the aurora block.
     assert "taryx@broker" not in env
 

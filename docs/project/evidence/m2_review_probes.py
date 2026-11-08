@@ -82,7 +82,7 @@ def test_cannot_append_to_posted_journal():
 
 @pytest.mark.django_db(transaction=True)
 def test_retry_original_graphql_request_after_rerating():
- a,r=setup();seed_operator_identities();c=Client();c.login(username='operator',password='taryx-operator')
+ a,r=setup();seed_operator_identities();c=Client();c.login(username='operator',password='multipass')
  query='mutation{billAccount(reference:"ACC-001",periodStart:"2026-03-02",periodEnd:"2026-03-03",operationId:"stable-request"){ok code operation{operationId}}}'
  def request():return c.post('/graphql',data=json.dumps({'query':query}),content_type='application/json').json()['data']['billAccount']
  with patch('taryx.interfaces.graphql.schema.process_billing_operation.delay'):
