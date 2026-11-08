@@ -9,7 +9,7 @@ This is the initial delivery sequence, not a calendar commitment. The earlier 6�
 | Documentation setup | Portable Cateniq-style workflow | Complete | None |
 | Planning baseline | Architecture, feature contracts and evidence-driven backlog | Complete | Documentation setup |
 | M1 — Foundation and domain profile | Reproducible workspace, sourced profile and metering history | Complete | Planning baseline |
-| M2 — Explainable bills and corrections | End-to-end operator billing with financial integrity | Complete | M1 |
+| M2 — Explainable bills and corrections | End-to-end operator billing with financial integrity | In progress | M1 |
 | M3 — Safe legacy migration | Characterisation, shadow comparison and controlled cohort cutover | In progress | M2 |
 | M4 — Client variation and market boundary | Second isolated client and bounded integration | Planned | M3 |
 | M5 — Operational portfolio delivery | Recovery evidence, Kubernetes and reproducible demonstration | Planned | M4 |
@@ -34,6 +34,8 @@ Exit criteria:
 Excludes issuance, ledger, migration and Kubernetes. Gates: [BLK-001](blockers.md#blk-001), [BLK-003](blockers.md#blk-003).
 
 ## M2 — Explainable bills and corrections
+
+2026-11-08 foundation re-review (user-labelled M1) at `c88b722`: **changes requested**, reopening TAR-007/TAR-009 for empty journals, outbox starvation and missing portal bill explanation. See [independent review](evidence/m1-independent-review.md). Earlier completion/remediation statements below remain historical.
 
 Independent re-review at `de0e08d` reopened TAR-006/TAR-009 for incomplete rating evidence and account-scoped recovery; all four follow-up findings remediated and both preserved probes pass. See the [review](evidence/m2-independent-review.md).
 

@@ -12,9 +12,9 @@ Task sections own status; index icons mirror them. See the [documentation guide]
 - ✅ [TAR-004 — Freeze domain and measurement profiles](#tar-004)
 - ✅ [TAR-005 — Implement versioned meter ingestion and fixtures](#tar-005)
 - ✅ [TAR-006 — Implement deterministic itemised rating](#tar-006)
-- ✅ [TAR-007 — Implement durable issuance and balanced posting](#tar-007)
+- 🟢 [TAR-007 — Implement durable issuance and balanced posting](#tar-007)
 - ✅ [TAR-008 — Implement successive corrections and adjustments](#tar-008)
-- ✅ [TAR-009 — Deliver the core operator journey](#tar-009)
+- 🟢 [TAR-009 — Deliver the core operator journey](#tar-009)
 - ✅ [TAR-010 — Build independent legacy characterisation](#tar-010)
 - ✅ [TAR-011 — Implement isolated shadow comparison and gates](#tar-011)
 - ✅ [TAR-012 — Deliver operator migration and cutover](#tar-012)
@@ -27,6 +27,8 @@ Task sections own status; index icons mirror them. See the [documentation guide]
 - 🚧 [TAR-019 — Evaluate the multi-agent implement/review orchestrator](#tar-019)
 
 ## Delivery notes
+
+Current foundation re-review: **changes requested** at `c88b722`; TAR-007/TAR-009 reopened. See [findings and verification](evidence/m1-independent-review.md). Earlier completion statements below are historical for this scope.
 
 M2 re-review findings are remediated and verified (both follow-up probes pass; see the [review](evidence/m2-independent-review.md)). Independent M3 re-review of `f9f21df` found F1–F4; all resolved and re-verified (13/13 preserved probes pass). Next action: close the remaining F2 cutover race in TAR-011/TAR-012 before M4. Later tasks remain Backlog until their dependencies and detailed contracts are ready. Portal/API slices can develop alongside their backend tasks; TAR-009 and TAR-012 own integrated acceptance. Observability hooks and correctness tests accompany implementation; TAR-016 owns the full cross-service campaign, not the first tests.
 
@@ -244,7 +246,7 @@ Re-remediated 2026-10-25: RatingLine membership is sealed via the same transacti
 - Area: billing
 - Milestone: M2
 - Priority: High
-- Status: Done ✅
+- Status: Ready 🟢
 - Depends on: TAR-006
 - References: [Contract](features/billing-and-ledger.md)
 
@@ -270,6 +272,8 @@ Runtime permission boundary is Postgres triggers plus transaction-scoped issuanc
 Reopened 2026-10-25 by the [independent M2 review](evidence/m2-independent-review.md). Prior evidence remains historical.
 
 Remediated 2026-10-25 (R2/R3/R4/R6): open quarantines now feed the input digest; a locked final revalidation (account row + digest inputs under a shared-revision lock protocol — ingestion publish and quarantine resolution take the same account lock first) re-verifies inputs before commit; sign-aware issuance legs post net-credit bills to the correct side and the racing-issuance catch only covers the generation uniqueness key; a transaction-local open-journal flag seals posted journals against appended legs (billing 0004); the GraphQL mutation resolves an existing operation by key before selecting a run, and concurrent same-key admission resolves the winner via savepoint. All six probes pass; regressions in tests/test_billing.py, tests/test_pricing.py and tests/test_graphql.py.
+
+Reopened 2026-11-08 by the [foundation re-review](evidence/m1-independent-review.md) of `c88b722f30526d8c57aef7ff89634ecd8a1fa983` (user-labelled M1; canonical M2). F1 empty-journal enforcement and F2 outbox failure isolation require remediation; both independent PostgreSQL probes fail. Next: fix the database commit check and starvation-safe recovery, then rerun probes and required checks.
 
 <a id="tar-008"></a>
 
@@ -313,7 +317,7 @@ Remediated 2026-10-25 (R2/R4): corrections share the same locked-revalidation bo
 - Area: portal
 - Milestone: M2
 - Priority: High
-- Status: Done ✅
+- Status: Ready 🟢
 - Depends on: TAR-008
 - References: [Contract](features/operator-and-clients.md)
 
@@ -343,6 +347,8 @@ Remediated 2026-10-25 (R1/R6/R7): DJANGO_CSRF_TRUSTED_ORIGINS covers the dev por
 Independent re-review of `de0e08d`: reopened for remaining R7 findings; see [review](evidence/m2-independent-review.md). Original checks pass; account-switch display leakage and pending-intent overwrite reproduced.
 
 Re-remediated 2026-10-25: AccountPanel is keyed by account.reference so switching remounts — all account-scoped state resets and the old poll interval is destroyed; operationStore keys intents per account+period and clearPending only removes the matching operationId, so an uncertain operation on one account survives billing another and delayed callbacks can't erase unrelated identities (vitest 6/6). npm test is now part of make check.
+
+Reopened 2026-11-08 by the [foundation re-review](evidence/m1-independent-review.md) of `c88b722f30526d8c57aef7ff89634ecd8a1fa983` (user-labelled M1; canonical M2). F3: issued-document UI lacks line-item provenance/explanation. Next: implement the pinned invoice explanation view and verify the operator journey.
 
 <a id="tar-010"></a>
 

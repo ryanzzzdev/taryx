@@ -5,6 +5,8 @@ Status: TAR-009 slice implemented and re-verified after independent-review remed
 Re-review at `de0e08d`: rating snapshot/membership and browser account-recovery claims above are only partially verified; see [remaining findings](../evidence/m2-independent-review.md). M2 remains open.
 Tasks: [TAR-009](../backlog.md#tar-009), [TAR-012](../backlog.md#tar-012), [TAR-013](../backlog.md#tar-013).
 
+2026-11-08: TAR-009 reopened by [foundation re-review F3](../evidence/m1-independent-review.md): invoice totals and ledger legs are visible, but the required pinned line-item explanation is absent. The journey is not fully verified.
+
 ## Operator journeys
 
 The portal supports account/supply-point inspection, ingestion status and rejected data, bill/line-item provenance, original and revised liability, operation recovery, comparison reports and cohort cutover. Introduce these screens with their backend milestones rather than leaving all UI integration until the end.

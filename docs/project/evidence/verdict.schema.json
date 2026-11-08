@@ -43,7 +43,7 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["command", "outcome"],
+        "required": ["command", "outcome", "evidence_path"],
         "properties": {
           "command": { "type": "string" },
           "outcome": { "enum": ["passed", "failed", "unavailable"] },
