@@ -22,7 +22,7 @@ from taryx.core.accounts.models import (
 )
 from taryx.core.accounts.seed import seed_demo_data
 from taryx.core.metering.ingestion import ingest_nem12_content
-from taryx.core.metering.models import IntervalRecord
+from taryx.core.metering.models import CurrentInterval, IntervalRecord
 from taryx.core.pricing.engine import RatingError
 from taryx.core.pricing.models import RatingLine, RatingRun
 from taryx.core.pricing.services import compute_input_digest, rate_account
@@ -380,3 +380,22 @@ def test_rating_coverage_uses_the_consumed_snapshot(monkeypatch):
         imports = run.lines.filter(element="import")
         assert sum((line.quantity for line in imports), Decimal(0)) == Decimal("24")
         assert len(run.input_snapshot["channels"][0]["records"]) == 48
+
+
+@pytest.mark.django_db
+def test_equivalent_revision_keeps_digest_but_newer_revision_advances():
+    """A re-enveloped identical revision is a selection no-op (digest
+    stable); a genuinely newer revision repoints and changes the digest."""
+    account = make_account([("E1", "import")], [("T-FLAT", date(2026, 1, 1), None)])
+    original = load("e1_flat.nem12")
+    ingest_nem12_content(original, "e1_flat.nem12")
+    first = rate_account(account, date(2026, 3, 2), date(2026, 3, 3), **KWARGS)
+    ingest_nem12_content(original.replace(b"TARYX,TARYX", b"OTHER,TARYX"), "same-values")
+    repeated = rate_account(account, date(2026, 3, 2), date(2026, 3, 3), **KWARGS)
+    assert repeated.input_digest == first.input_digest
+    assert set(CurrentInterval.objects.values_list("selection_version", flat=True)) == {1}
+    ingest_nem12_content(original.replace(b"20260301120000", b"20260302120000"), "newer")
+    revised = rate_account(account, date(2026, 3, 2), date(2026, 3, 3), **KWARGS)
+    assert revised.input_digest != first.input_digest
+    assert revised.total == first.total
+    assert set(CurrentInterval.objects.values_list("selection_version", flat=True)) == {2}

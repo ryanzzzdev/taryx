@@ -105,3 +105,27 @@ def test_ordinary_replay_matches_independent_flat_total(account):
     second = services.rate_account(account, DAY, END, **KWARGS)
     assert first.total == second.total == Decimal("9.13")
     assert first.input_digest == second.input_digest
+
+
+def test_repeated_consistent_blocks_on_distinct_days_remain_supported(account):
+    result = ingest_nem12_content(content(block(), block(day="20260303")), "two-days")
+    assert result.batch.status == IngestionBatch.Status.PUBLISHED
+    assert result.batch.record_count == 96
+    assert CurrentInterval.objects.count() == 96
+
+
+def test_equivalent_revision_keeps_digest_but_newer_revision_advances(account):
+    original = content(block())
+    ingest_nem12_content(original, "first")
+    first = services.rate_account(account, DAY, END, **KWARGS)
+    ingest_nem12_content(content(block(), sender="OTHER"), "equivalent")
+    repeated = services.rate_account(account, DAY, END, **KWARGS)
+    assert first.input_digest == repeated.input_digest
+    assert set(CurrentInterval.objects.values_list("selection_version", flat=True)) == {1}
+
+    newer = original.replace(b"20260301120000", b"20260302120000")
+    ingest_nem12_content(newer, "newer-source-timestamp")
+    revised = services.rate_account(account, DAY, END, **KWARGS)
+    assert revised.input_digest != first.input_digest
+    assert revised.total == first.total
+    assert set(CurrentInterval.objects.values_list("selection_version", flat=True)) == {2}

@@ -1,0 +1,38 @@
+{
+  "reviewed_sha": "e8fda0ccfb83c7ddd976771b0166eb5d8beb7ec5",
+  "verdict": "APPROVED",
+  "summary": "HEAD verified. M1-F1–F4 resolved; 17 independent probes and required checks pass. Review and project records updated. Billing approval unchanged. No commits made.",
+  "findings": [],
+  "checks": [
+    {
+      "command": "git rev-parse HEAD",
+      "outcome": "passed",
+      "evidence_path": "docs/project/evidence/m1-metering-independent-review.md"
+    },
+    {
+      "command": "UV_CACHE_DIR=/tmp/taryx-review-uv make check",
+      "outcome": "passed",
+      "evidence_path": "docs/project/evidence/m1-metering-independent-review.md"
+    },
+    {
+      "command": "UV_CACHE_DIR=/tmp/taryx-review-uv uv run --frozen pytest -q docs/project/evidence/test_m1_metering_review.py docs/project/evidence/m1_review_probes.py",
+      "outcome": "passed",
+      "evidence_path": "docs/project/evidence/m1-metering-independent-review.md"
+    },
+    {
+      "command": "git diff --check",
+      "outcome": "passed",
+      "evidence_path": "docs/project/evidence/m1-metering-independent-review.md"
+    }
+  ],
+  "verification_gaps": [
+    "Clean installation, Compose rebuild, hosted CI, performance campaign, browser/broker fault exercises and external-source revalidation were not repeated."
+  ],
+  "artifacts": [
+    "docs/project/evidence/m1-metering-independent-review.md",
+    "docs/project/evidence/test_m1_metering_review.py",
+    "docs/project/backlog.md",
+    "docs/project/roadmap.md",
+    "docs/project/journal/2026-11.md"
+  ]
+}

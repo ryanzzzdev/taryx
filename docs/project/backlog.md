@@ -28,13 +28,13 @@ Task sections own status; index icons mirror them. See the [documentation guide]
 
 ## Delivery notes
 
-M1 metering review (2026-11-08): **changes requested** for TAR-005/TAR-006; [four findings](evidence/m1-metering-independent-review.md). This supersedes older M1 completion claims below and does not reopen the approved billing scope.
+M1 metering round-two review (2026-11-08): **approved** at `e8fda0ccfb83c7ddd976771b0166eb5d8beb7ec5`. M1-F1–F4 resolved; TAR-005/TAR-006 completion confirmed with 17 independent probes and full checks passing. [Review](evidence/m1-metering-independent-review.md). Prior billing approval is retained.
 
 Foundation review **approved** at `2704f119c5eba16c284fe93ffd5f86ba5d832847` after the explicitly authorised, resumed fourth round. F1–F4 resolved; 155 backend/6 frontend tests and all 25 preserved probes pass. See [scope, evidence and retained verification gaps](evidence/m1-independent-review.md). Earlier completion and reopening statements below are historical.
 
 M2 re-review findings are remediated and verified (both follow-up probes pass; see the [review](evidence/m2-independent-review.md)). Independent M3 re-review of `f9f21df` found F1–F4; all resolved and re-verified (13/13 preserved probes pass). Next action: close the remaining F2 cutover race in TAR-011/TAR-012 before M4. Later tasks remain Backlog until their dependencies and detailed contracts are ready. Portal/API slices can develop alongside their backend tasks; TAR-009 and TAR-012 own integrated acceptance. Observability hooks and correctness tests accompany implementation; TAR-016 owns the full cross-service campaign, not the first tests.
 
-The architecture and functional scope are the planning baseline; exact schemas, dependency versions and open profiles are refined in their named tasks. Split large tasks into new IDs before starting if necessary; preserve existing history. Next unused ID: TAR-020. M1 metering completion is reopened by the review above; prior M2 billing approval is retained.
+The architecture and functional scope are the planning baseline; exact schemas, dependency versions and open profiles are refined in their named tasks. Split large tasks into new IDs before starting if necessary; preserve existing history. Next unused ID: TAR-020. M1 metering completion is confirmed by the round-two review above; prior M2 billing approval is retained.
 
 Re-review of `db18588` found one remaining F2 commit-window race; resolved by a shared cohort advisory-lock protocol between cutover and all gate-affecting writers — see the [third remediation addendum](evidence/m3-independent-review.md#third-remediation-addendum--2026-10-25).
 
@@ -205,6 +205,8 @@ Remediated after the [independent M1 review](evidence/m1-exit-review.md): two-ph
 
 2026-11-08 metering review: reopened at `230dc0f1078243e3448ecc145c842228b22cca8c` for M1-F1–F3; remediated same day — repeated-200 metadata now validated (`conflicting_200`), repeated channel/days reject as `repeated_interval` before insertion, and equivalent re-enveloped revisions keep incumbent selection/version. All probes folded into `tests/`; see [M1 findings and probes](evidence/m1-metering-independent-review.md). Previous evidence above is historical.
 
+Round-two independent review: **approved** at `e8fda0ccfb83c7ddd976771b0166eb5d8beb7ec5`; M1-F1–F3 verified resolved. 17 independent probes and full make check pass (159 backend/6 frontend). Earlier reopening statements are historical; see [review](evidence/m1-metering-independent-review.md).
+
 <a id="tar-006"></a>
 
 ## TAR-006 — Implement deterministic itemised rating
@@ -229,7 +231,7 @@ Calculate supported supply/import/export charges from immutable snapshots.
 
 ### Completion evidence
 
-Implementation and historical verification are recorded below. Current independent metering review: M1-F4 remains open; see the [review and reproduction](evidence/m1-metering-independent-review.md).
+Implementation and historical verification are recorded below. Round-two independent metering review: M1-F4 verified resolved; see the [review and reproduction](evidence/m1-metering-independent-review.md).
 
 ### Notes
 
@@ -245,6 +247,8 @@ Re-remediated 2026-10-25: RatingLine membership is sealed via the same transacti
 
 
 2026-11-08 metering review: reopened at `230dc0f1078243e3448ecc145c842228b22cca8c`; see [M1 findings and probes](evidence/m1-metering-independent-review.md). Resolve M1-F4 inconsistent rating snapshot coverage and rerun independent probes before completion. Previous evidence above is historical.
+
+Round-two independent review: **approved** at `e8fda0ccfb83c7ddd976771b0166eb5d8beb7ec5`; M1-F4 verified resolved. 17 independent probes and full make check pass (159 backend/6 frontend). Earlier reopening statements are historical; see [review](evidence/m1-metering-independent-review.md).
 
 <a id="tar-007"></a>
 

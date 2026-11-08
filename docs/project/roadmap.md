@@ -2,7 +2,7 @@
 
 Date: 2026-10-25
 
-This is the initial delivery sequence, not a calendar commitment. The earlier 6–10 week ambition is a sizing hypothesis; reassess after M1 and M3. [Backlog](backlog.md) owns task status; [architecture](architecture.md) owns design. M1 metering completion was reopened by the 2026-11-08 independent review and remediated the same day; prior billing approval is retained.
+This is the initial delivery sequence, not a calendar commitment. The earlier 6–10 week ambition is a sizing hypothesis; reassess after M1 and M3. [Backlog](backlog.md) owns task status; [architecture](architecture.md) owns design. M1 metering completion is confirmed by the 2026-11-08 round-two independent review; prior billing approval is retained.
 
 | Milestone | Outcome | Status | Depends on |
 | --- | --- | --- | --- |
@@ -17,6 +17,8 @@ This is the initial delivery sequence, not a calendar commitment. The earlier 6�
 Setup and planning completion refer only to [TAR-001](backlog.md#tar-001) and [TAR-002](backlog.md#tar-002). Core product value is demonstrated at M3; M4 and M5 extend it. Changes to that scope require an explicit record, not silent omission of unfinished extensions.
 
 ## M1 — Foundation and domain profile
+
+Latest metering review: **approved** at `e8fda0ccfb83c7ddd976771b0166eb5d8beb7ec5` on 2026-11-08. M1-F1–F4 resolved; 17 independent probes and full checks pass (159 backend/6 frontend). TAR-005/TAR-006 completion confirmed. [Review and retained limits](evidence/m1-metering-independent-review.md). Earlier reopening statements below are historical.
 
 2026-11-08 metering review: **changes requested** at `230dc0f1078243e3448ecc145c842228b22cca8c`; TAR-005/TAR-006 reopened for M1-F1–F4 and remediated the same day (parser metadata validation, explicit repeated-day rejection, equivalent-revision selection no-op, snapshot-coherent coverage). [Evidence and probes](evidence/m1-metering-independent-review.md). The user-defined review scope includes TAR-003–006 (rating was historically grouped under M2 below). Historical completion statements are superseded for metering/rating only; the approved billing review is unchanged.
 

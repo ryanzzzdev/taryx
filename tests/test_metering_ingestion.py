@@ -359,3 +359,14 @@ def test_identical_revision_in_new_envelope_is_selection_noop(seeded):
         )
     )
     assert before == after
+
+
+@pytest.mark.django_db
+def test_consistent_repeated_blocks_on_distinct_days_publish(seeded):
+    """Repeated 200 blocks with identical metadata are legitimate
+    continuations — rejection only bites on conflicting metadata or
+    repeated days."""
+    result = ingest_nem12_content(_content(_block(), _block(day="20260303")), "two-days")
+    assert result.batch.status == "published"
+    assert result.batch.record_count == 96
+    assert CurrentInterval.objects.count() == 96

@@ -1,4 +1,8 @@
-# M1 metering independent review — round 1
+# M1 metering independent review
+
+Current verdict: **APPROVED** at `e8fda0ccfb83c7ddd976771b0166eb5d8beb7ec5` (round 2, 2026-11-08 UTC). M1-F1–F4 resolved; see the round-two addendum below.
+
+## Historical round-one review
 
 Verdict: **CHANGES_REQUESTED**. Review date: 2026-11-08 UTC.
 
@@ -110,3 +114,31 @@ The round-1 prompt carried a mistyped candidate SHA; the reviewer
 verified and reported against the actual HEAD
 (`230dc0f1078243e3448ecc145c842228b22cca8c`) and flagged the gap — the
 round was accepted on the real reviewed SHA.
+
+## Independent round-two review — 2026-11-08
+
+Candidate and verified HEAD: `e8fda0ccfb83c7ddd976771b0166eb5d8beb7ec5`.
+The round-one identity gap is resolved for this round. Initial working tree contained only the unrelated untracked `m1c-events-r2.jsonl`, preserved unchanged by the reviewer.
+
+Code review confirms:
+
+- **M1-F1 resolved:** repeated metadata is compared before replacing the channel dictionary entry. The preserved corruption probe rejects atomically; the folded regression also checks `conflicting_200`.
+- **M1-F2 resolved:** seen channel/day identities span 200 blocks, yielding `repeated_interval` before publication. The folded test verifies the error code and absence of records.
+- **M1-F3 resolved:** equivalent value, quality and precedence retain the incumbent source and selection version. Additional boundary coverage checks the rating digest remains stable and a genuinely newer timestamp still advances the version.
+- **M1-F4 resolved:** coverage uses the captured interval rows and quarantine list consumed by rating. The preserved interleaving probe now rejects the empty snapshot. This establishes the reported coverage fix, not a general serializable snapshot guarantee across all concurrent metadata writers.
+
+Two additional probes in `test_m1_metering_review.py` exercise valid repeated blocks on distinct days and equivalent-versus-newer revision digest/version behaviour. No new implementation finding arose from this review.
+
+Documentation precision: the implementer's addendum above mentions serial changes, but `ChannelMeta` does not include the meter serial; the new comparison covers configuration, suffix, unit and interval length. Serial validation was not part of M1-F1. Four defect probes were newly folded into `tests/`; the fifth preserved probe is a replay control already covered by existing pricing tests.
+
+Verification results and final verdict follow below. Historical round-one failures remain preserved above. Existing clean-install, hosted CI, performance, browser/broker and external-source verification limits are unchanged; this review does not revisit billing approval or grant deployment/regulatory readiness.
+
+### Round-two verdict and verification
+
+**APPROVED** for the requested TAR-003–006 metering/rating scope at `e8fda0ccfb83c7ddd976771b0166eb5d8beb7ec5`. All four findings are resolved.
+
+- `UV_CACHE_DIR=/tmp/taryx-review-uv make check`: passed; 159 backend tests (85.19 s), 6 frontend tests, lint/format, mypy, import contracts with deliberate violation rejection, TypeScript and build.
+- `UV_CACHE_DIR=/tmp/taryx-review-uv uv run --frozen pytest -q docs/project/evidence/test_m1_metering_review.py docs/project/evidence/m1_review_probes.py`: **17 passed** (4.36 s): five original, two additional and ten earlier metering probes.
+- Probe ruff lint/format checks passed. Changed-record UTF-8/local-link checks, `git diff --check` and unchanged HEAD verification passed.
+
+TAR-005/TAR-006 completion and M1 completion confirmed. Prior billing approval retained. Only review evidence, probes and affected records changed; no commit made.
