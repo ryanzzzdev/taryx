@@ -4,6 +4,8 @@ Date: 2026-10-25
 Status: Implemented and verified 2026-11-08 (TAR-015) — synthetic `taryx-market/1` per [decision 005](../decisions/005-market-workflow-contract.md): `market-sim` coordinator service, `taryx.core.market` adapter (durable workflow/inbox/exception/outbox), `/callbacks/transfers` ingress, `market.submit|sweep|drain` tasks, GraphQL admission + inspection, live E2E to `market_state: registered`. 19 tests including real-sim subprocess and four scenario delivery patterns.
 Tasks: [TAR-014](../backlog.md#tar-014), [TAR-015](../backlog.md#tar-015).
 
+M4 independent review (2026-11-08): implementation acceptance reopened for TAR-015, M4-F4–F8. [Findings and verification limits](../evidence/m4-independent-review.md) supersede the M4 completion claims above; existing M3 approval is unchanged.
+
 ## Boundary
 
 Demonstrate one asynchronous supply-point interaction, such as a simplified transfer request. The adapter owns durable workflow state, outbound requests, correlation and reconciliation. The external simulator owns the counterparty response schedule. Neither may directly update core billing/account tables. The adapter sends versioned outcomes that the core validates and deduplicates.

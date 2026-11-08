@@ -102,3 +102,7 @@ AWS EKS, Terraform, ArgoCD and public hosting are future options. They are Krake
 ## Verification gates
 
 [Open questions](blockers.md) identify the metering/tariff profile, market workflow and measurement budgets that still require evidence. [Verification contract](features/verification.md) owns the scenarios. Each milestone exit records the observed environment and outcomes; accepted design is not evidence of runtime correctness.
+
+## M4 independent verification — 2026-11-08
+
+At `2dbc5b0`, client policy composition is present, but credential isolation and the market adapter ownership/recovery contracts are not yet satisfied. TAR-013/TAR-015 reopened for [M4-F1–F8](evidence/m4-independent-review.md); intended boundaries above remain the contract, not verified implementation guarantees. M3 approval is unchanged.

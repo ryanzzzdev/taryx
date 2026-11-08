@@ -11,6 +11,8 @@ Round-three review at `e809640` found persisted-line rendering and mutable pinne
 
 Latest independent verification (2026-11-08, `2704f119`): F3/F4 resolved and foundation review approved. Persisted authoritative legacy lines render and reconcile; database triggers reject UPDATE and DELETE of that evidence. New-engine pinning and API journey regressions pass. Verification combines source/API/frontend checks and the real legacy simulator; no fresh interactive browser session is claimed. Earlier open findings above are historical.
 
+M4 independent review (2026-11-08): implementation acceptance reopened for TAR-013, M4-F1–F3. [Findings and verification limits](../evidence/m4-independent-review.md) supersede the M4 completion claims above; existing M3 approval is unchanged.
+
 ## Operator journeys
 
 The portal supports account/supply-point inspection, ingestion status and rejected data, bill/line-item provenance, original and revised liability, operation recovery, comparison reports and cohort cutover. Introduce these screens with their backend milestones rather than leaving all UI integration until the end.

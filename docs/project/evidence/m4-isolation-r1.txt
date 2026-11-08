@@ -1,0 +1,12 @@
+BEGIN
+SET
+ current_user | rolsuper 
+--------------+----------
+ taryx        | t
+(1 row)
+
+ROLLBACK
+Listing users ...
+user	tags
+taryx	[administrator]
+taryx_sg	[]

@@ -95,6 +95,8 @@ Excludes migration of an entire historical accounting database. Routing rollback
 
 ## M4 — Client variation and market boundary
 
+2026-11-08 independent review: **changes requested** at `2dbc5b0`. TAR-013 and TAR-015 reopened for M4-F1–F8; TAR-014 remains Done. M4 remains In progress. [Findings and probes](evidence/m4-independent-review.md). Earlier implementation verification below does not establish exit acceptance.
+
 Scope: TAR-013–015. Same-image isolated retailers, sourced or explicitly synthetic market workflow, durable adapter and deterministic counterparty simulator.
 
 Exit criteria:

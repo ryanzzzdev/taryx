@@ -18,9 +18,9 @@ Task sections own status; index icons mirror them. See the [documentation guide]
 - ✅ [TAR-010 — Build independent legacy characterisation](#tar-010)
 - ✅ [TAR-011 — Implement isolated shadow comparison and gates](#tar-011)
 - ✅ [TAR-012 — Deliver operator migration and cutover](#tar-012)
-- ✅ [TAR-013 — Demonstrate two isolated client instances](#tar-013)
+- 🚧 [TAR-013 — Demonstrate two isolated client instances](#tar-013)
 - ✅ [TAR-014 — Freeze the bounded market workflow](#tar-014)
-- ✅ [TAR-015 — Implement market adapter and counterparty simulator](#tar-015)
+- 🚧 [TAR-015 — Implement market adapter and counterparty simulator](#tar-015)
 - 📋 [TAR-016 — Verify recovery and correlated diagnostics](#tar-016)
 - 📋 [TAR-017 — Package and verify Kubernetes delivery](#tar-017)
 - 📋 [TAR-018 — Measure and present the portfolio release](#tar-018)
@@ -513,7 +513,7 @@ Re-review of `db18588` reopened this task for the remaining F2 commit-window rac
 - Area: deployment
 - Milestone: M4
 - Priority: High
-- Status: Done ✅
+- Status: In progress 🚧
 - Depends on: TAR-012
 - References: [Contract](features/operator-and-clients.md)
 
@@ -528,6 +528,8 @@ Run two fictional retailers from one core image with independent state and polic
 - Import contracts enforce client independence; shared physical infrastructure limits are documented.
 
 ### Completion evidence
+
+2026-11-08 independent M4 review at `2dbc5b0`: **changes requested**; reopened for M4-F1–F3 (effective credential isolation). [Review and runnable probes](evidence/m4-independent-review.md). Prior implementation evidence below is historical; remediate findings and rerun independent review before completion.
 
 Live two-client deployment verified on 2026-11-08 (both stacks running from `build: .` — same image and compose file):
 
@@ -581,7 +583,7 @@ Contract-only task — no runtime code yet; TAR-015 implements the coordinator s
 - Area: integration
 - Milestone: M4
 - Priority: Normal
-- Status: Done ✅
+- Status: In progress 🚧
 - Depends on: TAR-013, TAR-014
 - References: [Contract](features/market-integration.md), [Decision 005](decisions/005-market-workflow-contract.md)
 
@@ -596,6 +598,8 @@ Complete one durable market workflow across owned adapter and external test doub
 - Uncertain outcomes reconcile; unrelated core work stays responsive; M4 exit evidence is recorded.
 
 ### Completion evidence
+
+2026-11-08 independent M4 review at `2dbc5b0`: **changes requested**; reopened for M4-F4–F8 (recovery, transitions and protocol/core validation). [Review and runnable probes](evidence/m4-independent-review.md). Prior implementation evidence below is historical; remediate findings and rerun independent review before completion.
 
 Implemented and verified 2026-11-08 against the decision-005 frozen contract:
 
