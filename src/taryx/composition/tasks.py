@@ -2,6 +2,7 @@
 
 from celery import shared_task
 
+from taryx.composition.policy import policy
 from taryx.core.accounts.models import Account
 from taryx.core.billing.services import (
     CalculationUnavailable,
@@ -11,7 +12,6 @@ from taryx.core.billing.services import (
 from taryx.core.migration.legacy_adapter import LegacyFailure
 from taryx.core.migration.services import calculate_for_billing, routing_for
 from taryx.core.pricing.services import compute_input_digest
-from taryx.territories.au_nem.tariffs import GST_RATE, POLICY_IDENTITY, TARIFFS
 
 
 def legacy_calculator(op) -> dict:
@@ -24,13 +24,14 @@ def legacy_calculator(op) -> dict:
 
 
 def digest_resolver(account: Account, period_start, period_end) -> str:
+    resolved = policy()
     return compute_input_digest(
         account,
         period_start,
         period_end,
-        tariffs=TARIFFS,
-        gst_rate=GST_RATE,
-        policy_identity=POLICY_IDENTITY,
+        tariffs=resolved.TARIFFS,
+        gst_rate=resolved.GST_RATE,
+        policy_identity=resolved.POLICY_IDENTITY,
     )
 
 

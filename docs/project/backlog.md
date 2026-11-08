@@ -506,8 +506,8 @@ Re-review of `db18588` reopened this task for the remaining F2 commit-window rac
 - Repository: taryx
 - Area: deployment
 - Milestone: M4
-- Priority: Normal
-- Status: Backlog 📋
+- Priority: High
+- Status: In progress 🚧
 - Depends on: TAR-012
 - References: [Contract](features/operator-and-clients.md)
 
@@ -527,9 +527,8 @@ Not started; no implementation or verification evidence.
 
 ### Notes
 
-Refine and mark Ready once dependencies pass; record relevant gate resolutions before dependent implementation.
+2026-11-08: client policy packages implemented — `taryx.clients.aurora_energy` re-exports the au_nem baseline; `taryx.clients.southgrid_retail` carries same-code/different-value tariffs, its own catalogue identity and demo specs with deliberately overlapping account references/NMIs. `taryx.composition.policy` resolves `TARYX_CLIENT` once at startup (default aurora, unknown client fails fast) and injects tariffs/GST/policy identity into tasks, GraphQL and management commands. `seed_client` command seeds client-specific specs. Import-linter already enforces client independence and layering. Remaining: second compose instance with separate DB/role and broker vhost, plus cross-client negative evidence. tests/test_clients.py: 4 tests.
 
-<a id="tar-014"></a>
 
 ## TAR-014 — Freeze the bounded market workflow
 

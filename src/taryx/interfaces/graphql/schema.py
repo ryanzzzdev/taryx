@@ -16,6 +16,7 @@ from django.contrib.auth import authenticate, login, logout
 from graphene_django import DjangoObjectType
 from graphql import GraphQLError
 
+from taryx.composition.policy import policy as _policy
 from taryx.composition.tasks import process_billing_operation
 from taryx.core.accounts.models import Account, MeterChannel, SupplyPoint
 from taryx.core.audit.models import record as audit_record
@@ -57,9 +58,17 @@ from taryx.core.migration.services import (
 from taryx.core.pricing.engine import RatingError
 from taryx.core.pricing.models import RatingRun
 from taryx.core.pricing.services import rate_account
-from taryx.territories.au_nem.tariffs import GST_RATE, POLICY_IDENTITY, TARIFFS
 
 MAX_LIMIT = 200
+
+
+def _policy_kwargs() -> dict:
+    resolved = _policy()
+    return {
+        "tariffs": resolved.TARIFFS,
+        "gst_rate": resolved.GST_RATE,
+        "policy_identity": resolved.POLICY_IDENTITY,
+    }
 
 
 class PermissionError_(GraphQLError):
@@ -400,9 +409,7 @@ class CohortType(DjangoObjectType):
         return cohort.members.all()
 
     def resolve_blockers(cohort, info):
-        return evaluation_blockers(
-            cohort, tariffs=TARIFFS, gst_rate=GST_RATE, policy_identity=POLICY_IDENTITY
-        )
+        return evaluation_blockers(cohort, **_policy_kwargs())
 
     def resolve_decisions(cohort, info):
         evidence = list(
@@ -698,14 +705,7 @@ class RateAccount(graphene.Mutation):
         if account is None:
             return RatePayload(ok=False, code="not_found", message="unknown account")
         try:
-            run = rate_account(
-                account,
-                period_start,
-                period_end,
-                tariffs=TARIFFS,
-                gst_rate=GST_RATE,
-                policy_identity=POLICY_IDENTITY,
-            )
+            run = rate_account(account, period_start, period_end, **_policy_kwargs())
         except RatingError as exc:
             return RatePayload(ok=False, code=exc.code, message=str(exc))
         audit_record(
@@ -928,9 +928,7 @@ class TransitionCohort(graphene.Mutation):
                 expected_revision,
                 _user(info),
                 reason=reason or "",
-                tariffs=TARIFFS,
-                gst_rate=GST_RATE,
-                policy_identity=POLICY_IDENTITY,
+                **_policy_kwargs(),
             )
         except MigrationError as exc:
             return TransitionPayload(ok=False, code=exc.code, message=str(exc))

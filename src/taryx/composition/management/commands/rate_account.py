@@ -2,10 +2,10 @@ from datetime import date
 
 from django.core.management.base import BaseCommand, CommandError
 
+from taryx.composition.policy import policy
 from taryx.core.accounts.models import Account
 from taryx.core.pricing.engine import RatingError
 from taryx.core.pricing.services import rate_account
-from taryx.territories.au_nem.tariffs import GST_RATE, POLICY_IDENTITY, TARIFFS
 
 
 class Command(BaseCommand):
@@ -21,14 +21,15 @@ class Command(BaseCommand):
             account = Account.objects.get(reference=options["reference"])
         except Account.DoesNotExist:
             raise CommandError(f"unknown account {options['reference']}") from None
+        resolved = policy()
         try:
             run = rate_account(
                 account,
                 options["start"],
                 options["end"],
-                tariffs=TARIFFS,
-                gst_rate=GST_RATE,
-                policy_identity=POLICY_IDENTITY,
+                tariffs=resolved.TARIFFS,
+                gst_rate=resolved.GST_RATE,
+                policy_identity=resolved.POLICY_IDENTITY,
             )
         except RatingError as exc:
             raise CommandError(f"{exc.code}: {exc}") from None
