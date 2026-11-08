@@ -209,6 +209,7 @@ def _issue(op: BillingOperation, amounts: dict[str, Decimal]) -> Invoice:
         rating_run=run,
         input_digest=run.input_digest,
         calculation_source=_op_source(op),
+        legacy_calculation_id=getattr(op, "_legacy_calculation_id", None),
         net=amounts["net"],
         gst=amounts["gst"],
         total=amounts["total"],
@@ -432,21 +433,21 @@ def drain_outbox(
     routing_resolver: Callable[[Account], tuple[str, int]] | None = None,
     legacy_calculator: Callable[[BillingOperation], dict] | None = None,
     limit: int = 200,
-    max_attempts: int = 10,
 ) -> list[BillingOperation]:
     """Recover pending outbox events (broker outage, lost tasks).
 
     Each event is processed independently: a failure is recorded on its
     outbox row (attempts/last_error) and skipped, so one unavailable
     calculation cannot starve later recoverable work in the same batch.
-    Events past max_attempts stay undelivered but are no longer selected,
-    so a full batch of permanently failing events cannot occupy the drain
-    forever. All events are attempted before the first failure is
-    re-raised — the drain still reports errors, just after progress.
+    Selection orders by attempts so chronic failures sink below fresh
+    work and a batch of them can never starve a new event — but events
+    are never excluded, so recovered dependencies complete on the next
+    drain. All selected events are attempted before the first failure
+    is re-raised.
     """
     pending = list(
-        OutboxEvent.objects.filter(delivered_at__isnull=True, attempts__lt=max_attempts)
-        .order_by("created_at")
+        OutboxEvent.objects.filter(delivered_at__isnull=True)
+        .order_by("attempts", "created_at")
         .select_related("operation")[:limit]
     )
     processed, failures = [], []

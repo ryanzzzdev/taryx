@@ -585,3 +585,59 @@ def test_invoice_line_items_pin_the_issued_calculation(seeded):
     for line in pinned["lines"]:
         assert line["tariffCode"] and line["basis"] and line["unit"]
         Decimal(line["quantity"]), Decimal(line["rate"]), Decimal(line["amount"])
+
+
+@pytest.mark.django_db(transaction=True)
+def test_legacy_invoice_explanation_reconciles(seeded):
+    """A legacy-source invoice explains itself with the authoritative
+    legacy figures — never the new-engine comparison run's lines."""
+    from taryx.core.accounts.models import Account
+    from taryx.core.billing.services import admit_issue, process_operation
+    from taryx.core.metering.ingestion import ingest_nem12_content
+    from taryx.core.pricing.services import rate_account
+    from taryx.territories.au_nem.tariffs import GST_RATE, POLICY_IDENTITY, TARIFFS
+
+    ingest_nem12_content(load("day1_base.nem12").encode(), "day1_base.nem12")
+    account = Account.objects.get(reference="ACC-001")
+    run = rate_account(
+        account,
+        dd(2026, 3, 2),
+        dd(2026, 3, 3),
+        tariffs=TARIFFS,
+        gst_rate=GST_RATE,
+        policy_identity=POLICY_IDENTITY,
+    )
+    op = admit_issue(
+        account,
+        dd(2026, 3, 2),
+        dd(2026, 3, 3),
+        run,
+        "GQL-LEGACY-1",
+        routing_resolver=lambda _account: ("legacy_only", 0),
+    )
+
+    def legacy(_op):
+        return {
+            "charge": Decimal("8.30"),
+            "export": Decimal("0.45"),
+            "net": Decimal("7.85"),
+            "gst": Decimal("0.83"),
+            "total": Decimal("8.68"),
+        }
+
+    process_operation(op.operation_id, digest_resolver=digest_resolver, legacy_calculator=legacy)
+
+    client = Client()
+    login(client, "viewer")
+    out = gql(
+        client,
+        "query($r:String!){invoices(reference:$r){total calculationSource "
+        "ratingRun{lines{amount gst}}}}",
+        r="ACC-001",
+    )
+    invoice = out["data"]["invoices"][0]
+    assert invoice["calculationSource"] == "legacy"
+    explained = sum(
+        Decimal(line["amount"]) + Decimal(line["gst"]) for line in invoice["ratingRun"]["lines"]
+    )
+    assert explained == Decimal(invoice["total"]) == Decimal("8.68")

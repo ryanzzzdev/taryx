@@ -75,6 +75,10 @@ class Invoice(models.Model):
     # "new" = Taryx rating run; "legacy" = authoritative figures from the
     # pinned legacy calculation (cohort routing modes legacy/shadow).
     calculation_source = models.CharField(max_length=8, default="new")
+    # Authoritative legacy evidence pinned at issuance: the shadow-alias
+    # LegacyCalculation row id whose response produced these figures (a
+    # plain int — cross-database foreign keys cannot be enforced).
+    legacy_calculation_id = models.PositiveIntegerField(null=True)
     net = models.DecimalField(max_digits=14, decimal_places=2)
     gst = models.DecimalField(max_digits=14, decimal_places=2)
     total = models.DecimalField(max_digits=14, decimal_places=2)

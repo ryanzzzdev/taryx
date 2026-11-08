@@ -35,7 +35,9 @@ Excludes issuance, ledger, migration and Kubernetes. Gates: [BLK-001](blockers.m
 
 ## M2 — Explainable bills and corrections
 
-2026-11-08 foundation re-review (user-labelled M1) at `c88b722`: **changes requested**, reopening TAR-007/TAR-009 for empty journals, outbox starvation and missing portal bill explanation; all three findings remediated same day and both probes folded into the suite. See [independent review](evidence/m1-independent-review.md). Earlier completion/remediation statements below remain historical.
+Round-two independent review at `c270a322` (2026-11-08): **changes requested**; F1 resolved, F2 retry-exhaustion recovery and F3 authoritative legacy explanation remain open. TAR-007/TAR-009 reopened; see [review](evidence/m1-independent-review.md). Required checks pass but two new independent probes fail.
+
+2026-11-08 foundation re-review (user-labelled M1) at `c88b722`: **changes requested**, reopening TAR-007/TAR-009 for empty journals, outbox starvation and missing portal bill explanation; round 2 verified F1 and found retry-exhaustion and legacy-explanation gaps — all findings remediated same day and all probes folded into the suite. See [independent review](evidence/m1-independent-review.md). Earlier completion/remediation statements below remain historical.
 
 Independent re-review at `de0e08d` reopened TAR-006/TAR-009 for incomplete rating evidence and account-scoped recovery; all four follow-up findings remediated and both preserved probes pass. See the [review](evidence/m2-independent-review.md).
 

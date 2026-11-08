@@ -131,7 +131,10 @@ def calculate_for_billing(op, *, base_url: str | None = None) -> dict:
         base_url=base_url or settings.LEGACY_BASE_URL,
         timeout=settings.LEGACY_TIMEOUT_SECONDS,
     )
-    _persist_legacy_result(result)
+    legacy_calc = _persist_legacy_result(result)
+    # Pin the authoritative evidence on the op so issuance can record
+    # which persisted legacy response produced its figures.
+    op._legacy_calculation_id = legacy_calc.id
     if op.cohort_mode == Cohort.Mode.SHADOW:
         _persist_comparison(rating_run, result)
     return {

@@ -430,3 +430,40 @@ def test_failed_outbox_event_does_not_starve_later_work(billed_account):
     assert failed.status == "pending"
     assert event.attempts == 2 and event.last_error
     assert healthy.status == "complete"
+
+
+@pytest.mark.django_db(transaction=True)
+def test_outbox_recovers_after_many_failed_attempts(billed_account):
+    """Failed events are never excluded: after any number of transient
+    failures the next ordinary drain retries and completes them."""
+    account, run = billed_account
+    op = admit_issue(
+        account,
+        DAY,
+        NEXT,
+        run,
+        "OP-EXHAUSTED",
+        routing_resolver=lambda _account: ("legacy_only", 0),
+    )
+
+    def unavailable(_op):
+        raise CalculationUnavailable("unavailable", "temporary outage")
+
+    for _ in range(10):
+        with pytest.raises(CalculationUnavailable):
+            drain_outbox(digest_resolver=digest_resolver, legacy_calculator=unavailable)
+    op.refresh_from_db()
+    assert op.status == "pending" and op.outbox_event.attempts == 10
+
+    def recovered(_op):
+        return {
+            "charge": Decimal("8.30"),
+            "export": Decimal("0.48"),
+            "net": Decimal("7.82"),
+            "gst": Decimal("0.83"),
+            "total": Decimal("8.65"),
+        }
+
+    drain_outbox(digest_resolver=digest_resolver, legacy_calculator=recovered)
+    op.refresh_from_db()
+    assert op.status == "complete"

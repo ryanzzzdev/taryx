@@ -7,7 +7,9 @@ portal renders outcomes deterministically and can poll operations.
 """
 
 from contextlib import suppress
-from datetime import timedelta
+from datetime import date, timedelta
+from decimal import Decimal
+from types import SimpleNamespace
 
 import graphene
 from django.contrib.auth import authenticate, login, logout
@@ -42,6 +44,7 @@ from taryx.core.migration.models import (
     Cohort,
     CohortEvent,
     ComparisonRun,
+    LegacyCalculation,
 )
 from taryx.core.migration.services import (
     MigrationError,
@@ -52,7 +55,7 @@ from taryx.core.migration.services import (
     transition_cohort,
 )
 from taryx.core.pricing.engine import RatingError
-from taryx.core.pricing.models import RatingLine, RatingRun
+from taryx.core.pricing.models import RatingRun
 from taryx.core.pricing.services import rate_account
 from taryx.territories.au_nem.tariffs import GST_RATE, POLICY_IDENTITY, TARIFFS
 
@@ -165,45 +168,45 @@ class CurrentIntervalType(DjangoObjectType):
         fields = ("interval_end_utc", "value", "quality", "selection_version")
 
 
-class RatingLineType(DjangoObjectType):
-    class Meta:
-        model = RatingLine
-        fields = (
-            "sequence",
-            "tariff_code",
-            "element",
-            "band",
-            "quantity",
-            "unit",
-            "rate",
-            "amount",
-            "gst",
-            "basis",
-            "segment_from",
-            "segment_to",
-        )
+class RatingLineType(graphene.ObjectType):
+    """Calculation line item — a RatingRun line or a pinned legacy
+    response line, both attribute-compatible."""
+
+    sequence = graphene.Int()
+    tariff_code = graphene.String()
+    element = graphene.String()
+    band = graphene.String()
+    quantity = graphene.Decimal()
+    unit = graphene.String()
+    rate = graphene.Decimal()
+    amount = graphene.Decimal()
+    gst = graphene.Decimal()
+    basis = graphene.String()
+    segment_from = graphene.Date()
+    segment_to = graphene.Date()
 
 
-class RatingRunType(DjangoObjectType):
+class RatingRunType(graphene.ObjectType):
+    """The pinned calculation evidence behind an invoice or rating
+    result — a persisted RatingRun, or an authoritative legacy
+    calculation presented in the same shape."""
+
+    id = graphene.Int()
+    period_start = graphene.Date()
+    period_end = graphene.Date()
+    net = graphene.Decimal()
+    gst = graphene.Decimal()
+    total = graphene.Decimal()
+    input_digest = graphene.String()
+    engine_version = graphene.String()
+    policy_identity = graphene.String()
+    created_at = graphene.DateTime()
     lines = graphene.List(RatingLineType, required=True)
 
-    class Meta:
-        model = RatingRun
-        fields = (
-            "id",
-            "period_start",
-            "period_end",
-            "net",
-            "gst",
-            "total",
-            "input_digest",
-            "engine_version",
-            "policy_identity",
-            "created_at",
-        )
-
     def resolve_lines(run, info):
-        return run.lines.order_by("sequence")
+        # Real RatingRun queryset vs. legacy evidence namespaces (below).
+        lines = run.lines
+        return lines.order_by("sequence") if hasattr(lines, "order_by") else lines
 
 
 class PostingType(DjangoObjectType):
@@ -263,6 +266,90 @@ class InvoiceType(DjangoObjectType):
 
     def resolve_adjustments(invoice, info):
         return invoice.adjustments.order_by("generation")
+
+    def resolve_rating_run(invoice, info):
+        # The pinned *authoritative* calculation: a Taryx run for
+        # new-source invoices, the persisted legacy response for
+        # legacy-source ones — its line items reconcile to the invoice.
+        if invoice.calculation_source != "legacy":
+            return invoice.rating_run
+        return _legacy_evidence(invoice)
+
+
+def _legacy_line(item: dict, sequence: int) -> SimpleNamespace:
+    return SimpleNamespace(
+        sequence=sequence,
+        tariff_code=item["tariff_code"],
+        element=item["element"],
+        band=item.get("band"),
+        quantity=Decimal(str(item["quantity"])),
+        unit=item["unit"],
+        rate=Decimal(str(item["rate"])),
+        amount=Decimal(str(item["amount"])),
+        gst=Decimal(str(item["gst"])),
+        basis=item.get("basis", ""),
+        segment_from=date.fromisoformat(item["segment"][0]),
+        segment_to=date.fromisoformat(item["segment"][1]),
+    )
+
+
+def _legacy_evidence(invoice: Invoice) -> SimpleNamespace:
+    """Authoritative legacy calculation presented in RatingRun shape."""
+    calc = None
+    if invoice.legacy_calculation_id:
+        calc = (
+            LegacyCalculation.objects.using(SHADOW_ALIAS)
+            .filter(pk=invoice.legacy_calculation_id)
+            .first()
+        )
+    if calc is not None:
+        return SimpleNamespace(
+            id=calc.id,
+            period_start=invoice.period_start,
+            period_end=invoice.period_end,
+            net=calc.net,
+            gst=calc.gst,
+            total=calc.total,
+            input_digest=calc.snapshot_hash,
+            engine_version=calc.engine_version,
+            policy_identity=f"legacy catalogue {calc.catalogue_version}",
+            created_at=calc.received_at,
+            lines=[
+                _legacy_line(item, i + 1)
+                for i, item in enumerate(calc.response_json.get("lines", []))
+            ],
+        )
+    # No pinned response (e.g. synthetic calculator): reconcile to the
+    # invoice totals with an explicitly labelled aggregate line rather
+    # than presenting the new-engine comparison run as authoritative.
+    return SimpleNamespace(
+        id=None,
+        period_start=invoice.period_start,
+        period_end=invoice.period_end,
+        net=invoice.net,
+        gst=invoice.gst,
+        total=invoice.total,
+        input_digest=invoice.input_digest,
+        engine_version="legacy",
+        policy_identity=None,
+        created_at=invoice.issued_at,
+        lines=[
+            SimpleNamespace(
+                sequence=1,
+                tariff_code="legacy",
+                element="authoritative_total",
+                band=None,
+                quantity=Decimal(1),
+                unit="bill",
+                rate=invoice.net,
+                amount=invoice.net,
+                gst=invoice.gst,
+                basis="legacy authoritative totals — line detail not pinned",
+                segment_from=invoice.period_start,
+                segment_to=invoice.period_end,
+            )
+        ],
+    )
 
 
 class BillingOperationType(DjangoObjectType):

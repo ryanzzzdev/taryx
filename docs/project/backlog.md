@@ -28,7 +28,7 @@ Task sections own status; index icons mirror them. See the [documentation guide]
 
 ## Delivery notes
 
-Foundation re-review at `c88b722` requested changes; all three findings remediated and both probes now pass — see [findings and verification](evidence/m1-independent-review.md). Earlier completion statements below are historical for this scope.
+Foundation review round 2 at `c270a322` verified F1 and requested further changes; both follow-up findings remediated — see [findings and verification](evidence/m1-independent-review.md). Earlier completion statements below are historical for this scope.
 
 M2 re-review findings are remediated and verified (both follow-up probes pass; see the [review](evidence/m2-independent-review.md)). Independent M3 re-review of `f9f21df` found F1–F4; all resolved and re-verified (13/13 preserved probes pass). Next action: close the remaining F2 cutover race in TAR-011/TAR-012 before M4. Later tasks remain Backlog until their dependencies and detailed contracts are ready. Portal/API slices can develop alongside their backend tasks; TAR-009 and TAR-012 own integrated acceptance. Observability hooks and correctness tests accompany implementation; TAR-016 owns the full cross-service campaign, not the first tests.
 
@@ -246,7 +246,7 @@ Re-remediated 2026-10-25: RatingLine membership is sealed via the same transacti
 - Area: billing
 - Milestone: M2
 - Priority: High
-- Status: Ready 🟢
+- Status: Done ✅
 - Depends on: TAR-006
 - References: [Contract](features/billing-and-ledger.md)
 
@@ -276,6 +276,10 @@ Remediated 2026-10-25 (R2/R3/R4/R6): open quarantines now feed the input digest;
 Reopened 2026-11-08 by the [foundation re-review](evidence/m1-independent-review.md) of `c88b722f30526d8c57aef7ff89634ecd8a1fa983` (user-labelled M1; canonical M2). F1 empty-journal enforcement and F2 outbox failure isolation require remediation; both independent PostgreSQL probes fail. Next: fix the database commit check and starvation-safe recovery, then rerun probes and required checks.
 
 Remediated 2026-11-08 (F1/F2): a second deferred constraint trigger on `billing_journalentry` INSERT applies the balanced-posting check at commit — an empty journal is rejected and the seal guarantees it can never be completed later (billing 0008). `drain_outbox` isolates failures per event: retry state (`attempts`/`last_error`) is recorded on the outbox row, later events still process, and events past `max_attempts` stop being selected so a full failing batch cannot starve the drain. Both probes pass and are folded into tests/test_billing.py.
+
+Round-two independent review of `c270a322` (2026-11-08): F1 is independently verified resolved, but F2 remains open: ten transient failures permanently exclude the pending event from normal recovery. Add fair retries or a supported observable requeue path. [Review and failing follow-up probes](evidence/m1-independent-review.md). Required checks pass (151 backend/6 frontend); 20 preserved probes pass and two follow-ups fail.
+
+Re-remediated 2026-11-08 (round-2 F2): the attempt cap is removed — pending events are never excluded; selection orders by `attempts` then `created_at` so chronic failures sink below fresh work yet are always retried, letting a recovered dependency complete on the next ordinary drain. Both follow-up probes pass and are folded into tests/test_billing.py.
 
 <a id="tar-008"></a>
 
@@ -319,7 +323,7 @@ Remediated 2026-10-25 (R2/R4): corrections share the same locked-revalidation bo
 - Area: portal
 - Milestone: M2
 - Priority: High
-- Status: Ready 🟢
+- Status: Done ✅
 - Depends on: TAR-008
 - References: [Contract](features/operator-and-clients.md)
 
@@ -353,6 +357,10 @@ Re-remediated 2026-10-25: AccountPanel is keyed by account.reference so switchin
 Reopened 2026-11-08 by the [foundation re-review](evidence/m1-independent-review.md) of `c88b722f30526d8c57aef7ff89634ecd8a1fa983` (user-labelled M1; canonical M2). F3: issued-document UI lacks line-item provenance/explanation. Next: implement the pinned invoice explanation view and verify the operator journey.
 
 Remediated 2026-11-08 (F3): `InvoiceType` exposes `calculationSource` and the pinned `ratingRun` (lines, digest, engine/policy identity); the portal's issued documents expand into per-line provenance — tariff, segment, quantity × rate = amount, gst and basis. tests/test_graphql.py verifies the pinned run survives subsequent re-rating.
+
+Round-two independent review of `c270a322` (2026-11-08): F3 remains open for legacy invoices: the expander renders new-engine lines that do not reconcile to authoritative legacy totals. Render pinned authoritative evidence and distinguish comparison lines. [Review and failing follow-up probes](evidence/m1-independent-review.md). Required checks pass (151 backend/6 frontend); 20 preserved probes pass and two follow-ups fail.
+
+Re-remediated 2026-11-08 (round-2 F3): the invoice pins its authoritative calculation — `legacy_calculation_id` records the persisted shadow-alias LegacyCalculation used at issuance (billing 0009). `invoice.ratingRun` resolves per `calculationSource`: the real RatingRun for new-source bills, the pinned legacy response's own line items for legacy bills (an explicitly labelled aggregate line reconciling to net+gst when no response was pinned). RatingRun/RatingLine are now attribute-compatible ObjectTypes so both shapes serve one contract; the follow-up probe is folded into tests/test_graphql.py.
 
 <a id="tar-010"></a>
 
