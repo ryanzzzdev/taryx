@@ -1,6 +1,6 @@
 # Independent M1 foundation re-review
 
-Current reviewed SHA: `e80964058f102655c4f76c56813ea2e73e4aca9f`. Current verdict: **CHANGES_REQUESTED** (F1/F2 resolved; F3/F4 open). See the round-three addendum below; earlier results are historical.
+Current reviewed SHA: `2704f119c5eba16c284fe93ffd5f86ba5d832847`. Current verdict: **APPROVED** for the reviewed foundation scope; F1–F4 resolved. See the resumed round-four addendum below; earlier results are historical.
 
 Reviewed SHA: `c88b722f30526d8c57aef7ff89634ecd8a1fa983`
 Date: 2026-11-08
@@ -147,3 +147,32 @@ Disposition: TAR-007/TAR-009 remain Ready for remediation and canonical M2 remai
 - **F4**: `migration/migrations/0004` adds a BEFORE UPDATE/DELETE trigger on `migration_legacycalculation` — pinned authoritative evidence is immutable at the database level, and the restricted shadow credential cannot rewrite it (ComparisonRun stays mutable by design: it is refreshable observation evidence, not pinned provenance).
 
 Verification: both authoritative probes pass (6/6 preserved this round) and are folded into `tests/test_migration.py` against the real legacy simulator — persisted line shape, reconciliation, and shadow-credential rejection all verified end-to-end. Loop note: this is round 3 remediation under the user's standing instruction to loop until approval; the pilot's 3-round escalation is recorded, not silently ignored.
+
+## Independent round-four re-review — resumed 2026-11-08
+
+Candidate: `2704f119c5eba16c284fe93ffd5f86ba5d832847`. The user explicitly authorised round four and then supplied this replacement SHA after the quota interruption. `git diff --exit-code 7895f7a0aff62828eb635d8d0e0800138e740511 2704f119c5eba16c284fe93ffd5f86ba5d832847 -- src tests web pyproject.toml uv.lock Makefile` passed: implementation and project tests are unchanged. The intervening commit preserves the partial DELETE probe, event log and process/journal records.
+
+The interrupted check log ends mid-pytest and its process is unavailable; it is not counted as a completed check or verdict. Required checks and preserved probes were restarted against the replacement candidate. The pre-existing modified `m1-events-r4.jsonl` was preserved. No implementation changes or commits were made by this review.
+
+### F3 remediation assessment
+
+`_legacy_line` now reads the persisted `segment_from`/`segment_to` keys produced by `_persist_legacy_result`. The schema retains the source-aware invoice resolver, so the real pinned legacy response supplies line quantities, amounts, dates and engine identity rather than the new-engine comparison. The new project regression exercises the actual legacy simulator and persistence/issuance path; the independent probe exercises the same persistence path with only the remote response replaced.
+
+### F4 remediation assessment
+
+Migration `migration.0004_legacycalculation_immutable` installs a BEFORE UPDATE OR DELETE trigger on the entire persisted calculation row. The shadow role's existing DML grants cannot bypass that trigger. Freezing the row also prevents removal of the target referenced by an immutable issued invoice; mutable ComparisonRun observations remain separate. The retained round-four raw-SQL DELETE probe bypasses ORM protection and asserts the database's immutable error and continued row existence, complementing the original UPDATE probe.
+
+### Scope and retained limits
+
+This approval covers the user-labelled M1 foundation slice (canonical M2/TAR-007–009), not a new M3/migration campaign or production-readiness assessment. No fresh interactive browser session, broker outage, worker kill after commit/before acknowledgement, hosted CI or deployment was performed. Browser confidence comes from portal source inspection, frontend checks and API journey tests, including real simulator-backed explanation tests. Earlier recorded residual performance/query-bound and full operational campaign work is not claimed complete.
+
+### Round-four results and disposition
+
+**APPROVED** at `2704f119c5eba16c284fe93ffd5f86ba5d832847`. F1/F2 remain resolved; F3 persisted authoritative line rendering and F4 UPDATE/DELETE protection are independently verified resolved. No open findings remain in this review scope.
+
+- `UV_CACHE_DIR=/tmp/taryx-review-uv make check` — passed: Ruff lint/format, mypy (90 files), import contracts with deliberate violation rejection, **155 backend tests**, **6 frontend tests**, frontend typecheck and production build. This fresh run includes the two real legacy-simulator regressions.
+- `.venv/bin/pytest -q docs/project/evidence/m1_authoritative_probes.py docs/project/evidence/m1_foundation_probes.py docs/project/evidence/m1_followup_probes.py docs/project/evidence/m1_review_probes.py docs/project/evidence/m2_review_probes.py docs/project/evidence/m2_followup_probes.py -c pyproject.toml --tb=short` — **25 passed**. Includes all previous independent regressions and the retained raw-DELETE probe from the interrupted round.
+- `ruff check` and `ruff format --check` on `m1_authoritative_probes.py`, `git diff --check`, and changed-record link/UTF-8/task-index checks passed.
+- PostgreSQL verification used scoped escalated execution against the isolated pytest database. Fresh logs: `/tmp/taryx-m1-r4-resumed-check.log` and `/tmp/taryx-m1-r4-resumed-probes.log`; this document retains the command outcomes.
+
+TAR-007/TAR-009 and canonical M2 completion are confirmed for this reviewed foundation slice. Original metering/bootstrap M1 is unchanged. The explicit fourth-round authorisation resolves the previous pilot escalation; the quota interruption was not counted as a verdict. This does not approve a separate M3 campaign, hosted release or the retained operational verification gaps above. No new probe was needed on resumption: the committed partial DELETE probe was inspected and successfully run.

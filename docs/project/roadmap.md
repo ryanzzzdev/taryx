@@ -35,6 +35,8 @@ Excludes issuance, ledger, migration and Kubernetes. Gates: [BLK-001](blockers.m
 
 ## M2 — Explainable bills and corrections
 
+Latest foundation review: **approved** at `2704f119` on 2026-11-08 after the authorised resumed fourth round. F1–F4 resolved; canonical M2 completion confirmed for this scope with 155 backend/6 frontend tests and 25 independent probes passing. [Review](evidence/m1-independent-review.md) retains browser and operational verification limits; historical reopening statements below are superseded. This is not a separate M3 or release-readiness approval.
+
 Round-three foundation review at `e809640` (2026-11-08): **changes requested** — F3 persisted legacy rendering and F4 mutable authoritative provenance; both remediated same day (evidence immutability trigger + persisted line shape) and folded into the suite. See [review](evidence/m1-independent-review.md); later evidence supersedes historical completion statements below.
 
 Round-two independent review at `c270a322` (2026-11-08): **changes requested**; F1 resolved, F2 retry-exhaustion recovery and F3 authoritative legacy explanation remain open. TAR-007/TAR-009 reopened; see [review](evidence/m1-independent-review.md). Required checks pass but two new independent probes fail.

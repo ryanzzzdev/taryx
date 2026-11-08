@@ -28,7 +28,7 @@ Task sections own status; index icons mirror them. See the [documentation guide]
 
 ## Delivery notes
 
-Foundation re-review rounds 1–3 (user-labelled M1; canonical M2) found five findings — empty-journal commit gap, outbox starvation, missing bill explanation, retry exhaustion, and mutable pinned legacy evidence — all remediated and folded into the suite; see the [review](evidence/m1-independent-review.md). Earlier completion statements below are historical for this scope. The pilot's three-round limit was exceeded on the user's standing instruction to loop until approval.
+Foundation review **approved** at `2704f119c5eba16c284fe93ffd5f86ba5d832847` after the explicitly authorised, resumed fourth round. F1–F4 resolved; 155 backend/6 frontend tests and all 25 preserved probes pass. See [scope, evidence and retained verification gaps](evidence/m1-independent-review.md). Earlier completion and reopening statements below are historical.
 
 M2 re-review findings are remediated and verified (both follow-up probes pass; see the [review](evidence/m2-independent-review.md)). Independent M3 re-review of `f9f21df` found F1–F4; all resolved and re-verified (13/13 preserved probes pass). Next action: close the remaining F2 cutover race in TAR-011/TAR-012 before M4. Later tasks remain Backlog until their dependencies and detailed contracts are ready. Portal/API slices can develop alongside their backend tasks; TAR-009 and TAR-012 own integrated acceptance. Observability hooks and correctness tests accompany implementation; TAR-016 owns the full cross-service campaign, not the first tests.
 
@@ -285,6 +285,8 @@ Round-three independent review at `e809640` (2026-11-08): F1/F2 resolved. F4: ne
 
 Re-remediated 2026-11-08 (F3/F4): persisted legacy lines use flat `segment_from`/`segment_to` keys — the resolver now reads them, so real pinned evidence renders. `migration_legacycalculation` gains a BEFORE UPDATE/DELETE immutability trigger (migration 0004), matching the invoice/journal boundary; a shadow-credential mutation of pinned evidence is rejected by the database. Both probes pass and are folded into tests/test_migration.py.
 
+Independent round-four confirmation (2026-11-08) at `2704f119`: **approved** for this foundation slice. Empty-journal enforcement, admission/issuance regressions, outbox recovery and immutable authoritative evidence (UPDATE and raw DELETE) verified. Required checks and all 25 preserved probes pass; see [review](evidence/m1-independent-review.md) for scope and remaining operational verification gaps.
+
 <a id="tar-008"></a>
 
 ## TAR-008 — Implement successive corrections and adjustments
@@ -367,6 +369,8 @@ Round-two independent review of `c270a322` (2026-11-08): F3 remains open for leg
 Re-remediated 2026-11-08 (round-2 F3): the invoice pins its authoritative calculation — `legacy_calculation_id` records the persisted shadow-alias LegacyCalculation used at issuance (billing 0009). `invoice.ratingRun` resolves per `calculationSource`: the real RatingRun for new-source bills, the pinned legacy response's own line items for legacy bills (an explicitly labelled aggregate line reconciling to net+gst when no response was pinned). RatingRun/RatingLine are now attribute-compatible ObjectTypes so both shapes serve one contract; the follow-up probe is folded into tests/test_graphql.py.
 
 Round-three independent review at `e809640` (2026-11-08): F3: real persisted legacy lines fail with a segment-key mismatch; fix the resolver against the stored format. Verify against the real persistence path and F4-protected authoritative evidence. [Review/probes](evidence/m1-independent-review.md): required checks pass, 22 preserved probes pass, two new probes fail.
+
+Independent round-four confirmation (2026-11-08) at `2704f119`: **approved** for this foundation slice. Pinned authoritative explanation verified for new and legacy invoices, including the real simulator/persistence path; portal source and API journey tests reviewed. No fresh interactive browser session claimed. Required checks and all 25 preserved probes pass; see [review](evidence/m1-independent-review.md) for scope and remaining operational verification gaps.
 
 <a id="tar-010"></a>
 

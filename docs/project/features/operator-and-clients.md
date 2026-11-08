@@ -9,6 +9,8 @@ Tasks: [TAR-009](../backlog.md#tar-009), [TAR-012](../backlog.md#tar-012), [TAR-
 
 Round-three review at `e809640` found persisted-line rendering and mutable pinned evidence gaps (F3/F4); remediated same day — real legacy lines render and the pinned LegacyCalculation is immutable at the database level. [Review](../evidence/m1-independent-review.md).
 
+Latest independent verification (2026-11-08, `2704f119`): F3/F4 resolved and foundation review approved. Persisted authoritative legacy lines render and reconcile; database triggers reject UPDATE and DELETE of that evidence. New-engine pinning and API journey regressions pass. Verification combines source/API/frontend checks and the real legacy simulator; no fresh interactive browser session is claimed. Earlier open findings above are historical.
+
 ## Operator journeys
 
 The portal supports account/supply-point inspection, ingestion status and rejected data, bill/line-item provenance, original and revised liability, operation recovery, comparison reports and cohort cutover. Introduce these screens with their backend milestones rather than leaving all UI integration until the end.
