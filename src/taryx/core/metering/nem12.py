@@ -135,6 +135,7 @@ def parse_nem12(text: str) -> tuple[dict[tuple[str, str], ChannelMeta], list[Cha
             raise Nem12Error("multiple_headers", "multiple 100 records found")
 
     meta: dict[tuple[str, str], ChannelMeta] = {}
+    seen_days: dict[tuple[str, str], set[date]] = {}
     channels: list[ChannelData] = []
     current: ChannelData | None = None
     current_meta: ChannelMeta | None = None
@@ -195,6 +196,16 @@ def parse_nem12(text: str) -> tuple[dict[tuple[str, str], ChannelMeta], list[Cha
                 uom=uom,
                 interval_minutes=interval_minutes,
             )
+            previous = meta.get((nmi, suffix))
+            if previous is not None and previous != current_meta:
+                # A repeated channel block must declare identical metadata:
+                # earlier days were parsed under their own block's interval
+                # length, so letting the last block's metadata stand would
+                # re-time every interval already collected.
+                raise Nem12Error(
+                    "conflicting_200",
+                    f"row {row_number}: repeated 200 for {nmi}:{suffix} changes channel metadata",
+                )
             meta[(nmi, suffix)] = current_meta
             current = ChannelData(nmi=nmi, suffix=suffix)
             channels.append(current)
@@ -213,6 +224,17 @@ def parse_nem12(text: str) -> tuple[dict[tuple[str, str], ChannelMeta], list[Cha
             if last_date is not None and interval_date <= last_date:
                 raise Nem12Error("out_of_order", f"row {row_number}: IntervalDate not ascending")
             last_date = interval_date
+            channel_days = seen_days.setdefault((current.nmi, current.suffix), set())
+            if interval_date in channel_days:
+                # The same channel/day twice in one file is a duplicate
+                # interval identity — an explicit defect, not a constraint
+                # violation left for the database to find.
+                raise Nem12Error(
+                    "repeated_interval",
+                    f"row {row_number}: repeated interval day {interval_date} "
+                    f"for {current.nmi}:{current.suffix}",
+                )
+            channel_days.add(interval_date)
             n_values = len(row) - 7
             if n_values != expected_per_day:
                 raise Nem12Error(

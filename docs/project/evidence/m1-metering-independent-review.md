@@ -63,3 +63,50 @@ Limits: no fresh dependency installation/clean Compose rebuild, hosted CI, R1 pe
 ## Closeout
 
 TAR-005 and TAR-006 reopened; M1 is In progress for this review scope. TAR-003/TAR-004 unchanged. Billing approval and its prior evidence remain intact. Fix M1-F1–F4, preserve/fold these probes into the suite, and request re-review at an accurate full commit SHA. No implementation changes or commits made by the reviewer.
+
+---
+
+## Remediation — 2026-11-08 (Devin)
+
+All four findings resolved at the remediation commit; the five preserved
+probes pass and each defect case is folded into `tests/` as a regression.
+
+- **M1-F1** — `parse_nem12` now retains per-channel metadata across
+  repeated `200` blocks and rejects the file with `conflicting_200` when
+  a repeated block declares different metadata (interval length, UOM,
+  serial). Days parsed under one block's interval length can no longer
+  be re-timed by a later block. Regression:
+  `test_mixed_interval_metadata_rejected_atomically` in
+  `tests/test_metering_ingestion.py`.
+- **M1-F2** — the parser tracks seen `(nmi, suffix, interval_date)`
+  triples across blocks; a repeated channel/day raises `repeated_interval`
+  and the batch lands as an inspectable `REJECTED` row instead of
+  leaking an `IntegrityError` from `uniq_record_position`. Regression:
+  `test_repeated_channel_day_is_explicit_rejection`.
+- **M1-F3** — `_publish_interval` compares the precedence tuple
+  `(quality rank, MSATS timestamp, update timestamp)` plus value/quality
+  of the winning record against the incumbent; an identical record in a
+  new file envelope keeps the original `source_record` and
+  `selection_version`, so repeated revisions leave rating digests
+  untouched. Regression:
+  `test_identical_revision_in_new_envelope_is_selection_noop`.
+- **M1-F4** — `rate_account` validates coverage against the same
+  captured snapshot consumed by calculation (`len(rows)` vs the
+  expected interval count, plus open quarantines from the gathered
+  list) instead of re-querying the database. A publication interleaved
+  after the gather can no longer make an empty snapshot validate; the
+  run either consumes a coherent 48-record snapshot or raises
+  `incomplete_coverage`. Regression:
+  `test_rating_coverage_uses_the_consumed_snapshot` in
+  `tests/test_pricing.py`.
+
+Verification: preserved probes `test_m1_metering_review.py` **5
+passed**; earlier `m1_review_probes.py` 10 passed; scoped suite 68
+metering/pricing/parser tests; `make check` green — ruff lint/format,
+mypy, 3 import contracts, **159 backend tests**, 6 frontend tests,
+TypeScript check and production build.
+
+The round-1 prompt carried a mistyped candidate SHA; the reviewer
+verified and reported against the actual HEAD
+(`230dc0f1078243e3448ecc145c842228b22cca8c`) and flagged the gap — the
+round was accepted on the real reviewed SHA.

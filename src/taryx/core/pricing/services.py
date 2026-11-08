@@ -14,7 +14,6 @@ from decimal import Decimal
 from django.db import transaction
 
 from taryx.core.accounts.models import Account, MeterChannel
-from taryx.core.metering.ingestion import channel_coverage
 from taryx.core.metering.models import CurrentInterval, QuarantinedInterval
 from taryx.core.metering.nem_time import nem_interval_end_utc, nem_local
 from taryx.core.pricing.engine import (
@@ -220,14 +219,18 @@ def rate_account(
 
     agreements, channel_rows, quarantines = _gather_inputs(account, period_start, period_end)
 
+    # Coverage is validated against the same captured snapshot the
+    # calculation consumes — re-querying the database here would let an
+    # interleaved publication validate data that is not in the digest.
+    expected_per_day_total = (period_end - period_start).days
     slices: list[ChannelSlice] = []
     for channel, rows in channel_rows:
-        coverage = channel_coverage(channel, period_start, period_end)
-        if not coverage.complete:
+        expected = (expected_per_day_total * 24 * 60) // channel.interval_minutes
+        quarantined = sum(1 for q in quarantines if q.channel_id == channel.id)
+        if len(rows) != expected or quarantined:
             raise RatingError(
                 "incomplete_coverage",
-                f"{channel}: {coverage.selected}/{coverage.expected} intervals, "
-                f"{coverage.quarantined} quarantined",
+                f"{channel}: {len(rows)}/{expected} intervals, {quarantined} quarantined",
             )
         slices.append(
             ChannelSlice(

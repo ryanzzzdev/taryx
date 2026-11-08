@@ -175,7 +175,7 @@ Corrected after the [independent M1 review](evidence/m1-exit-review.md): QMM qua
 - Area: metering
 - Milestone: M1
 - Priority: High
-- Status: In progress 🚧
+- Status: Done ✅
 - Depends on: TAR-003, TAR-004
 - References: [Contract](features/metering-and-rating.md)
 
@@ -203,7 +203,7 @@ Ingest reproducible synthetic batches into versioned PostgreSQL metering history
 Remediated after the [independent M1 review](evidence/m1-exit-review.md): two-phase selection with per-interval locked re-evaluation, savepoint duplicate recovery (published and rejected), encoding/lexical/row-shape validation, and quarantine resolution by unambiguous newer winners. All ten review probes pass; regressions folded into tests/. Next action: TAR-006.
 
 
-2026-11-08 metering review: reopened at `230dc0f1078243e3448ecc145c842228b22cca8c`; see [M1 findings and probes](evidence/m1-metering-independent-review.md). Resolve M1-F1–F3 ingestion/selection failures and rerun independent probes before completion. Previous evidence above is historical.
+2026-11-08 metering review: reopened at `230dc0f1078243e3448ecc145c842228b22cca8c` for M1-F1–F3; remediated same day — repeated-200 metadata now validated (`conflicting_200`), repeated channel/days reject as `repeated_interval` before insertion, and equivalent re-enveloped revisions keep incumbent selection/version. All probes folded into `tests/`; see [M1 findings and probes](evidence/m1-metering-independent-review.md). Previous evidence above is historical.
 
 <a id="tar-006"></a>
 
@@ -213,7 +213,7 @@ Remediated after the [independent M1 review](evidence/m1-exit-review.md): two-ph
 - Area: pricing
 - Milestone: M2
 - Priority: High
-- Status: In progress 🚧
+- Status: Done ✅
 - Depends on: TAR-005
 - References: [Contract](features/metering-and-rating.md)
 

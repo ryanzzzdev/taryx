@@ -354,3 +354,29 @@ def test_calculation_affecting_inputs_change_the_digest():
         policy_identity=POLICY_IDENTITY,
     )
     assert other != run.input_digest
+
+
+@pytest.mark.django_db
+def test_rating_coverage_uses_the_consumed_snapshot(monkeypatch):
+    """Coverage is checked against the rows the calculation consumes —
+    an interleaved publication cannot validate an empty snapshot."""
+    from taryx.core.pricing import services
+
+    account = make_account([("E1", "import")], [("T-FLAT", date(2026, 1, 1), None)])
+    original = services._gather_inputs
+
+    def interleave(*args, **kwargs):
+        snapshot = original(*args, **kwargs)
+        ingest_nem12_content(load("e1_flat.nem12"), "e1_flat-late.nem12")
+        return snapshot
+
+    monkeypatch.setattr(services, "_gather_inputs", interleave)
+    try:
+        run = rate_account(account, date(2026, 3, 2), date(2026, 3, 3), **KWARGS)
+    except RatingError as error:
+        assert error.code == "incomplete_coverage"
+    else:
+        # A coherent retried snapshot is also valid; supply-only is not.
+        imports = run.lines.filter(element="import")
+        assert sum((line.quantity for line in imports), Decimal(0)) == Decimal("24")
+        assert len(run.input_snapshot["channels"][0]["records"]) == 48

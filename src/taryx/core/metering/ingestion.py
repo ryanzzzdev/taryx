@@ -249,14 +249,32 @@ def _publish_interval(
             quality=winner.quality,
             source_record=winner,
         )
-    elif current.source_record_id != winner.id or current.value != winner.value:
-        current.value = winner.value
-        current.quality = winner.quality
-        current.source_record = winner
-        current.selection_version += 1
-        current.save(
-            update_fields=["value", "quality", "source_record", "selection_version", "updated_at"]
+    else:
+        # An equivalent effective selection — same value, quality and
+        # precedence, only a newer batch identity — retains the original
+        # source pointer: repeated revisions stay no-ops rather than
+        # bumping selection_version and invalidating rating digests.
+        incumbent = current.source_record
+        equivalent = (
+            incumbent is not None
+            and current.value == winner.value
+            and current.quality == winner.quality
+            and precedence(incumbent) == precedence(winner)
         )
+        if not equivalent:
+            current.value = winner.value
+            current.quality = winner.quality
+            current.source_record = winner
+            current.selection_version += 1
+            current.save(
+                update_fields=[
+                    "value",
+                    "quality",
+                    "source_record",
+                    "selection_version",
+                    "updated_at",
+                ]
+            )
 
     QuarantinedInterval.objects.filter(
         channel_id=channel_id,

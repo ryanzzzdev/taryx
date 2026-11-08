@@ -2,13 +2,13 @@
 
 Date: 2026-10-25
 
-This is the initial delivery sequence, not a calendar commitment. The earlier 6–10 week ambition is a sizing hypothesis; reassess after M1 and M3. [Backlog](backlog.md) owns task status; [architecture](architecture.md) owns design. M1 metering completion is reopened by the 2026-11-08 independent review; prior billing approval is retained.
+This is the initial delivery sequence, not a calendar commitment. The earlier 6–10 week ambition is a sizing hypothesis; reassess after M1 and M3. [Backlog](backlog.md) owns task status; [architecture](architecture.md) owns design. M1 metering completion was reopened by the 2026-11-08 independent review and remediated the same day; prior billing approval is retained.
 
 | Milestone | Outcome | Status | Depends on |
 | --- | --- | --- | --- |
 | Documentation setup | Portable Cateniq-style workflow | Complete | None |
 | Planning baseline | Architecture, feature contracts and evidence-driven backlog | Complete | Documentation setup |
-| M1 — Foundation and domain profile | Reproducible workspace, sourced profile and metering history | In progress | Planning baseline |
+| M1 — Foundation and domain profile | Reproducible workspace, sourced profile and metering history | Complete | Planning baseline |
 | M2 — Explainable bills and corrections | End-to-end operator billing with financial integrity | Complete | M1 |
 | M3 — Safe legacy migration | Characterisation, shadow comparison and controlled cohort cutover | In progress | M2 |
 | M4 — Client variation and market boundary | Second isolated client and bounded integration | Planned | M3 |
@@ -18,7 +18,7 @@ Setup and planning completion refer only to [TAR-001](backlog.md#tar-001) and [T
 
 ## M1 — Foundation and domain profile
 
-2026-11-08 metering review: **changes requested** at `230dc0f1078243e3448ecc145c842228b22cca8c`; TAR-005/TAR-006 reopened for M1-F1–F4. [Evidence and probes](evidence/m1-metering-independent-review.md). The user-defined review scope includes TAR-003–006 (rating was historically grouped under M2 below). Historical completion statements are superseded for metering/rating only; the approved billing review is unchanged.
+2026-11-08 metering review: **changes requested** at `230dc0f1078243e3448ecc145c842228b22cca8c`; TAR-005/TAR-006 reopened for M1-F1–F4 and remediated the same day (parser metadata validation, explicit repeated-day rejection, equivalent-revision selection no-op, snapshot-coherent coverage). [Evidence and probes](evidence/m1-metering-independent-review.md). The user-defined review scope includes TAR-003–006 (rating was historically grouped under M2 below). Historical completion statements are superseded for metering/rating only; the approved billing review is unchanged.
 
 Independent review at `b5a180f` reopened TAR-004/TAR-005 for format compatibility and ingestion correctness; all five findings remediated and all ten preserved probes now pass. See [review](evidence/m1-exit-review.md).
 

@@ -300,3 +300,62 @@ def test_quarantined_interval_blocks_coverage(seeded):
     cov = channel_coverage(channel("E1"), date(2026, 3, 2), date(2026, 3, 3))
     assert cov.quarantined == 1
     assert not cov.complete
+
+
+def _block(minutes: int = 30, day: str = "20260302") -> str:
+    return "\n".join(
+        [
+            f"200,4102000001,E1,,E1,NEM100,1000001,kWh,{minutes},",
+            ",".join(
+                ["300", day]
+                + ["0.5"] * (1440 // minutes)
+                + ["A", "", "", "20260301120000", "20260301120000"]
+            ),
+        ]
+    )
+
+
+def _content(*blocks: str, sender: str = "TARYX") -> bytes:
+    return (
+        "100,NEM12,20260306120000," + sender + ",TARYX\n" + "\n".join(blocks) + "\n900\n"
+    ).encode()
+
+
+@pytest.mark.django_db
+def test_mixed_interval_metadata_rejected_atomically(seeded):
+    """A 5-minute block followed by a 30-minute block on one channel must
+    not publish the earlier days under the later block's metadata."""
+    result = ingest_nem12_content(_content(_block(5), _block(30, "20260303")), "mixed")
+    assert result.batch.status == "rejected"
+    assert result.batch.error_code == "conflicting_200"
+    assert not IntervalRecord.objects.exists()
+    assert not CurrentInterval.objects.exists()
+
+
+@pytest.mark.django_db
+def test_repeated_channel_day_is_explicit_rejection(seeded):
+    """The same channel/day twice in one file is an inspectable rejection,
+    not a database constraint escape."""
+    result = ingest_nem12_content(_content(_block(), _block()), "repeated-day")
+    assert result.batch.status == "rejected"
+    assert result.batch.error_code == "repeated_interval"
+    assert not IntervalRecord.objects.exists()
+
+
+@pytest.mark.django_db
+def test_identical_revision_in_new_envelope_is_selection_noop(seeded):
+    """An equivalent record in a new batch envelope must not repoint the
+    selection or bump selection_version — repeated revisions are no-ops."""
+    ingest_nem12_content(_content(_block()), "first")
+    before = list(
+        CurrentInterval.objects.order_by("interval_end_utc").values_list(
+            "source_record_id", "selection_version"
+        )
+    )
+    ingest_nem12_content(_content(_block(), sender="OTHER"), "same-revision")
+    after = list(
+        CurrentInterval.objects.order_by("interval_end_utc").values_list(
+            "source_record_id", "selection_version"
+        )
+    )
+    assert before == after
