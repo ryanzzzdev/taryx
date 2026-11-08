@@ -24,12 +24,13 @@ Task sections own status; index icons mirror them. See the [documentation guide]
 - 📋 [TAR-016 — Verify recovery and correlated diagnostics](#tar-016)
 - 📋 [TAR-017 — Package and verify Kubernetes delivery](#tar-017)
 - 📋 [TAR-018 — Measure and present the portfolio release](#tar-018)
+- 🚧 [TAR-019 — Evaluate the multi-agent implement/review orchestrator](#tar-019)
 
 ## Delivery notes
 
 M2 re-review findings are remediated and verified (both follow-up probes pass; see the [review](evidence/m2-independent-review.md)). Independent M3 re-review of `f9f21df` found F1–F4; all resolved and re-verified (13/13 preserved probes pass). Next action: close the remaining F2 cutover race in TAR-011/TAR-012 before M4. Later tasks remain Backlog until their dependencies and detailed contracts are ready. Portal/API slices can develop alongside their backend tasks; TAR-009 and TAR-012 own integrated acceptance. Observability hooks and correctness tests accompany implementation; TAR-016 owns the full cross-service campaign, not the first tests.
 
-The architecture and functional scope are the planning baseline; exact schemas, dependency versions and open profiles are refined in their named tasks. Split large tasks into new IDs before starting if necessary; preserve existing history. Next unused ID: TAR-019. M1 remains verified; M2 remediation is re-verified.
+The architecture and functional scope are the planning baseline; exact schemas, dependency versions and open profiles are refined in their named tasks. Split large tasks into new IDs before starting if necessary; preserve existing history. Next unused ID: TAR-020. M1 remains verified; M2 remediation is re-verified.
 
 Re-review of `db18588` found one remaining F2 commit-window race; resolved by a shared cohort advisory-lock protocol between cutover and all gate-affecting writers — see the [third remediation addendum](evidence/m3-independent-review.md#third-remediation-addendum--2026-10-25).
 
@@ -634,3 +635,42 @@ Not started; no implementation or verification evidence.
 ### Notes
 
 Refine and mark Ready once dependencies pass; record relevant gate resolutions before dependent implementation.
+
+<a id="tar-019"></a>
+
+## TAR-019 — Evaluate the multi-agent implement/review orchestrator
+
+- Repository: taryx
+- Area: workspace
+- Milestone: Not assigned
+- Priority: Low
+- Status: In progress 🚧
+- Depends on: None
+- References: [Problem framing](../agent-notes/multi-agent-handoff-problem.md), [Orchestrator research](../agent-notes/multi-agent-orchestrator-research.md)
+
+### Outcome
+
+Decide the architecture for the autonomous Devin–Codex implement/review
+loop (thin orchestrator, MCP inversion, or hybrid) and prototype the
+chosen mechanism on one milestone.
+
+### Done when
+
+- Devin-side headless invocation is verified (install `devin` CLI, or
+  record why the MCP/hybrid route was chosen).
+- `codex exec --output-schema` verdict contract verified empirically.
+- A bounded review loop runs end-to-end on one milestone with all pushes
+  still manual.
+
+### Completion evidence
+
+Pending.
+
+### Notes
+
+Simplified approach chosen 2026-11-08: Devin drives the loop in-session
+via `codex exec resume` against the existing review thread — see
+docs/agent-notes/codex-review-loop.md. `codex exec` smoke-tested;
+`codex exec resume` reaches the thread but conflicts on the app
+writer-lock while the thread is open. Remaining verification:
+first real review round end-to-end (writes, verdict, HEAD check).
