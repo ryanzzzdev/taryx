@@ -98,7 +98,9 @@ Exit criteria:
 - Duplicate, delayed, out-of-order and rejected messages recover or fail according to the transition table.
 - Adapter restart and uncertain outcomes reconcile without duplicate business transitions; unrelated billing remains available.
 
-Excludes full MSATS/aseXML conformance and live AEMO connectivity. Gate: [BLK-002](blockers.md#blk-002).
+Excludes full MSATS/aseXML conformance and live AEMO connectivity. Gate: [BLK-002](blockers.md#blk-002) — resolved 2026-11-08 by [decision 005](decisions/005-market-workflow-contract.md).
+
+Status note 2026-11-08: all three scoped tasks implemented and verified (TAR-013/014/015 — see backlog evidence). Milestone stays In progress pending the deferred independent review; M4 review loop was skipped this campaign on Codex quota and is owed before the milestone is claimed complete.
 
 ## M5 — Operational portfolio delivery
 
