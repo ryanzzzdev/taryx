@@ -1,5 +1,9 @@
 # M3 exit review — safe legacy migration
 
+Latest independent verdict (2026-11-08): **CHANGES_REQUESTED** at `7d6c633`;
+TAR-010–012 reopened for M3-RR-F1/F2. See the [fresh re-review](m3-re-review.md).
+The implementation assessments and completion statements below are historical.
+
 Date: 2026-10-25. Reviewer: Devin (SWE-2 High), campaign checkpoints TAR-010/011/012.
 Scope: [M3 exit criteria](../roadmap.md#m3--safe-legacy-migration). Contract:
 [legacy-migration](../features/legacy-migration.md).

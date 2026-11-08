@@ -15,9 +15,9 @@ Task sections own status; index icons mirror them. See the [documentation guide]
 - ✅ [TAR-007 — Implement durable issuance and balanced posting](#tar-007)
 - ✅ [TAR-008 — Implement successive corrections and adjustments](#tar-008)
 - ✅ [TAR-009 — Deliver the core operator journey](#tar-009)
-- ✅ [TAR-010 — Build independent legacy characterisation](#tar-010)
-- ✅ [TAR-011 — Implement isolated shadow comparison and gates](#tar-011)
-- ✅ [TAR-012 — Deliver operator migration and cutover](#tar-012)
+- 🚧 [TAR-010 — Build independent legacy characterisation](#tar-010)
+- 🚧 [TAR-011 — Implement isolated shadow comparison and gates](#tar-011)
+- 🚧 [TAR-012 — Deliver operator migration and cutover](#tar-012)
 - 📋 [TAR-013 — Demonstrate two isolated client instances](#tar-013)
 - 📋 [TAR-014 — Freeze the bounded market workflow](#tar-014)
 - 📋 [TAR-015 — Implement market adapter and counterparty simulator](#tar-015)
@@ -392,7 +392,7 @@ Independent round-four confirmation (2026-11-08) at `2704f119`: **approved** for
 - Area: migration
 - Milestone: M3
 - Priority: High
-- Status: Done ✅
+- Status: In progress 🚧
 - Depends on: TAR-009
 - References: [Contract](features/legacy-migration.md)
 
@@ -420,6 +420,8 @@ Independent re-review of `f9f21df` found F1–F4; all remediated with the five f
 
 Re-review at `db18588`: TAR-010 remediation verified by all original adapter and invalid-response probes plus the full suite. Remaining F2 cutover serialization belongs to TAR-011/TAR-012.
 
+2026-11-08 fresh independent re-review at `7d6c633285d98ed7afd0ed42c8c873a55c4f9faf`: **reopened** for M3-RR-F1/F2 (missing legacy output and malformed line identities). Full checks pass (161 backend/6 frontend), all 17 earlier M3 probes pass, but three new probes fail. Implement request-aware output validation and persist malformed attempts as INCONCLUSIVE before re-review. [Findings and reproduction](evidence/m3-re-review.md).
+
 <a id="tar-011"></a>
 
 ## TAR-011 — Implement isolated shadow comparison and gates
@@ -428,7 +430,7 @@ Re-review at `db18588`: TAR-010 remediation verified by all original adapter and
 - Area: migration
 - Milestone: M3
 - Priority: High
-- Status: Done ✅
+- Status: In progress 🚧
 - Depends on: TAR-010
 - References: [Contract](features/legacy-migration.md)
 
@@ -457,6 +459,8 @@ Independent re-review of `f9f21df` found F1–F4; all remediated with the five f
 
 Re-review of `db18588` reopened this task for the remaining F2 commit-window race; remediated with the cohort advisory-lock protocol — the commit-window probe now passes as a permanent regression. See the [third remediation addendum](evidence/m3-independent-review.md#third-remediation-addendum--2026-10-25).
 
+2026-11-08 fresh independent re-review at `7d6c633285d98ed7afd0ed42c8c873a55c4f9faf`: **reopened** for M3-RR-F1/F2 (missing legacy output and malformed line identities). Full checks pass (161 backend/6 frontend), all 17 earlier M3 probes pass, but three new probes fail. Implement request-aware output validation and persist malformed attempts as INCONCLUSIVE before re-review. [Findings and reproduction](evidence/m3-re-review.md).
+
 <a id="tar-012"></a>
 
 ## TAR-012 — Deliver operator migration and cutover
@@ -465,7 +469,7 @@ Re-review of `db18588` reopened this task for the remaining F2 commit-window rac
 - Area: portal
 - Milestone: M3
 - Priority: High
-- Status: Done ✅
+- Status: In progress 🚧
 - Depends on: TAR-011
 - References: [Contract](features/legacy-migration.md)
 
@@ -492,6 +496,8 @@ Reopened by independent review of `c06e1fc` (2026-10-25); all eight findings rem
 Independent re-review of `f9f21df` found F1–F4; all remediated with the five follow-up probes passing as permanent regressions — see the [second remediation addendum](evidence/m3-independent-review.md#second-remediation-addendum--2026-10-25).
 
 Re-review of `db18588` reopened this task for the remaining F2 commit-window race; remediated with the cohort advisory-lock protocol — the commit-window probe now passes as a permanent regression. See the [third remediation addendum](evidence/m3-independent-review.md#third-remediation-addendum--2026-10-25).
+
+2026-11-08 fresh independent re-review at `7d6c633285d98ed7afd0ed42c8c873a55c4f9faf`: **reopened** for M3-RR-F1/F2 (missing legacy output and malformed line identities). Full checks pass (161 backend/6 frontend), all 17 earlier M3 probes pass, but three new probes fail. Implement request-aware output validation and persist malformed attempts as INCONCLUSIVE before re-review. [Findings and reproduction](evidence/m3-re-review.md).
 
 <a id="tar-013"></a>
 

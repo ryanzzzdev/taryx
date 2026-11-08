@@ -1,5 +1,11 @@
 # Legacy comparison and cohort migration
 
+Latest verification (2026-11-08): **changes requested** at `7d6c633`.
+TAR-010–012 reopened for missing-output acceptance and malformed line identities
+that leave earlier gate evidence eligible (M3-RR-F1/F2). The contract below is
+unchanged; implementation does not yet satisfy it. [Fresh independent review](../evidence/m3-re-review.md).
+Earlier verification statements below are historical.
+
 Current independent verification at `db18588`: one cutover evidence-update race remains (F2); see [review](../evidence/m3-independent-review.md). Other prior finding probes pass.
 Date: 2026-10-25
 Status: implemented but reopened by [independent M3 review](../evidence/m3-independent-review.md); TAR-010/011/012 are not verified complete. Independent `legacy-sim` service (own sqlite schema, protocol `taryx-legacy/1`, catalogue `L-2003.4`) with characterised heritage GST-exempt policy and FIT-TRUNC-2003 defect (TAR-010); comparison evidence, scoped decisions and frozen cutover gates (TAR-011); routing-pinned billing, GraphQL controls, portal journey and audited transitions (TAR-012). Fictional policies and legacy defects are test scenarios, not Australian regulations.
