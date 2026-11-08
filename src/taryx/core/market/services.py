@@ -79,7 +79,7 @@ def request_transfer(supply_point: SupplyPoint, effective_date) -> TransferWorkf
             json.dumps(_request_fields(workflow), sort_keys=True).encode()
         ).hexdigest()
         workflow.save(update_fields=["request_digest"])
-        account_services.begin_transfer(supply_point)
+        account_services.begin_transfer(supply_point, workflow.correlation_id)
     return workflow
 
 
@@ -128,7 +128,12 @@ def submit_workflow(correlation_id, *, client=None, now=None) -> TransferWorkflo
             if polled and str(polled.get("correlation_id")) == str(correlation_id):
                 status = str(polled.get("status"))
                 last_seq = polled.get("last_seq")
-                if status in OUTCOMES and isinstance(last_seq, int) and last_seq >= 0:
+                if (
+                    status in OUTCOMES
+                    and isinstance(last_seq, int)
+                    and not isinstance(last_seq, bool)
+                    and last_seq >= 0
+                ):
                     recovered = {"seq": last_seq, "outcome": status}
                     workflow.detail = "recovered via status poll"
                     workflow.save()
@@ -142,7 +147,7 @@ def submit_workflow(correlation_id, *, client=None, now=None) -> TransferWorkflo
                     workflow.save()
                     return workflow
         if recovered is None:
-            if workflow.attempts >= conf["max_attempts"]:
+            if workflow.attempts > conf["max_attempts"]:
                 return _fail(workflow, "submit attempts exhausted")
             try:
                 response = client.post("/transfers", _request_body(workflow))
@@ -150,6 +155,8 @@ def submit_workflow(correlation_id, *, client=None, now=None) -> TransferWorkflo
                 if isinstance(exc, MarketHttpError) and exc.status == 409:
                     return _fail(workflow, f"digest conflict under same correlation: {exc}")
                 workflow.detail = str(exc)[:500]
+                if workflow.attempts >= conf["max_attempts"]:
+                    return _fail(workflow, f"submit attempts exhausted: {exc}")
                 workflow.save()
                 return workflow
             except MarketMalformed as exc:

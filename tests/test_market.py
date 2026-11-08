@@ -430,6 +430,77 @@ class TestReviewProbes:
         event.refresh_from_db()
         assert event.delivered_at is None
 
+    def test_core_consumer_rejects_missing_schema_fields(self, db, submitted):
+        from taryx.core.accounts.services import apply_transfer_outcome
+
+        with pytest.raises(ValueError):
+            apply_transfer_outcome(
+                submitted.supply_point,
+                {"version": "1", "nmi": submitted.supply_point.nmi},
+            )
+
+    def test_stale_outbox_delivery_does_not_reapply_old_correlation(
+        self, db, submitted, monkeypatch, t0
+    ):
+        """A delivered event replayed after a newer transfer is pending
+        must not register the point — the pending correlation wins."""
+        from django.db.models.query import QuerySet
+
+        apply_callback(_callback(submitted))
+        original = QuerySet.__iter__
+        interleaved = False
+
+        def competing_drain(queryset):
+            nonlocal interleaved
+            rows = original(queryset)
+            if queryset.model is MarketOutbox and not interleaved:
+                rows = iter(list(rows))
+                interleaved = True
+                assert drain_market_outbox() == 1
+                request_transfer(submitted.supply_point, t0.date())
+                submitted.supply_point.refresh_from_db()
+                assert submitted.supply_point.market_state == "pending"
+            return rows
+
+        monkeypatch.setattr(QuerySet, "__iter__", competing_drain)
+        drain_market_outbox()
+        submitted.supply_point.refresh_from_db()
+        assert submitted.supply_point.market_state == "pending"
+        # The stale event stays undeliverable — visible, not silently ok.
+        event = MarketOutbox.objects.get(workflow=submitted)
+        assert event.attempts > 0
+
+    def test_one_attempt_budget_allows_initial_submission(self, db, supply_point, t0, settings):
+        """The first marker must not consume the whole budget before
+        the first POST — max_attempts counts posts, not markers."""
+        settings.MARKET_MAX_ATTEMPTS = 1
+        workflow = request_transfer(supply_point, t0.date())
+        client = FakeClient(posts=[{"status": "submitted", "seq": 0}])
+        submit_workflow(workflow.correlation_id, client=client, now=t0)
+        assert len(client.post_calls) == 1
+        workflow.refresh_from_db()
+        assert workflow.state == "submitted"
+
+    def test_boolean_recovery_sequence_cannot_abort_sweep(self, db, supply_point, t0):
+        """A boolean last_seq must fail recovery validation, not escape
+        into apply_callback and abort the whole sweep."""
+        workflow = request_transfer(supply_point, t0.date())
+        workflow.attempts = 1
+        workflow.save(update_fields=["attempts"])
+        client = FakeClient(
+            posts=[{"status": "submitted", "seq": 0}],
+            gets=[
+                {
+                    "correlation_id": str(workflow.correlation_id),
+                    "status": "completed",
+                    "last_seq": True,
+                }
+            ],
+        )
+        sweep(client=client, now=t0 + timedelta(seconds=10))
+        workflow.refresh_from_db()
+        assert workflow.state != "completed"
+
 
 def _free_port() -> int:
     sock = socket.socket()

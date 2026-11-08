@@ -17,12 +17,15 @@ class SupplyPoint(models.Model):
 
     nmi = models.CharField("NMI", max_length=10, unique=True)
     account = models.ForeignKey(Account, on_delete=models.CASCADE, related_name="supply_points")
-    # Written only by the market adapter's admission path and its
-    # transactional outbox consumer — never by the counterparty-facing
-    # code directly (decision 005).
+    # Written only by the validating core consumer — never by the
+    # counterparty-facing adapter code directly (decision 005).
     market_state = models.CharField(
         max_length=16, choices=MarketState.choices, default=MarketState.NONE
     )
+    # Correlation of the transfer currently pending on this point —
+    # the per-correlation dedup that stops a stale outbox delivery
+    # from reapplying an old completion over a newer transfer.
+    pending_transfer_id = models.UUIDField(null=True)
 
     def __str__(self) -> str:
         return self.nmi

@@ -97,6 +97,18 @@ def test_second_stack_services_and_provisioning_order():
     assert "taryx-legacy-sg" in COMPOSE
 
 
+def test_application_services_share_one_image():
+    """TAR-013's same-image criterion: all four application containers
+    must run the single named image — four `build:` entries would
+    produce four distinct digests."""
+    for svc in ("api", "api-sg", "worker", "worker-sg"):
+        block = re.search(rf"^  {svc}:\n((?:    .*\n)+)", COMPOSE, re.M).group(1)
+        assert "image: taryx-app:latest" in block, f"{svc} does not pin the shared image"
+    assert len(re.findall(r"^\s+build: \.$", COMPOSE, re.M)) == 1, (
+        "only api may build the shared image"
+    )
+
+
 def test_shadow_credentials_are_client_scoped():
     """M4-F9: the shared shadow role must never reach another client's
     database — each deployment resolves its own shadow credential."""

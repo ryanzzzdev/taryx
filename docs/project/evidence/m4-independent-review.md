@@ -437,3 +437,48 @@ service-identity limitation is not evidence of the same-digest criterion.
   interactive browser or hosted CI campaign. Migration 0005 was inspected and
   its live resulting privileges verified; a fresh Southgrid installation was
   not performed. Same-image verification was performed this round and failed.
+
+## Remediation — round 3 (2026-11-08)
+
+All four round-3 findings remediated; all 27 probes pass.
+
+- **M4-F7** — recovery parsing rejects `bool` `last_seq` explicitly
+  (`bool` is an `int` subclass, so a plain type check leaked it through
+  into `apply_callback` and aborted the whole sweep). An invalid
+  recovery payload is now recorded as unrecovered and the sweep
+  continues.
+- **M4-F8** — durable per-correlation dedup at the core boundary:
+  `SupplyPoint.pending_transfer_id` (migration `0003`) records the
+  newest pending transfer's correlation; `apply_transfer_outcome`
+  requires every schema field and applies only while the point is
+  `pending` for that exact correlation. A stale outbox event replayed
+  after a newer transfer began can no longer re-register the point —
+  it stays an undelivered, visible `last_error` instead of silently
+  succeeding.
+- **M4-F10** — attempt markers now count POST attempts: the pre-post
+  budget check is `attempts > max` (`MARKET_MAX_ATTEMPTS=1` allows the
+  initial POST; an at-cap stranded draft still gets its final recovery
+  poll), and a failed post at `attempts >= max` transitions the
+  workflow to `failed`. Five transport failures with the default
+  budget now produce five POSTs then `failed`.
+- **M4-F11** — all four application services reference the single
+  named image `taryx-app:latest` with exactly one `build: .` block on
+  `api`; live `docker inspect` confirms one shared digest across
+  `api`, `api-sg`, `worker`, `worker-sg`. The static assertion now
+  counts whole `build: .` lines instead of substring matches that
+  caught `build: ./web`/`./legacy-sim`/`./market-sim`.
+
+Related fix exposed by the live rebuild: `taryx_app` lost `ALTER
+TABLE` ability when its `taryx` membership was revoked in round 1 —
+migrations need object *ownership*, not just `ALL` privileges.
+`db/init/02-clients.sql` now transfers table/view ownership to each
+application role (`api` migrated cleanly and is healthy under it).
+
+Probe handling: the four round-3 service probes are folded into
+`tests/test_market.py`; the live image-digest probe stays in
+`m4-probes/`. Verification: 27/27 probes; `make check` green —
+221 backend, 6 frontend, lint/format, mypy, import contracts,
+TypeScript/build. Live: all four app containers share image digest
+`sha256:a692e0cf…`; `db-init` re-applied; `api`/`api-sg`/`worker`/
+`worker-sg` recreated on the shared image. Three-round cap reached —
+escalated to the driver before any further review round.

@@ -39,15 +39,33 @@ ALTER DATABASE taryx_southgrid SET taryx.shadow_role TO 'taryx_shadow_sg';
 
 -- Aurora's application role must NOT be a member of the bootstrap
 -- superuser: SET ROLE would restore full power and bypass every ACL
--- above. Grant owner-equivalent privileges on the existing objects
--- directly instead; objects created later (migrations running as
--- taryx_app) are owned by it. CREATEROLE covers the migration-time
--- CREATE ROLE for taryx_shadow.
+-- above. Instead it owns the application objects outright — migrations
+-- (ALTER TABLE) and runtime writes need ownership, which grants alone
+-- cannot give. The superuser keeps only database-level provisioning.
+-- CREATEROLE covers the migration-time CREATE ROLE for taryx_shadow.
 REVOKE taryx FROM taryx_app;
 GRANT USAGE, CREATE ON SCHEMA public TO taryx_app;
-GRANT ALL ON ALL TABLES IN SCHEMA public TO taryx_app WITH GRANT OPTION;
-GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO taryx_app;
-GRANT ALL ON ALL FUNCTIONS IN SCHEMA public TO taryx_app;
+DO $$
+DECLARE
+    obj record;
+BEGIN
+    -- Column-linked sequences carry their table's owner automatically.
+    FOR obj IN
+        SELECT c.relname, c.relkind
+        FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = 'public' AND c.relkind IN ('r', 'v', 'm')
+    LOOP
+        EXECUTE format(
+            'ALTER %s %I OWNER TO taryx_app',
+            CASE obj.relkind
+                WHEN 'r' THEN 'TABLE'
+                WHEN 'v' THEN 'VIEW'
+                WHEN 'm' THEN 'MATERIALIZED VIEW'
+            END,
+            obj.relname
+        );
+    END LOOP;
+END $$;
 
 -- The southgrid app role needs CREATEROLE for the same migration-time
 -- shadow-role creation when it migrates first on a fresh cluster.

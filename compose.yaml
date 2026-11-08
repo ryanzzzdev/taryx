@@ -112,6 +112,9 @@ services:
 
   api:
     build: .
+    # All four application containers run this single image — same
+    # digest is the same-build evidence, not four separate builds.
+    image: taryx-app:latest
     command: sh -c "python manage.py migrate --noinput && python manage.py runserver 0.0.0.0:8000"
     environment:
       <<: *taryx-env
@@ -124,7 +127,7 @@ services:
         condition: service_healthy
 
   worker:
-    build: .
+    image: taryx-app:latest
     command: celery -A taryx.config.celery:app worker -B --loglevel=INFO --without-gossip --without-mingle --without-heartbeat
     environment:
       <<: *taryx-env
@@ -135,7 +138,7 @@ services:
         condition: service_healthy
 
   api-sg:
-    build: .
+    image: taryx-app:latest
     command: sh -c "python manage.py migrate --noinput && python manage.py runserver 0.0.0.0:8000"
     environment:
       <<: *southgrid-env
@@ -150,7 +153,7 @@ services:
         condition: service_completed_successfully
 
   worker-sg:
-    build: .
+    image: taryx-app:latest
     command: celery -A taryx.config.celery:app worker -B --loglevel=INFO --without-gossip --without-mingle --without-heartbeat
     environment:
       <<: *southgrid-env
