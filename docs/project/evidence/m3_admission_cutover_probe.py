@@ -94,3 +94,80 @@ def test_old_route_cannot_issue_after_cutover(legacy):
     cohort.refresh_from_db()
     assert cohort.routing_mode == "new_only"
     assert ("complete", "legacy") not in outcomes, outcomes
+
+
+def test_rollback_serializes_with_new_billing(legacy):
+    cohort = m._cohort(None, mode="new_only", refs=("ACC-001",))
+    account, run = m._rated(None)
+
+    ready_to_issue = Event()
+    release_issue = Event()
+    outcomes, errors, workers = [], [], []
+    original_save = Cohort.save
+    original_issue = billing._issue
+
+    def bill():
+        close_old_connections()
+        try:
+            op = billing.admit_issue(
+                account,
+                m.DAY,
+                m.NEXT,
+                run,
+                "rollback-race",
+                routing_resolver=services.routing_for,
+            )
+            op = m._process(op.operation_id, legacy)
+            outcomes.append(
+                (
+                    op.status,
+                    op.invoice.calculation_source if op.invoice_id else None,
+                )
+            )
+        except Exception as exc:
+            errors.append(exc)
+        finally:
+            connections.close_all()
+
+    def pause_issue(*args, **kwargs):
+        # Routing and inputs have already been validated under locks.
+        ready_to_issue.set()
+        assert release_issue.wait(10), "Rollback did not finish"
+        return original_issue(*args, **kwargs)
+
+    def interleave_save(instance, *args, **kwargs):
+        if instance.pk == cohort.pk and instance.routing_mode == "legacy_only" and not workers:
+            worker = Thread(target=bill, daemon=True)
+            workers.append(worker)
+            worker.start()
+            # Correct serialization may block admission until rollback commits.
+            ready_to_issue.wait(2)
+        return original_save(instance, *args, **kwargs)
+
+    rejected = False
+    with (
+        patch.object(Cohort, "save", interleave_save),
+        patch.object(billing, "_issue", pause_issue),
+    ):
+        try:
+            services.transition_cohort(
+                cohort.pk,
+                "legacy_only",
+                cohort.routing_revision,
+                None,
+                **m.GATE,
+            )
+        except services.MigrationError:
+            rejected = True
+        finally:
+            release_issue.set()
+            for worker in workers:
+                worker.join(15)
+
+    assert all(not worker.is_alive() for worker in workers)
+    assert not errors, errors
+    if not rejected:
+        assert workers
+        cohort.refresh_from_db()
+        assert cohort.routing_mode == "legacy_only"
+        assert ("complete", "new") not in outcomes, outcomes

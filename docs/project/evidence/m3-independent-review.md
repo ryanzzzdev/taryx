@@ -207,3 +207,12 @@ Codex round 2 (`m3-verdict-r2.txt`): **CHANGES_REQUESTED**, one P1 — `admit_is
 - Callers (`bill_account` command, GraphQL `billAccount`) pass `routing_resolver=routing_for`; the billing layer keeps its DI boundary (no migration import).
 
 Verification: `m3_admission_cutover_probe.py` passes and is folded into `tests/test_migration.py` (33 migration tests); 13/13 preserved probes; 146 pytest; format/lint/mypy/contracts green.
+
+
+## Sixth remediation addendum — 2026-11-08 (loop round 3)
+
+Codex round 3 (`m3-verdict-r3.txt`): **CHANGES_REQUESTED**, one P1 — member locks and the final pending-operations check sat inside the `to_mode == NEW_ONLY` branch, so `NEW_ONLY → LEGACY_ONLY` could change routing while a newly admitted worker held its issuance locks; the worker's routing re-check cannot protect against a transition that ignores its lock.
+
+**Resolution**: member locks (`NO KEY UPDATE`), the shared gate lock and the pending-operations recheck now apply to **every** routing transition; only `evaluation_blockers` remains `NEW_ONLY`-specific. Rollback serializes with admission and issuance identically to cutover.
+
+Verification: the appended `test_rollback_serializes_with_new_billing` probe passes and is folded into `tests/test_migration.py` (34 migration tests); full `make check` re-run.

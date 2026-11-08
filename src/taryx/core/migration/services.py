@@ -332,26 +332,25 @@ def transition_cohort(
             )
             if blockers:
                 raise MigrationError("gate_blocked", "; ".join(blockers))
-            # Commit-safe revalidation: lock every member account row,
-            # then re-run the COMPLETE gate and the in-flight check.
-            # Inputs, comparisons, decisions or ops committed during the
-            # first evaluation are now visible (stale → reject); ones
-            # still in flight block on the account lock and can only
-            # commit after this transaction — i.e. after cutover.
-            # FOR NO KEY UPDATE: blocks every input mutator (all take
-            # FOR UPDATE) but NOT the FOR KEY SHARE row locks that
-            # evidence writers' FK checks take implicitly — so a writer
-            # holding the gate lock never waits on a member row, which
-            # is the deadlock the gate-lock ordering would otherwise
-            # create (advisory → account vs account → advisory).
-            members = list(
-                Account.objects.filter(cohort=cohort).order_by("pk").select_for_update(no_key=True)
-            )
-            # Hold the shared gate lock from the final re-read through
-            # commit: writers of evidence/decisions/memberships either
-            # committed before this point (re-evaluated above) or block
-            # here and can only publish after the route commit.
-            _gate_lock(cohort.id, using="default")
+        # Commit-safe revalidation for EVERY routing change — rollback
+        # included: lock every member account row, hold the shared gate
+        # lock, then re-run the pending check under those locks. Ops or
+        # evidence committed meanwhile are now visible; ones in flight
+        # block on these locks and can only land after the route commit.
+        # FOR NO KEY UPDATE: blocks every input mutator (all take
+        # FOR UPDATE) but NOT the FOR KEY SHARE row locks that
+        # evidence writers' FK checks take implicitly — so a writer
+        # holding the gate lock never waits on a member row, which
+        # is the deadlock the gate-lock ordering would otherwise
+        # create (advisory → account vs account → advisory).
+        members = list(
+            Account.objects.filter(cohort=cohort).order_by("pk").select_for_update(no_key=True)
+        )
+        # Writers of evidence/decisions/memberships either committed
+        # before this point (re-evaluated below) or block here and can
+        # only publish after the route commit.
+        _gate_lock(cohort.id, using="default")
+        if to_mode == Cohort.Mode.NEW_ONLY:
             blockers = evaluation_blockers(
                 cohort,
                 tariffs=tariffs,
@@ -363,10 +362,10 @@ def transition_cohort(
                     "gate_blocked",
                     "revalidation under commit locks: " + "; ".join(blockers),
                 )
-            if BillingOperation.objects.filter(
-                account__in=members, status=BillingOperation.Status.PENDING
-            ).exists():
-                raise MigrationError("in_flight", "billing admitted during gate evaluation")
+        if BillingOperation.objects.filter(
+            account__in=members, status=BillingOperation.Status.PENDING
+        ).exists():
+            raise MigrationError("in_flight", "billing admitted during transition")
         cohort.routing_mode = to_mode
         cohort.routing_revision += 1
         cohort.save(update_fields=["routing_mode", "routing_revision"])
