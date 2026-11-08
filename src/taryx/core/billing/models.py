@@ -55,6 +55,10 @@ class OutboxEvent(models.Model):
     topic = models.CharField(max_length=64, default="billing.issue")
     created_at = models.DateTimeField(auto_now_add=True)
     delivered_at = models.DateTimeField(null=True)
+    # Observable retry state: each failed drain attempt is recorded so one
+    # failing event neither disappears nor starves later events forever.
+    attempts = models.PositiveIntegerField(default=0)
+    last_error = models.TextField(blank=True)
 
 
 class Invoice(models.Model):

@@ -432,19 +432,39 @@ def drain_outbox(
     routing_resolver: Callable[[Account], tuple[str, int]] | None = None,
     legacy_calculator: Callable[[BillingOperation], dict] | None = None,
     limit: int = 200,
+    max_attempts: int = 10,
 ) -> list[BillingOperation]:
-    """Recover pending outbox events (broker outage, lost tasks)."""
+    """Recover pending outbox events (broker outage, lost tasks).
+
+    Each event is processed independently: a failure is recorded on its
+    outbox row (attempts/last_error) and skipped, so one unavailable
+    calculation cannot starve later recoverable work in the same batch.
+    Events past max_attempts stay undelivered but are no longer selected,
+    so a full batch of permanently failing events cannot occupy the drain
+    forever. All events are attempted before the first failure is
+    re-raised — the drain still reports errors, just after progress.
+    """
     pending = list(
-        OutboxEvent.objects.filter(delivered_at__isnull=True)
+        OutboxEvent.objects.filter(delivered_at__isnull=True, attempts__lt=max_attempts)
         .order_by("created_at")
-        .values_list("operation__operation_id", flat=True)[:limit]
+        .select_related("operation")[:limit]
     )
-    return [
-        process_operation(
-            operation_id,
-            digest_resolver=digest_resolver,
-            routing_resolver=routing_resolver,
-            legacy_calculator=legacy_calculator,
-        )
-        for operation_id in pending
-    ]
+    processed, failures = [], []
+    for event in pending:
+        try:
+            processed.append(
+                process_operation(
+                    event.operation.operation_id,
+                    digest_resolver=digest_resolver,
+                    routing_resolver=routing_resolver,
+                    legacy_calculator=legacy_calculator,
+                )
+            )
+        except Exception as exc:
+            event.attempts += 1
+            event.last_error = f"{type(exc).__name__}: {exc}"[:400]
+            event.save(update_fields=["attempts", "last_error"])
+            failures.append(exc)
+    if failures:
+        raise failures[0]
+    return processed

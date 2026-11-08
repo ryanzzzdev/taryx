@@ -5,7 +5,7 @@ Status: TAR-009 slice implemented and re-verified after independent-review remed
 Re-review at `de0e08d`: rating snapshot/membership and browser account-recovery claims above are only partially verified; see [remaining findings](../evidence/m2-independent-review.md). M2 remains open.
 Tasks: [TAR-009](../backlog.md#tar-009), [TAR-012](../backlog.md#tar-012), [TAR-013](../backlog.md#tar-013).
 
-2026-11-08: TAR-009 reopened by [foundation re-review F3](../evidence/m1-independent-review.md): invoice totals and ledger legs are visible, but the required pinned line-item explanation is absent. The journey is not fully verified.
+2026-11-08: TAR-009 reopened by [foundation re-review F3](../evidence/m1-independent-review.md): invoice totals and ledger legs are visible, but the required pinned line-item explanation is absent. Remediated same day — issued documents expand into the pinned rating run's line items (tariff, segment, quantity, rate, amount, basis) plus engine/policy identity and calculation source.
 
 ## Operator journeys
 

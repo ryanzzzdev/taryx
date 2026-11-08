@@ -20,9 +20,31 @@ type Batch = { status: string; acceptedCount: number; quarantinedCount: number; 
 type Run = { id: number; total: string; inputDigest: string };
 type Posting = { accountCode: string; debit: string; credit: string };
 type Adjustment = { number: string; generation: number; deltaTotal: string };
+type RatingLine = {
+  sequence: number;
+  tariffCode: string;
+  element: string;
+  band: string | null;
+  quantity: string;
+  unit: string;
+  rate: string;
+  amount: string;
+  gst: string;
+  basis: string;
+  segmentFrom: string;
+  segmentTo: string;
+};
 type Invoice = {
   number: string;
   total: string;
+  calculationSource: string;
+  ratingRun: {
+    id: number;
+    inputDigest: string;
+    engineVersion: string;
+    policyIdentity: string;
+    lines: RatingLine[];
+  };
   journalEntries: { postings: Posting[] }[];
   adjustments: Adjustment[];
 };
@@ -236,7 +258,7 @@ function AccountPanel({
 
   const refreshInvoices = useCallback(() => {
     gql<{ invoices: Invoice[] }>(
-      "query($r:String!){invoices(reference:$r){number total journalEntries{postings{accountCode debit credit}} adjustments{number generation deltaTotal}}}",
+      "query($r:String!){invoices(reference:$r){number total calculationSource journalEntries{postings{accountCode debit credit}} adjustments{number generation deltaTotal} ratingRun{id inputDigest engineVersion policyIdentity lines{sequence tariffCode element band quantity unit rate amount gst basis segmentFrom segmentTo}}}}",
       { r: account.reference },
     ).then((d) => setInvoices(d.invoices));
   }, [account.reference]);
@@ -428,23 +450,43 @@ function AccountPanel({
         <strong>Issued documents</strong>
         {invoices.map((inv) => (
           <div key={inv.number} style={mono}>
-            {inv.number} ${inv.total}
-            {inv.journalEntries.map((j, i) => (
-              <span key={i}>
-                {" "}
-                [
-                {j.postings
-                  .map((p) => `${p.accountCode} ${p.debit !== "0.00" ? `Dr${p.debit}` : `Cr${p.credit}`}`)
-                  .join(" | ")}
-                ]
-              </span>
-            ))}
-            {inv.adjustments.map((a) => (
-              <span key={a.number}>
-                {" "}
-                +{a.number}(gen{a.generation}) Δ${a.deltaTotal}
-              </span>
-            ))}
+            <details>
+              <summary>
+                {inv.number} ${inv.total} · {inv.calculationSource} · run{" "}
+                {inv.ratingRun.id}
+                {inv.journalEntries.map((j, i) => (
+                  <span key={i}>
+                    {" "}
+                    [
+                    {j.postings
+                      .map((p) =>
+                        `${p.accountCode} ${p.debit !== "0.00" ? `Dr${p.debit}` : `Cr${p.credit}`}`,
+                      )
+                      .join(" | ")}
+                    ]
+                  </span>
+                ))}
+                {inv.adjustments.map((a) => (
+                  <span key={a.number}>
+                    {" "}
+                    +{a.number}(gen{a.generation}) Δ${a.deltaTotal}
+                  </span>
+                ))}
+              </summary>
+              <div style={{ marginTop: "0.3rem" }}>
+                digest {inv.ratingRun.inputDigest.slice(0, 12)}… · engine{" "}
+                {inv.ratingRun.engineVersion} · policy{" "}
+                {inv.ratingRun.policyIdentity}
+                {inv.ratingRun.lines.map((l) => (
+                  <div key={l.sequence}>
+                    {l.tariffCode} {l.element}
+                    {l.band ? `/${l.band}` : ""} {l.segmentFrom}→{l.segmentTo}:{" "}
+                    {l.quantity}
+                    {l.unit} × {l.rate} = ${l.amount} (gst {l.gst}) — {l.basis}
+                  </div>
+                ))}
+              </div>
+            </details>
           </div>
         ))}
       </div>

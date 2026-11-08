@@ -39,6 +39,7 @@ from taryx.core.billing.services import (
     ACC_GST_LIABILITY,
     ACC_RECEIVABLE,
     AdmissionError,
+    CalculationUnavailable,
     admit_issue,
     drain_outbox,
     process_operation,
@@ -389,3 +390,43 @@ def test_concurrent_same_key_admission_resolves_one_winner():
     assert {r.operation_id for r in results} == {"OP-SAME"}
     assert BillingOperation.objects.count() == 1
     assert OutboxEvent.objects.count() == 1
+
+
+@pytest.mark.django_db(transaction=True)
+def test_empty_journal_rejected_at_commit(billed_account):
+    """A journal header reaching commit without legs violates the >=2
+    balanced-posting invariant — and the seal means it could never be
+    completed later, so the deferred check also runs on journal insert."""
+    account, run = billed_account
+    op = process(admit(account, run))
+    with pytest.raises(IntegrityError), transaction.atomic():
+        JournalEntry.objects.create(invoice=op.invoice, operation=op, memo="empty")
+
+
+@pytest.mark.django_db(transaction=True)
+def test_failed_outbox_event_does_not_starve_later_work(billed_account):
+    """One failing event records its retry state and is skipped — it
+    cannot block recovery of later independent events."""
+    account, run = billed_account
+    failed = admit_issue(
+        account,
+        DAY,
+        NEXT,
+        run,
+        "OP-LEGACY",
+        routing_resolver=lambda _account: ("legacy_only", 0),
+    )
+    healthy = admit(account, run, op="OP-HEALTHY")
+
+    def unavailable(_op):
+        raise CalculationUnavailable("unavailable", "synthetic legacy outage")
+
+    for _ in range(2):
+        with pytest.raises(CalculationUnavailable):
+            drain_outbox(digest_resolver=digest_resolver, legacy_calculator=unavailable)
+    failed.refresh_from_db()
+    healthy.refresh_from_db()
+    event = OutboxEvent.objects.get(operation=failed)
+    assert failed.status == "pending"
+    assert event.attempts == 2 and event.last_error
+    assert healthy.status == "complete"

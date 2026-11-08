@@ -242,6 +242,7 @@ class JournalEntryType(DjangoObjectType):
 class InvoiceType(DjangoObjectType):
     journal_entries = graphene.List(JournalEntryType, required=True)
     adjustments = graphene.List(AdjustmentType, required=True)
+    rating_run = graphene.Field(RatingRunType, required=True)
 
     class Meta:
         model = Invoice
@@ -253,6 +254,7 @@ class InvoiceType(DjangoObjectType):
             "gst",
             "total",
             "input_digest",
+            "calculation_source",
             "issued_at",
         )
 

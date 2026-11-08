@@ -12,9 +12,9 @@ Task sections own status; index icons mirror them. See the [documentation guide]
 - ✅ [TAR-004 — Freeze domain and measurement profiles](#tar-004)
 - ✅ [TAR-005 — Implement versioned meter ingestion and fixtures](#tar-005)
 - ✅ [TAR-006 — Implement deterministic itemised rating](#tar-006)
-- 🟢 [TAR-007 — Implement durable issuance and balanced posting](#tar-007)
+- ✅ [TAR-007 — Implement durable issuance and balanced posting](#tar-007)
 - ✅ [TAR-008 — Implement successive corrections and adjustments](#tar-008)
-- 🟢 [TAR-009 — Deliver the core operator journey](#tar-009)
+- ✅ [TAR-009 — Deliver the core operator journey](#tar-009)
 - ✅ [TAR-010 — Build independent legacy characterisation](#tar-010)
 - ✅ [TAR-011 — Implement isolated shadow comparison and gates](#tar-011)
 - ✅ [TAR-012 — Deliver operator migration and cutover](#tar-012)
@@ -28,7 +28,7 @@ Task sections own status; index icons mirror them. See the [documentation guide]
 
 ## Delivery notes
 
-Current foundation re-review: **changes requested** at `c88b722`; TAR-007/TAR-009 reopened. See [findings and verification](evidence/m1-independent-review.md). Earlier completion statements below are historical for this scope.
+Foundation re-review at `c88b722` requested changes; all three findings remediated and both probes now pass — see [findings and verification](evidence/m1-independent-review.md). Earlier completion statements below are historical for this scope.
 
 M2 re-review findings are remediated and verified (both follow-up probes pass; see the [review](evidence/m2-independent-review.md)). Independent M3 re-review of `f9f21df` found F1–F4; all resolved and re-verified (13/13 preserved probes pass). Next action: close the remaining F2 cutover race in TAR-011/TAR-012 before M4. Later tasks remain Backlog until their dependencies and detailed contracts are ready. Portal/API slices can develop alongside their backend tasks; TAR-009 and TAR-012 own integrated acceptance. Observability hooks and correctness tests accompany implementation; TAR-016 owns the full cross-service campaign, not the first tests.
 
@@ -275,6 +275,8 @@ Remediated 2026-10-25 (R2/R3/R4/R6): open quarantines now feed the input digest;
 
 Reopened 2026-11-08 by the [foundation re-review](evidence/m1-independent-review.md) of `c88b722f30526d8c57aef7ff89634ecd8a1fa983` (user-labelled M1; canonical M2). F1 empty-journal enforcement and F2 outbox failure isolation require remediation; both independent PostgreSQL probes fail. Next: fix the database commit check and starvation-safe recovery, then rerun probes and required checks.
 
+Remediated 2026-11-08 (F1/F2): a second deferred constraint trigger on `billing_journalentry` INSERT applies the balanced-posting check at commit — an empty journal is rejected and the seal guarantees it can never be completed later (billing 0008). `drain_outbox` isolates failures per event: retry state (`attempts`/`last_error`) is recorded on the outbox row, later events still process, and events past `max_attempts` stop being selected so a full failing batch cannot starve the drain. Both probes pass and are folded into tests/test_billing.py.
+
 <a id="tar-008"></a>
 
 ## TAR-008 — Implement successive corrections and adjustments
@@ -349,6 +351,8 @@ Independent re-review of `de0e08d`: reopened for remaining R7 findings; see [rev
 Re-remediated 2026-10-25: AccountPanel is keyed by account.reference so switching remounts — all account-scoped state resets and the old poll interval is destroyed; operationStore keys intents per account+period and clearPending only removes the matching operationId, so an uncertain operation on one account survives billing another and delayed callbacks can't erase unrelated identities (vitest 6/6). npm test is now part of make check.
 
 Reopened 2026-11-08 by the [foundation re-review](evidence/m1-independent-review.md) of `c88b722f30526d8c57aef7ff89634ecd8a1fa983` (user-labelled M1; canonical M2). F3: issued-document UI lacks line-item provenance/explanation. Next: implement the pinned invoice explanation view and verify the operator journey.
+
+Remediated 2026-11-08 (F3): `InvoiceType` exposes `calculationSource` and the pinned `ratingRun` (lines, digest, engine/policy identity); the portal's issued documents expand into per-line provenance — tariff, segment, quantity × rate = amount, gst and basis. tests/test_graphql.py verifies the pinned run survives subsequent re-rating.
 
 <a id="tar-010"></a>
 

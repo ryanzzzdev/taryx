@@ -50,3 +50,14 @@ Add an invoice-linked explanation view using the issued document's pinned calcul
 No fresh interactive browser journey, real broker interruption, worker kill after commit/before acknowledgement, hosted CI, deployment or throughput campaign was performed. Existing passing tests do not establish those scenarios. The operator source was reviewed alongside API permission/idempotency tests in the project suite.
 
 Reopen TAR-007 and TAR-009 as Ready for remediation; canonical M2 remains In progress. Preserve the original metering M1 completion and historical evidence. Do not approve the user-named foundation M1 until findings are resolved and targeted plus required checks pass. No acceptance scope was changed.
+
+
+## Remediation addendum — 2026-11-08 (Devin)
+
+All three findings resolved:
+
+- **F1**: `billing/migrations/0008` adds a deferred constraint trigger on `billing_journalentry` INSERT applying the same balanced-posting check at commit. An empty journal is now rejected; the 0004 seal guarantees it could never be completed later, so the insert-time commit check closes the gap. Valid journals (legs created later in the same transaction) still pass.
+- **F2**: `drain_outbox` isolates failures per event — `attempts`/`last_error` recorded on the `OutboxEvent` row (migration 0008), later events still process, events past `max_attempts` (10) stay undelivered but unselected so a permanently failing batch cannot occupy the drain. All events are attempted before the first failure is re-raised.
+- **F3**: `InvoiceType` exposes `calculationSource` and the pinned `ratingRun` (lines with tariff/segment/quantity/rate/amount/gst/basis plus engine and policy identity). The portal's issued documents expand per invoice into full line-item provenance.
+
+Verification: both probes pass and are folded into `tests/test_billing.py`; `test_invoice_line_items_pin_the_issued_calculation` in `tests/test_graphql.py` verifies the pinned run survives re-rating; `make check` green (151 pytest, 6 vitest, typecheck, build, ruff/mypy/import contracts).

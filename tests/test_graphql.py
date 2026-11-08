@@ -516,3 +516,72 @@ def test_migration_journey_permissions_and_guards():
         c=cohort.id,
     )
     assert out["data"]["transitionCohort"]["code"] == "in_flight"
+
+
+@pytest.mark.django_db
+def test_invoice_line_items_pin_the_issued_calculation(seeded):
+    """The explain journey: an invoice's rating run exposes the pinned
+    line items — quantities, rates and basis from the issued generation,
+    unaffected by subsequent re-rating."""
+    client = Client()
+    login(client, "operator")
+    gql(
+        client,
+        "mutation($f:String!,$c:String!){ingestNem12(filename:$f,content:$c){ok}}",
+        f="day1_base.nem12",
+        c=load("day1_base.nem12"),
+    )
+    rated = gql(
+        client,
+        "mutation($r:String!,$s:Date!,$e:Date!){rateAccount(reference:$r,"
+        "periodStart:$s,periodEnd:$e){ok run{id inputDigest}}}",
+        r="ACC-001",
+        s=DAY,
+        e=NEXT,
+    )
+    issued_run = rated["data"]["rateAccount"]["run"]
+    gql(
+        client,
+        "mutation($r:String!,$s:Date!,$e:Date!,$o:String!){billAccount("
+        "reference:$r,periodStart:$s,periodEnd:$e,operationId:$o){ok}}",
+        r="ACC-001",
+        s=DAY,
+        e=NEXT,
+        o="GQL-EXP-1",
+    )
+    drain_outbox(digest_resolver=digest_resolver)
+
+    # Subsequent correction inputs create a newer run with a new digest.
+    gql(
+        client,
+        "mutation($f:String!,$c:String!){ingestNem12(filename:$f,content:$c){ok}}",
+        f="day1_rev1.nem12",
+        c=load("day1_rev1.nem12"),
+    )
+    rerated = gql(
+        client,
+        "mutation($r:String!,$s:Date!,$e:Date!){rateAccount(reference:$r,"
+        "periodStart:$s,periodEnd:$e){ok run{id inputDigest}}}",
+        r="ACC-001",
+        s=DAY,
+        e=NEXT,
+    )
+    assert rerated["data"]["rateAccount"]["run"]["id"] != issued_run["id"]
+
+    out = gql(
+        client,
+        "query($r:String!){invoices(reference:$r){number inputDigest "
+        "calculationSource ratingRun{id inputDigest engineVersion "
+        "policyIdentity lines{tariffCode element quantity unit rate "
+        "amount basis segmentFrom segmentTo}}}}",
+        r="ACC-001",
+    )
+    invoice = out["data"]["invoices"][0]
+    pinned = invoice["ratingRun"]
+    assert pinned["id"] == issued_run["id"]
+    assert pinned["inputDigest"] == issued_run["inputDigest"] == invoice["inputDigest"]
+    assert invoice["calculationSource"] == "new"
+    assert pinned["lines"], "issued line items must be explainable"
+    for line in pinned["lines"]:
+        assert line["tariffCode"] and line["basis"] and line["unit"]
+        Decimal(line["quantity"]), Decimal(line["rate"]), Decimal(line["amount"])
