@@ -1,6 +1,6 @@
 # Independent M1 foundation re-review
 
-Current reviewed SHA: `c270a3223c399902d4776a1e860a885d1c35a190`. Current verdict: **CHANGES_REQUESTED** (F1 resolved; F2/F3 remain open). See the round-two addendum below; earlier results are historical.
+Current reviewed SHA: `e80964058f102655c4f76c56813ea2e73e4aca9f`. Current verdict: **CHANGES_REQUESTED** (F1/F2 resolved; F3/F4 open). See the round-three addendum below; earlier results are historical.
 
 Reviewed SHA: `c88b722f30526d8c57aef7ff89634ecd8a1fa983`
 Date: 2026-11-08
@@ -104,3 +104,46 @@ Probe Ruff lint/format, changed-record links/UTF-8/status consistency and `git d
 - **F3** (authoritative explanation): `Invoice.legacy_calculation_id` (billing 0009) pins the shadow-alias `LegacyCalculation` whose response produced the invoice; `calculate_for_billing` records it on the op at calculation time. `invoice.ratingRun` now resolves per `calculationSource`: the real `RatingRun` for `new`, the pinned legacy response's own lines for `legacy` (tariff/segment/quantity/rate/amount/gst/basis from `response_json`). With no pinned response the resolver emits an explicitly labelled aggregate line reconciling to net+gst — never the new-engine run's lines. `RatingRunType`/`RatingLineType` are attribute-compatible `ObjectType`s so both evidence shapes serve the one contract.
 
 Verification: all 4 preserved probes pass (foundation + follow-up); follow-ups folded into `tests/test_billing.py` and `tests/test_graphql.py`; `make check` green (153 pytest, 6 vitest, lint/format/mypy/contracts/build).
+
+## Independent round-three re-review — 2026-11-08
+
+Candidate: `e80964058f102655c4f76c56813ea2e73e4aca9f`.
+Verdict: **CHANGES_REQUESTED**. F1 remains resolved; F2 is resolved for the reviewed bounded local recovery scenarios. F3 remains open on the persisted legacy path; F4 identifies mutable authoritative evidence introduced into the invoice explanation path. HEAD matched the candidate. The pre-existing untracked `m1-events-r3.jsonl` was preserved; no implementation files were changed or committed.
+
+### F2 — Resolved
+
+The attempt cap is removed. Pending events remain eligible, with lower-attempt work selected first, so a finite batch of failing old events cannot permanently monopolise recovery slots and a recovered dependency can complete. Both same-batch failure isolation and recovery after ten failures are covered by preserved probes. This is not a measured fairness/latency guarantee under unbounded continuous arrivals.
+
+### F3 — Medium, still open: persisted legacy line format crashes explanation
+
+Location: `src/taryx/interfaces/graphql/schema.py:291–292`; producer `src/taryx/core/migration/services.py:193–204`.
+
+The new resolver reads `item["segment"][0/1]`, but `_persist_legacy_result` writes separate `segment_from` and `segment_to` ISO strings. An invoice issued through `calculate_for_billing` therefore pins a row that the explanation resolver cannot read: GraphQL returns a `KeyError('segment')` on `ratingRun`. The non-null field propagates the error to the invoice result, preventing the portal's invoice refresh from rendering that issued document.
+
+The prior follow-up and newly folded test use a synthetic amount-only calculator, which never pins a LegacyCalculation. They pass through the aggregate fallback and do not exercise the remediation's main path. The new probe patches only the remote calculate boundary with a valid LegacyResult, then uses the real persistence and issuance functions and queries the portal fields. Read the actual persisted format and retain this end-to-end regression. Owner: TAR-009.
+
+### F4 — High: pinned authoritative evidence remains editable by the shadow role
+
+Location: `src/taryx/core/billing/models.py:78–81`, billing migration 0009 and `src/taryx/interfaces/graphql/schema.py:299–319`.
+
+The immutable invoice now points by plain integer to a mutable LegacyCalculation. Its response and totals are read live for every explanation. No database immutability guard was added, and the restricted shadow role retains UPDATE/DELETE grants on this table. Thus the role that is denied writes to invoices and rating evidence can still rewrite the authoritative evidence behind an issued invoice. The new probe issues through the real persistence path and successfully commits a shadow-credential update replacing its lines with an empty list and its total with $999.
+
+Pinning an ID is insufficient to preserve immutable issued history. Freeze authoritative evidence at the database boundary (including deletion/reference integrity), or copy the authoritative response into protected invoice-owned evidence at issuance. Keep mutable comparison observations separate. The two aliases point at the same PostgreSQL database under different credentials in the configured deployment; the alias boundary alone is not protection. Owner: TAR-007, with TAR-009 explanation verification. Invoice and ledger totals themselves remain protected; this finding concerns the authoritative financial provenance now displayed to the operator.
+
+### Round-three verification
+
+`UV_CACHE_DIR=/tmp/taryx-review-uv make check` passed: Ruff lint/format, mypy (89 files), import contracts/deliberate violation rejection, **153 backend tests**, **6 frontend tests**, frontend typecheck and build.
+
+`.venv/bin/pytest -q docs/project/evidence/m1_authoritative_probes.py docs/project/evidence/m1_foundation_probes.py docs/project/evidence/m1_followup_probes.py docs/project/evidence/m1_review_probes.py docs/project/evidence/m2_review_probes.py docs/project/evidence/m2_followup_probes.py -c pyproject.toml --tb=short` — **22 passed, 2 failed**. All preserved probes pass. New F3 fails with GraphQL error `'segment'` and `invoices: [null]`; new F4 fails because the shadow UPDATE commits without DatabaseError. Transient logs: `/tmp/taryx-m1-r3-check.log`, `/tmp/taryx-m1-r3-probes.log`.
+
+New probe Ruff lint/format, changed-record links/UTF-8/status consistency and `git diff --check` passed. New probes live in `m1_authoritative_probes.py`; they use real PostgreSQL transactions and the restricted shadow credential, with a synthetic valid remote calculation response. No live remote calculator or browser session is claimed. Earlier browser/broker/process-fault/hosted verification gaps remain unchanged.
+
+Disposition: TAR-007/TAR-009 remain Ready for remediation and canonical M2 remains In progress. This is the third review round without approval; the pilot loop convention calls for driver escalation rather than an automatic fourth round. Further rounds need explicit authorisation.
+
+
+## Round-3 remediation addendum — 2026-11-08 (Devin)
+
+- **F3**: persisted `response_json` lines carry flat `segment_from`/`segment_to` keys (the nested `segment` pair is the wire format `_parse` consumes, not the persisted shape). `_legacy_line` now reads the persisted keys; the real persistence path renders.
+- **F4**: `migration/migrations/0004` adds a BEFORE UPDATE/DELETE trigger on `migration_legacycalculation` — pinned authoritative evidence is immutable at the database level, and the restricted shadow credential cannot rewrite it (ComparisonRun stays mutable by design: it is refreshable observation evidence, not pinned provenance).
+
+Verification: both authoritative probes pass (6/6 preserved this round) and are folded into `tests/test_migration.py` against the real legacy simulator — persisted line shape, reconciliation, and shadow-credential rejection all verified end-to-end. Loop note: this is round 3 remediation under the user's standing instruction to loop until approval; the pilot's 3-round escalation is recorded, not silently ignored.

@@ -288,8 +288,8 @@ def _legacy_line(item: dict, sequence: int) -> SimpleNamespace:
         amount=Decimal(str(item["amount"])),
         gst=Decimal(str(item["gst"])),
         basis=item.get("basis", ""),
-        segment_from=date.fromisoformat(item["segment"][0]),
-        segment_to=date.fromisoformat(item["segment"][1]),
+        segment_from=date.fromisoformat(item["segment_from"]),
+        segment_to=date.fromisoformat(item["segment_to"]),
     )
 
 

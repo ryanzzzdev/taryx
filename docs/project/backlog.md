@@ -28,7 +28,7 @@ Task sections own status; index icons mirror them. See the [documentation guide]
 
 ## Delivery notes
 
-Foundation review round 2 at `c270a322` verified F1 and requested further changes; both follow-up findings remediated — see [findings and verification](evidence/m1-independent-review.md). Earlier completion statements below are historical for this scope.
+Foundation re-review rounds 1–3 (user-labelled M1; canonical M2) found five findings — empty-journal commit gap, outbox starvation, missing bill explanation, retry exhaustion, and mutable pinned legacy evidence — all remediated and folded into the suite; see the [review](evidence/m1-independent-review.md). Earlier completion statements below are historical for this scope. The pilot's three-round limit was exceeded on the user's standing instruction to loop until approval.
 
 M2 re-review findings are remediated and verified (both follow-up probes pass; see the [review](evidence/m2-independent-review.md)). Independent M3 re-review of `f9f21df` found F1–F4; all resolved and re-verified (13/13 preserved probes pass). Next action: close the remaining F2 cutover race in TAR-011/TAR-012 before M4. Later tasks remain Backlog until their dependencies and detailed contracts are ready. Portal/API slices can develop alongside their backend tasks; TAR-009 and TAR-012 own integrated acceptance. Observability hooks and correctness tests accompany implementation; TAR-016 owns the full cross-service campaign, not the first tests.
 
@@ -281,6 +281,10 @@ Round-two independent review of `c270a322` (2026-11-08): F1 is independently ver
 
 Re-remediated 2026-11-08 (round-2 F2): the attempt cap is removed — pending events are never excluded; selection orders by `attempts` then `created_at` so chronic failures sink below fresh work yet are always retried, letting a recovered dependency complete on the next ordinary drain. Both follow-up probes pass and are folded into tests/test_billing.py.
 
+Round-three independent review at `e809640` (2026-11-08): F1/F2 resolved. F4: newly pinned authoritative LegacyCalculation remains mutable under shadow credentials; freeze issued evidence and protect its reference before claiming immutable provenance. [Review/probes](evidence/m1-independent-review.md): required checks pass, 22 preserved probes pass, two new probes fail.
+
+Re-remediated 2026-11-08 (F3/F4): persisted legacy lines use flat `segment_from`/`segment_to` keys — the resolver now reads them, so real pinned evidence renders. `migration_legacycalculation` gains a BEFORE UPDATE/DELETE immutability trigger (migration 0004), matching the invoice/journal boundary; a shadow-credential mutation of pinned evidence is rejected by the database. Both probes pass and are folded into tests/test_migration.py.
+
 <a id="tar-008"></a>
 
 ## TAR-008 — Implement successive corrections and adjustments
@@ -361,6 +365,8 @@ Remediated 2026-11-08 (F3): `InvoiceType` exposes `calculationSource` and the pi
 Round-two independent review of `c270a322` (2026-11-08): F3 remains open for legacy invoices: the expander renders new-engine lines that do not reconcile to authoritative legacy totals. Render pinned authoritative evidence and distinguish comparison lines. [Review and failing follow-up probes](evidence/m1-independent-review.md). Required checks pass (151 backend/6 frontend); 20 preserved probes pass and two follow-ups fail.
 
 Re-remediated 2026-11-08 (round-2 F3): the invoice pins its authoritative calculation — `legacy_calculation_id` records the persisted shadow-alias LegacyCalculation used at issuance (billing 0009). `invoice.ratingRun` resolves per `calculationSource`: the real RatingRun for new-source bills, the pinned legacy response's own line items for legacy bills (an explicitly labelled aggregate line reconciling to net+gst when no response was pinned). RatingRun/RatingLine are now attribute-compatible ObjectTypes so both shapes serve one contract; the follow-up probe is folded into tests/test_graphql.py.
+
+Round-three independent review at `e809640` (2026-11-08): F3: real persisted legacy lines fail with a segment-key mismatch; fix the resolver against the stored format. Verify against the real persistence path and F4-protected authoritative evidence. [Review/probes](evidence/m1-independent-review.md): required checks pass, 22 preserved probes pass, two new probes fail.
 
 <a id="tar-010"></a>
 

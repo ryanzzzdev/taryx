@@ -7,6 +7,8 @@ Tasks: [TAR-009](../backlog.md#tar-009), [TAR-012](../backlog.md#tar-012), [TAR-
 
 2026-11-08: TAR-009 reopened by [foundation re-review F3](../evidence/m1-independent-review.md): invoice totals and ledger legs are visible, but the required pinned line-item explanation is absent; round 2 confirmed new-engine lines but not authoritative legacy evidence. Remediated same day — issued documents expand into the pinned *authoritative* calculation's line items (tariff, segment, quantity, rate, amount, basis; `calculationSource` distinguishes the engine), reconciling to the invoice total for both engines.
 
+Round-three review at `e809640` found persisted-line rendering and mutable pinned evidence gaps (F3/F4); remediated same day — real legacy lines render and the pinned LegacyCalculation is immutable at the database level. [Review](../evidence/m1-independent-review.md).
+
 ## Operator journeys
 
 The portal supports account/supply-point inspection, ingestion status and rejected data, bill/line-item provenance, original and revised liability, operation recovery, comparison reports and cohort cutover. Introduce these screens with their backend milestones rather than leaving all UI integration until the end.

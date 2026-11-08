@@ -1103,3 +1103,48 @@ def test_rollback_serializes_with_new_billing(legacy):
         cohort.refresh_from_db()
         assert cohort.routing_mode == "legacy_only"
         assert ("complete", "new") not in outcomes, outcomes
+
+
+def test_pinned_legacy_evidence_explains_invoice(legacy):
+    """A legacy-source invoice's ratingRun resolves to the pinned
+    persisted LegacyCalculation — its own lines reconcile to the total."""
+    from types import SimpleNamespace
+
+    from taryx.interfaces.graphql.schema import schema
+
+    cohort = _cohort(None)
+    account, run = _rated(None)
+    op = _process(_admit(account, run, cohort).operation_id, legacy)
+    invoice = op.invoice
+    assert invoice.calculation_source == "legacy"
+    assert invoice.legacy_calculation_id is not None
+
+    user = User.objects.create_user(username="evidence-viewer")
+    result = schema.execute(
+        '{invoices(reference:"ACC-001"){total calculationSource ratingRun{'
+        "engineVersion lines{tariffCode amount gst segmentFrom segmentTo}}}}",
+        context_value=SimpleNamespace(user=user),
+    )
+    assert not result.errors, result.errors
+    inv = result.data["invoices"][0]
+    assert inv["calculationSource"] == "legacy"
+    lines = inv["ratingRun"]["lines"]
+    assert lines and all(line["tariffCode"] for line in lines)
+    explained = sum(Decimal(line["amount"]) + Decimal(line["gst"]) for line in lines)
+    assert explained == Decimal(inv["total"])
+
+
+def test_pinned_legacy_evidence_is_immutable(legacy):
+    """The shadow credential cannot mutate the persisted calculation an
+    issued invoice pins as its authoritative provenance."""
+    from django.db import DatabaseError, transaction
+
+    from taryx.core.migration.models import LegacyCalculation
+
+    cohort = _cohort(None)
+    account, run = _rated(None)
+    op = _process(_admit(account, run, cohort).operation_id, legacy)
+    with pytest.raises(DatabaseError), transaction.atomic(using=SHADOW_ALIAS):
+        LegacyCalculation.objects.using(SHADOW_ALIAS).filter(
+            pk=op.invoice.legacy_calculation_id
+        ).update(total=Decimal("999.00"))

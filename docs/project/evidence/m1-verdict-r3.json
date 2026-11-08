@@ -1,0 +1,49 @@
+{
+  "reviewed_sha": "e80964058f102655c4f76c56813ea2e73e4aca9f",
+  "verdict": "CHANGES_REQUESTED",
+  "summary": "F1/F2 resolved. F3/F4 reproduced with new probes; review and affected records updated. No commit made. Third-round pilot limit reached; driver escalation required.",
+  "findings": [
+    {
+      "id": "F3",
+      "severity": "medium",
+      "location": "src/taryx/interfaces/graphql/schema.py:291–292",
+      "explanation": "The resolver expects a segment array, but persisted legacy lines contain segment_from/segment_to. Real pinned invoices return GraphQL error 'segment', preventing explanation rendering."
+    },
+    {
+      "id": "F4",
+      "severity": "high",
+      "location": "src/taryx/core/billing/models.py:78–81; src/taryx/interfaces/graphql/schema.py:299–319",
+      "explanation": "Issued invoices reference mutable LegacyCalculation evidence. A probe using restricted shadow credentials successfully replaces its lines and total after issuance, violating immutable financial provenance."
+    }
+  ],
+  "checks": [
+    {
+      "command": "UV_CACHE_DIR=/tmp/taryx-review-uv make check",
+      "outcome": "passed",
+      "evidence_path": "docs/project/evidence/m1-independent-review.md"
+    },
+    {
+      "command": ".venv/bin/pytest -q docs/project/evidence/m1_authoritative_probes.py docs/project/evidence/m1_foundation_probes.py docs/project/evidence/m1_followup_probes.py docs/project/evidence/m1_review_probes.py docs/project/evidence/m2_review_probes.py docs/project/evidence/m2_followup_probes.py -c pyproject.toml --tb=short",
+      "outcome": "failed",
+      "evidence_path": "docs/project/evidence/m1-independent-review.md"
+    },
+    {
+      "command": "git diff --check",
+      "outcome": "passed",
+      "evidence_path": "docs/project/evidence/m1-independent-review.md"
+    }
+  ],
+  "verification_gaps": [
+    "No fresh browser session; rendering verified through GraphQL and source inspection.",
+    "New probes mock the remote calculator response while exercising real persistence, issuance and PostgreSQL credentials.",
+    "No live broker outage, after-commit/before-ack kill, hosted CI or deployment verification."
+  ],
+  "artifacts": [
+    "docs/project/evidence/m1-independent-review.md",
+    "docs/project/evidence/m1_authoritative_probes.py",
+    "docs/project/backlog.md",
+    "docs/project/roadmap.md",
+    "docs/project/features/operator-and-clients.md",
+    "docs/project/journal/2026-11.md"
+  ]
+}
