@@ -1,7 +1,7 @@
 # Operator portal and client isolation
 
 Date: 2026-10-25
-Status: TAR-009 slice implemented and re-verified after independent-review remediation (decision 004 contract: session auth, roles, bounded GraphQL, operation polling, audit, portal journey, CSRF origin bootstrap, durable browser operation IDs). Client isolation remains planning contract.
+Status: TAR-009 slice implemented and re-verified after independent-review remediation (decision 004 contract: session auth, roles, bounded GraphQL, operation polling, audit, portal journey, CSRF origin bootstrap, durable browser operation IDs). Client isolation implemented and verified 2026-11-08 (TAR-013): one image, two retailer deployments — separate database/role (`taryx_app`/`taryx` vs `taryx_sg`/`taryx_southgrid`), broker vhost/user (`taryx` vs `taryx-sg`, creator auto-grant revoked), per-client legacy simulator volume and web port; client identity via `TARYX_CLIENT` startup config resolved once in `taryx.composition.policy`; refused cross-client CONNECT/AMQP verified live; southgrid rated the same day/account at 9.59 vs aurora 8.75. Limits: shared Postgres server and broker — credentials/data/route isolation, not independent fault domains.
 Re-review at `de0e08d`: rating snapshot/membership and browser account-recovery claims above are only partially verified; see [remaining findings](../evidence/m2-independent-review.md). M2 remains open.
 Tasks: [TAR-009](../backlog.md#tar-009), [TAR-012](../backlog.md#tar-012), [TAR-013](../backlog.md#tar-013).
 

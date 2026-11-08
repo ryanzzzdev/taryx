@@ -18,7 +18,7 @@ Task sections own status; index icons mirror them. See the [documentation guide]
 - 🚧 [TAR-010 — Build independent legacy characterisation](#tar-010)
 - 🚧 [TAR-011 — Implement isolated shadow comparison and gates](#tar-011)
 - 🚧 [TAR-012 — Deliver operator migration and cutover](#tar-012)
-- 📋 [TAR-013 — Demonstrate two isolated client instances](#tar-013)
+- ✅ [TAR-013 — Demonstrate two isolated client instances](#tar-013)
 - 📋 [TAR-014 — Freeze the bounded market workflow](#tar-014)
 - 📋 [TAR-015 — Implement market adapter and counterparty simulator](#tar-015)
 - 📋 [TAR-016 — Verify recovery and correlated diagnostics](#tar-016)
@@ -507,7 +507,7 @@ Re-review of `db18588` reopened this task for the remaining F2 commit-window rac
 - Area: deployment
 - Milestone: M4
 - Priority: High
-- Status: In progress 🚧
+- Status: Done ✅
 - Depends on: TAR-012
 - References: [Contract](features/operator-and-clients.md)
 
@@ -523,7 +523,16 @@ Run two fictional retailers from one core image with independent state and polic
 
 ### Completion evidence
 
-Not started; no implementation or verification evidence.
+Live two-client deployment verified on 2026-11-08 (both stacks running from `build: .` — same image and compose file):
+
+- Database: `taryx_app`/`taryx` (aurora) vs `taryx_sg`/`taryx_southgrid` (southgrid); CONNECT refused in both directions (`taryx_app→taryx_southgrid`, `taryx_sg→taryx`), `taryx_shadow` reaches both for per-database evidence grants. Aurora app runs as non-superuser `taryx_app` (member of the bootstrap owner); the superuser stays confined to `db-init` provisioning.
+- Broker: vhost `taryx` for user `taryx`, vhost `taryx-sg` for `taryx_sg`; AMQP connect refused in both directions (creator's auto-grant revoked by `broker/init/provision.py`, HTTP management API, idempotent).
+- Services: `api-sg` (8002), `worker-sg`, `legacy-sg` (18091, own volume) and `web-sg` (5175) up alongside aurora's; `worker-sg` consumed on `taryx-sg`.
+- Divergent policy output: ACC-001 2026-03-02 rated net 8.64/gst 0.95/total 9.59 under southgrid vs the same-day aurora invoice at 8.75 on identical inputs; distinct `policy_identity` and digest.
+- Overlapping identifiers: southgrid ACC-001..003 are distinct businesses ("Bayview Corner Store" vs "Meridian Heights Bakery") under the same references and NMIs — seeded per deployment via `seed_client`.
+- Tests: `tests/test_clients.py` (4) + `tests/test_deployment_isolation.py` (5, declaration checks); `make check` green — 178 backend, 6 frontend, lint/format, mypy, import contracts (3 kept; the reported core→interfaces "violation" is the deliberate negative probe), build.
+
+Limits: shared physical Postgres server and broker — per the contract this demonstrates credentials/data/route isolation, not independent fault domains. `docker compose` service identity, not a digest-pinning registry flow, is the same-image evidence.
 
 ### Notes
 

@@ -1,3 +1,28 @@
+x-taryx-env: &taryx-env
+  POSTGRES_HOST: db
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: taryx
+  # Non-superuser application role (member of the bootstrap owner, so it
+  # keeps owner privileges on aurora objects but is subject to ACLs
+  # elsewhere). Provisioning keeps the `taryx` superuser to itself.
+  POSTGRES_USER: taryx_app
+  POSTGRES_PASSWORD: taryx_app
+  CELERY_BROKER_URL: amqp://taryx:taryx@broker:5672/taryx
+  DJANGO_DEBUG: "true"
+  TARYX_CLIENT: aurora_energy
+  LEGACY_BASE_URL: http://legacy:8090
+
+x-southgrid-env: &southgrid-env
+  POSTGRES_HOST: db
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: taryx_southgrid
+  POSTGRES_USER: taryx_sg
+  POSTGRES_PASSWORD: taryx_sg
+  CELERY_BROKER_URL: amqp://taryx_sg:taryx_sg@broker:5672/taryx-sg
+  DJANGO_DEBUG: "true"
+  TARYX_CLIENT: southgrid_retail
+  LEGACY_BASE_URL: http://legacy-sg:8090
+
 services:
   db:
     image: postgres:18.6
@@ -9,11 +34,30 @@ services:
       - "55432:5432"
     volumes:
       - taryx-pgdata:/var/lib/postgresql
+      - ./db/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U taryx -d taryx"]
       interval: 5s
       timeout: 3s
       retries: 12
+
+  # Applies the same client-role/database grants idempotently on every
+  # `up` — initdb.d only runs on a fresh volume, so existing volumes get
+  # the southgrid role/database through this one-shot job.
+  db-init:
+    image: postgres:18.6
+    command: sh -c "psql -v ON_ERROR_STOP=1 -f /init/02-clients.sql"
+    environment:
+      PGHOST: db
+      PGUSER: taryx
+      PGPASSWORD: taryx
+      PGDATABASE: taryx
+    volumes:
+      - ./db/init:/init:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
 
   broker:
     image: rabbitmq:4.3.7-management-alpine
@@ -32,18 +76,27 @@ services:
       timeout: 5s
       retries: 24
 
+  # Client vhost/user provisioning through the management API; the PUTs
+  # are upsert-shaped so re-running is safe.
+  broker-init:
+    image: python:3.13-alpine
+    command: python /init/provision.py
+    environment:
+      BROKER_API: http://broker:15672
+      BROKER_USER: taryx
+      BROKER_PASS: taryx
+    volumes:
+      - ./broker/init:/init:ro
+    depends_on:
+      broker:
+        condition: service_healthy
+    restart: "no"
+
   api:
     build: .
     command: sh -c "python manage.py migrate --noinput && python manage.py runserver 0.0.0.0:8000"
     environment:
-      POSTGRES_HOST: db
-      POSTGRES_PORT: "5432"
-      POSTGRES_DB: taryx
-      POSTGRES_USER: taryx
-      POSTGRES_PASSWORD: taryx
-      CELERY_BROKER_URL: amqp://taryx:taryx@broker:5672/taryx
-      DJANGO_DEBUG: "true"
-      LEGACY_BASE_URL: http://legacy:8090
+      <<: *taryx-env
     ports:
       - "8001:8000"
     depends_on:
@@ -56,18 +109,63 @@ services:
     build: .
     command: celery -A taryx.config.celery:app worker --loglevel=INFO --without-gossip --without-mingle --without-heartbeat
     environment:
-      POSTGRES_HOST: db
-      POSTGRES_PORT: "5432"
-      POSTGRES_DB: taryx
-      POSTGRES_USER: taryx
-      POSTGRES_PASSWORD: taryx
-      CELERY_BROKER_URL: amqp://taryx:taryx@broker:5672/taryx
-      LEGACY_BASE_URL: http://legacy:8090
+      <<: *taryx-env
     depends_on:
       db:
         condition: service_healthy
       broker:
         condition: service_healthy
+
+  api-sg:
+    build: .
+    command: sh -c "python manage.py migrate --noinput && python manage.py runserver 0.0.0.0:8000"
+    environment:
+      <<: *southgrid-env
+    ports:
+      - "8002:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
+      broker-init:
+        condition: service_completed_successfully
+
+  worker-sg:
+    build: .
+    command: celery -A taryx.config.celery:app worker --loglevel=INFO --without-gossip --without-mingle --without-heartbeat
+    environment:
+      <<: *southgrid-env
+    depends_on:
+      db:
+        condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
+      broker-init:
+        condition: service_completed_successfully
+
+  legacy-sg:
+    build: ./legacy-sim
+    environment:
+      LEGACY_DB: /data/legacy_calc.db
+    ports:
+      - "18091:8090"
+    volumes:
+      - taryx-legacy-sg:/data
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request;urllib.request.urlopen(\"http://localhost:8090/healthz\")'"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  web-sg:
+    build: ./web
+    environment:
+      VITE_PROXY_TARGET: http://api-sg:8000
+    ports:
+      - "5175:5173"
+    depends_on:
+      - api-sg
 
   legacy:
     build: ./legacy-sim
@@ -96,3 +194,4 @@ volumes:
   taryx-pgdata:
   taryx-broker:
   taryx-legacy:
+  taryx-legacy-sg:

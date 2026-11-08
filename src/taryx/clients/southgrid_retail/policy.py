@@ -15,6 +15,7 @@ CLIENT_NAME = "Southgrid Retail"
 
 CATALOGUE_VERSION = "2026-10-25.3-sg1"
 POLICY_IDENTITY = f"southgrid-retail/au_nem-retail-catalogue/{CATALOGUE_VERSION}"
+GST_RATE = Decimal("0.10")
 
 _PEAK_WINDOW = (time(7, 0), time(22, 0))
 
