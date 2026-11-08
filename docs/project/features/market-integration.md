@@ -10,6 +10,8 @@ Round-2 independent review at `d1831219` (2026-11-08): M4-F5/F7/F8 remain open i
 
 Round 3 at `4b65cf58` (2026-11-08): F5 resolved; core account services now own writes, but F7/F8 remain and F10 affects the submission budget. [Evidence](../evidence/m4-independent-review.md#round-3--independent-verification-2026-11-08) supersedes earlier M4 completion claims. R3 remediation (2026-11-08): F7 boolean `last_seq` rejection, F8 `pending_transfer_id` per-correlation dedup in the accounts consumer, F10 POST-count attempt budget — all resolved; pending re-review.
 
+Round 4: F7/F10 reported cases verified; F8 remains open because correlation validation and mutation are not atomic against concurrent admission. [Review](../evidence/m4-review-r4.md) supersedes the R3 claim that F8 is resolved.
+
 ## Boundary
 
 Demonstrate one asynchronous supply-point interaction, such as a simplified transfer request. The adapter owns durable workflow state, outbound requests, correlation and reconciliation. The external simulator owns the counterparty response schedule. Neither may directly update core billing/account tables. The adapter sends versioned outcomes that the core validates and deduplicates.

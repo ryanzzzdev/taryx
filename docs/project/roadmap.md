@@ -95,6 +95,8 @@ Excludes migration of an entire historical accounting database. Routing rollback
 
 ## M4 — Client variation and market boundary
 
+Authorised round 4 at `853842c9ba24c92aa7d487ca3546910eef7107e1`: **changes requested**. F7/F10/F11 reported cases pass; F8 retains a stale-consumer concurrency window. All four live image digests match, but imported market code omits part of the candidate remediation. M4 remains In progress. [Round-4 evidence](evidence/m4-review-r4.md).
+
 Round 3 (2026-11-08): **changes requested** at `4b65cf58`. M4-F5/F9 resolved; F7/F8 remain, with new F10 submission-budget and F11 image-identity gaps. TAR-013/TAR-015 In progress; TAR-014 Done. M4 remains In progress. Three-round cap reached: driver escalation required before another review. [Review](evidence/m4-independent-review.md#round-3--independent-verification-2026-11-08).
 
 Round-3 remediation (2026-11-08): all four findings addressed — boolean `last_seq` recovery rejection, `pending_transfer_id` per-correlation dedup at the core consumer, POST-count attempt budget, and one named `taryx-app:latest` image shared by all four app services (one live digest). `make check` green (221 backend/6 frontend). M4 remains In progress pending independent re-review.

@@ -482,3 +482,10 @@ TypeScript/build. Live: all four app containers share image digest
 `sha256:a692e0cf…`; `db-init` re-applied; `api`/`api-sg`/`worker`/
 `worker-sg` recreated on the shared image. Three-round cap reached —
 escalated to the driver before any further review round.
+
+## Round 4 — authorised independent review
+
+Candidate `853842c9ba24c92aa7d487ca3546910eef7107e1`: **CHANGES_REQUESTED**.
+F7/F10/F11 reported cases resolved; F8 remains at a later consumer read/write
+interleaving. [Full findings, checks and live provenance limits](m4-review-r4.md).
+The earlier partial round-4 JSONL is incomplete and supplies no verdict.

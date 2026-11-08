@@ -1,0 +1,72 @@
+api taryx.core.accounts.services: imported AST matches candidate=True
+api taryx.core.market.services: imported AST matches candidate=False
+--- live
++++ candidate
+@@ -155,6 +155,8 @@
+                 if isinstance(exc, MarketHttpError) and exc.status == 409:
+                     return _fail(workflow, f"digest conflict under same correlation: {exc}")
+                 workflow.detail = str(exc)[:500]
++                if workflow.attempts >= conf["max_attempts"]:
++                    return _fail(workflow, f"submit attempts exhausted: {exc}")
+                 workflow.save()
+                 return workflow
+             except MarketMalformed as exc:
+@@ -386,4 +388,3 @@
+             event.last_error = str(exc)[:500]
+             event.save(update_fields=["attempts", "last_error"])
+     return delivered
+-
+api-sg taryx.core.accounts.services: imported AST matches candidate=True
+api-sg taryx.core.market.services: imported AST matches candidate=False
+--- live
++++ candidate
+@@ -155,6 +155,8 @@
+                 if isinstance(exc, MarketHttpError) and exc.status == 409:
+                     return _fail(workflow, f"digest conflict under same correlation: {exc}")
+                 workflow.detail = str(exc)[:500]
++                if workflow.attempts >= conf["max_attempts"]:
++                    return _fail(workflow, f"submit attempts exhausted: {exc}")
+                 workflow.save()
+                 return workflow
+             except MarketMalformed as exc:
+@@ -386,4 +388,3 @@
+             event.last_error = str(exc)[:500]
+             event.save(update_fields=["attempts", "last_error"])
+     return delivered
+-
+worker taryx.core.accounts.services: imported AST matches candidate=True
+worker taryx.core.market.services: imported AST matches candidate=False
+--- live
++++ candidate
+@@ -155,6 +155,8 @@
+                 if isinstance(exc, MarketHttpError) and exc.status == 409:
+                     return _fail(workflow, f"digest conflict under same correlation: {exc}")
+                 workflow.detail = str(exc)[:500]
++                if workflow.attempts >= conf["max_attempts"]:
++                    return _fail(workflow, f"submit attempts exhausted: {exc}")
+                 workflow.save()
+                 return workflow
+             except MarketMalformed as exc:
+@@ -386,4 +388,3 @@
+             event.last_error = str(exc)[:500]
+             event.save(update_fields=["attempts", "last_error"])
+     return delivered
+-
+worker-sg taryx.core.accounts.services: imported AST matches candidate=True
+worker-sg taryx.core.market.services: imported AST matches candidate=False
+--- live
++++ candidate
+@@ -155,6 +155,8 @@
+                 if isinstance(exc, MarketHttpError) and exc.status == 409:
+                     return _fail(workflow, f"digest conflict under same correlation: {exc}")
+                 workflow.detail = str(exc)[:500]
++                if workflow.attempts >= conf["max_attempts"]:
++                    return _fail(workflow, f"submit attempts exhausted: {exc}")
+                 workflow.save()
+                 return workflow
+             except MarketMalformed as exc:
+@@ -386,4 +388,3 @@
+             event.last_error = str(exc)[:500]
+             event.save(update_fields=["attempts", "last_error"])
+     return delivered
+-

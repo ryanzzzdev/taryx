@@ -529,6 +529,8 @@ Run two fictional retailers from one core image with independent state and polic
 
 ### Completion evidence
 
+Authorised round 4 at `853842c9ba24c92aa7d487ca3546910eef7107e1`: F11 same-image discrepancy resolved by live inspection; preserved isolation probes pass. Runtime market code differs from the candidate, so deployment verification remains qualified and this task stays In progress pending candidate-image verification. [Review](evidence/m4-review-r4.md).
+
 2026-11-08 independent round 3 at `4b65cf589537fbbfba449e5e82b80ccb5597c354`: **changes requested** — M4-F9 isolation verified resolved, but new M4-F11 fails the same-image-digest criterion. Original probes 22 pass; expanded probes 22 pass/5 fail; project checks pass (216 backend/6 frontend). [Round-3 findings](evidence/m4-independent-review.md#round-3--independent-verification-2026-11-08) supersede remediation completion claims below. Remediate and escalate to the user at the three-round cap before another review round.
 
 2026-11-08 R3 remediation: M4-F11 resolved — all four app services reference one named image `taryx-app:latest` built once on `api`; live `docker inspect` confirms a shared digest across `api`/`api-sg`/`worker`/`worker-sg`. Also transferred object ownership to `taryx_app` so the demoted role can still run `ALTER TABLE` migrations. `make check` green (221 backend/6 frontend). Pending independent re-review.
@@ -608,6 +610,8 @@ Complete one durable market workflow across owned adapter and external test doub
 - Uncertain outcomes reconcile; unrelated core work stays responsive; M4 exit evidence is recorded.
 
 ### Completion evidence
+
+Authorised round 4 at `853842c9ba24c92aa7d487ca3546910eef7107e1`: F7/F10 reported cases resolved; F8 remains open: a consumer using a stale supply-point instance can register a newer pending transfer. Keep In progress; make correlation validation/update atomic and retain the new interleaving probe. [Review](evidence/m4-review-r4.md).
 
 2026-11-08 independent round 3 at `4b65cf589537fbbfba449e5e82b80ccb5597c354`: **changes requested** — M4-F5 crash recovery verified resolved; M4-F7/F8 remain and new M4-F10 affects the submission budget. Original probes 22 pass; expanded probes 22 pass/5 fail; project checks pass (216 backend/6 frontend). [Round-3 findings](evidence/m4-independent-review.md#round-3--independent-verification-2026-11-08) supersede remediation completion claims below. Remediate and escalate to the user at the three-round cap before another review round.
 
