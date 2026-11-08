@@ -37,15 +37,13 @@ class Command(BaseCommand):
         if run is None:
             raise CommandError("no rating run for this account and period — rate first")
         try:
-            mode, revision = routing_for(account)
             op = admit_issue(
                 account,
                 options["start"],
                 options["end"],
                 run,
                 options["op"],
-                cohort_mode=mode,
-                cohort_revision=revision,
+                routing_resolver=routing_for,
             )
         except AdmissionError as exc:
             raise CommandError(f"{exc.code}: {exc}") from None

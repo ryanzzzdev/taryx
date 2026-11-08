@@ -498,8 +498,7 @@ def _admit(account, run, cohort, op="OP-M1"):
         NEXT,
         run,
         op,
-        cohort_mode=cohort.routing_mode,
-        cohort_revision=cohort.routing_revision,
+        routing_resolver=lambda a: (cohort.routing_mode, cohort.routing_revision),
     )
 
 
@@ -958,3 +957,74 @@ def test_existing_failure_update_cannot_bypass_final_gate(legacy):
     assert not published, (
         "NEW_ONLY committed despite failed evidence publishing after final gate read"
     )
+
+
+def test_old_route_cannot_issue_after_cutover(legacy):
+    """Admission serializes with cutover: routing is resolved under the
+    account lock, so an op admitted during the commit window pins the
+    NEW routing — a complete bill with legacy amounts can never land
+    after NEW_ONLY commits."""
+    from threading import Event, Thread
+    from unittest.mock import patch
+
+    from django.db import close_old_connections, connections
+
+    from taryx.core.billing import services as billing
+    from taryx.core.migration import services
+
+    cohort = _cohort(None, refs=("ACC-001",))
+    account, run = _rated(None)
+    comparison = run_comparison(run, base_url=legacy)
+    actor = _approve_all(cohort, comparison)
+
+    reached_input_lock = Event()
+    outcomes, errors, workers = [], [], []
+    original_save = Cohort.save
+    original_lock = billing.lock_inputs
+
+    def bill():
+        close_old_connections()
+        try:
+            op = billing.admit_issue(
+                account,
+                DAY,
+                NEXT,
+                run,
+                "admission-race",
+                routing_resolver=services.routing_for,
+            )
+            op = _process(op.operation_id, legacy)
+            outcomes.append((op.status, op.invoice.calculation_source if op.invoice_id else None))
+        except Exception as exc:
+            errors.append(exc)
+        finally:
+            connections.close_all()
+
+    def observe_input_lock(*args, **kwargs):
+        reached_input_lock.set()
+        return original_lock(*args, **kwargs)
+
+    def interleave_save(instance, *args, **kwargs):
+        if instance.pk == cohort.pk and instance.routing_mode == "new_only" and not workers:
+            worker = Thread(target=bill, daemon=True)
+            workers.append(worker)
+            worker.start()
+            reached_input_lock.wait(2)
+        return original_save(instance, *args, **kwargs)
+
+    with (
+        patch.object(Cohort, "save", interleave_save),
+        patch.object(billing, "lock_inputs", observe_input_lock),
+    ):
+        try:
+            transition_cohort(cohort.pk, "new_only", cohort.routing_revision, actor, **GATE)
+        finally:
+            for worker in workers:
+                worker.join(15)
+
+    assert workers
+    assert all(not worker.is_alive() for worker in workers)
+    assert not errors, errors
+    cohort.refresh_from_db()
+    assert cohort.routing_mode == "new_only"
+    assert ("complete", "legacy") not in outcomes, outcomes

@@ -194,3 +194,16 @@ Codex round 1 (`codex exec resume`, read-only thread — verdict in `m3-verdict-
 `decide_discrepancy` and the seeded membership `set` keep explicit parent-row locks before the gate lock (consistent cohort → accounts → advisory ordering on the default connection).
 
 Verification: `m3_gate_deadlock_probe.py` and `m3_commit_window_probe.py` pass unchanged in intent (the deadlock probe's instrumentation is restored — the writer can once again hold the advisory mid-window without deadlocking); 13/13 preserved probes + 32 migration tests + 146 pytest; format/lint/mypy/contracts green; live seed + comparison + gate re-verified.
+
+
+## Fifth remediation addendum — 2026-11-08 (loop round 2)
+
+Codex round 2 (`m3-verdict-r2.txt`): **CHANGES_REQUESTED**, one P1 — `admit_issue` took neither an account lock nor the gate lock, so a billing operation could be admitted under the old routing pin after the final pending-operations check but before the route commit; `process_operation` revalidated routing before `lock_inputs`, not under it, so the op could then issue legacy amounts after `NEW_ONLY` committed. Source-confirmed interleaving; runnable probe `m3_admission_cutover_probe.py`.
+
+**Resolution**:
+
+- `admit_issue` now takes `routing_resolver` instead of explicit `cohort_mode`/`cohort_revision` and resolves the pin **inside** its atomic while holding the account row `FOR UPDATE` — which conflicts with the cutover's member `NO KEY UPDATE` locks. Admission either commits before the member locks (visible to the pending check → `in_flight`) or waits and pins the post-commit routing.
+- `process_operation` revalidates the routing pin a second time **after `lock_inputs`** — a cutover committed during the lock wait marks the op `stale` instead of issuing under the old pin.
+- Callers (`bill_account` command, GraphQL `billAccount`) pass `routing_resolver=routing_for`; the billing layer keeps its DI boundary (no migration import).
+
+Verification: `m3_admission_cutover_probe.py` passes and is folded into `tests/test_migration.py` (33 migration tests); 13/13 preserved probes; 146 pytest; format/lint/mypy/contracts green.

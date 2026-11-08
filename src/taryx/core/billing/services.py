@@ -77,8 +77,7 @@ def admit_issue(
     rating_run: RatingRun,
     operation_id: str,
     *,
-    cohort_mode: str = "new_only",
-    cohort_revision: int = 0,
+    routing_resolver=None,
 ) -> BillingOperation:
     """Durably admit a billing operation and its outbox event atomically.
 
@@ -87,12 +86,27 @@ def admit_issue(
     digest posts a linked adjustment instead. The caller may enqueue a
     fast-path task afterwards; if the broker is down the pending outbox
     event is recovered by drain_outbox.
+
+    The routing pin is resolved under the account row lock: the lock
+    conflicts with a cohort cutover's member locks, so an admission can
+    never pin a routing identity after the cutover's final pending-ops
+    check but before the route commit.
     """
-    payload = _payload_sha(
-        account, period_start, period_end, rating_run, cohort_mode, cohort_revision
-    )
     try:
         with transaction.atomic():
+            Account.objects.select_for_update().get(pk=account.pk)
+            if routing_resolver is None:
+                cohort_mode, cohort_revision = "new_only", 0
+            else:
+                cohort_mode, cohort_revision = routing_resolver(account)
+            payload = _payload_sha(
+                account,
+                period_start,
+                period_end,
+                rating_run,
+                cohort_mode,
+                cohort_revision,
+            )
             op = BillingOperation.objects.create(
                 operation_id=operation_id,
                 account=account,
@@ -330,6 +344,20 @@ def process_operation(
         # can only land after this transaction commits. The digest also
         # covers open quarantines, which input locks alone cannot pin.
         lock_inputs(op.account, op.period_start, op.period_end)
+        # Routing pin re-check under the input locks: a cutover committed
+        # while this transaction waited on the account lock must not
+        # issue under the admitted legacy pin.
+        if routing_resolver is not None:
+            current_mode, current_revision = routing_resolver(op.account)
+            if (current_mode, current_revision) != (
+                op.cohort_mode,
+                op.cohort_revision,
+            ):
+                return _finish(
+                    op,
+                    BillingOperation.Status.STALE,
+                    "cohort routing changed during issuance validation",
+                )
         if digest_resolver(op.account, op.period_start, op.period_end) != (
             op.rating_run.input_digest
         ):

@@ -679,15 +679,13 @@ class BillAccount(graphene.Mutation):
         if run is None:
             return BillPayload(ok=False, code="no_rating_run", message="rate first")
         try:
-            mode, revision = routing_for(account)
             op = admit_issue(
                 account,
                 period_start,
                 period_end,
                 run,
                 operation_id,
-                cohort_mode=mode,
-                cohort_revision=revision,
+                routing_resolver=routing_for,
             )
         except AdmissionError as exc:
             return BillPayload(ok=False, code=exc.code, message=str(exc))
