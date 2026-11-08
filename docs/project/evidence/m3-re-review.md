@@ -153,3 +153,33 @@ all 17 earlier M3 probes pass; migration suite **39 tests** including
 the three folded regressions; `make check` green — ruff lint/format,
 mypy, 3 import contracts, **164 backend tests**, 6 frontend tests,
 TypeScript check and production build.
+
+---
+
+## Round two — interrupted, extended remediation — 2026-11-08 (Devin)
+
+Round 2 died on Codex quota mid-verification (`turn.failed`; session
+`01a1ba3e-7224-7dc3-a29f-cec764756ff2` retained). The died turn left a
+complete probes file (`m3_re_review_r2_probes.py`) exercising boundary
+cases of the round-one fixes — all reproduced real gaps, remediated
+before the resumed round:
+
+- **Omitted daily supply** — the round-one completeness check
+  reconciled import kWh only; a response billing all usage but dropping
+  the supply line still issued a partial invoice ($7.47 vs $8.68).
+  `_check_usage_completeness` now also requires supply lines covering
+  every distinct record day in the request.
+- **`agreement_id: 1e309`** — `int(inf)` raised `OverflowError`, which
+  escaped `_parse`'s catch tuple. It is now wrapped as `malformed`
+  like every other shape violation.
+- **Shadow billing evidence** — a malformed authoritative response
+  during `calculate_for_billing` left no comparison evidence, so the
+  cutover gate stayed clear after the FAILED operation. The shadow
+  path now persists the same INCONCLUSIVE row `run_comparison` writes
+  before propagating (extracted into `_persist_inconclusive`).
+
+The R2 probes also verify transient codes (`timeout`, `unavailable`)
+keep PENDING/retry semantics — only `malformed` terminates FAILED.
+All five round-two probes pass and are folded into
+`tests/test_migration.py`; the full suite is green (169 backend,
+6 frontend).

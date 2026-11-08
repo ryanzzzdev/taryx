@@ -180,7 +180,7 @@ def _parse(result) -> LegacyResult:
         net = _decimal(result["net"], "net")
         gst = _decimal(result["gst"], "gst")
         total = _decimal(result["total"], "total")
-    except (KeyError, TypeError, IndexError, ValueError) as exc:
+    except (KeyError, TypeError, IndexError, ValueError, OverflowError) as exc:
         raise LegacyFailure("malformed", f"response shape invalid: {exc}") from exc
     try:
         if sum((item.amount for item in lines), Decimal(0)) != net:
@@ -230,20 +230,31 @@ def _check_usage_completeness(request: dict, parsed: LegacyResult) -> None:
     evidence rather than a protocol defect.
     """
     required = Decimal(0)
+    days: set = set()
     saw_import = False
     for channel in request.get("channels") or []:
-        if channel.get("direction") != "import":
-            continue
-        saw_import = True
         for record in channel.get("records") or []:
+            days.add(record.get("date"))
+            if channel.get("direction") != "import":
+                continue
+            saw_import = True
             required += _decimal(record.get("value"), "channel record value")
-    if not saw_import:
-        return
-    billed = sum((line.quantity for line in parsed.lines if line.element == "import"), Decimal(0))
-    if billed != required:
+    if saw_import:
+        billed = sum(
+            (line.quantity for line in parsed.lines if line.element == "import"), Decimal(0)
+        )
+        if billed != required:
+            raise LegacyFailure(
+                "malformed",
+                f"import lines bill {billed} kWh of {required} kWh requested",
+            )
+    # The daily supply charge is emitted once per covered day; lines
+    # that silently drop it still reconcile arithmetically.
+    supplied = sum((line.quantity for line in parsed.lines if line.element == "supply"), Decimal(0))
+    if supplied != Decimal(len(days)):
         raise LegacyFailure(
             "malformed",
-            f"import lines bill {billed} kWh of {required} kWh requested",
+            f"supply lines cover {supplied} of {len(days)} requested days",
         )
 
 

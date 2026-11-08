@@ -75,36 +75,42 @@ def run_comparison(rating_run: RatingRun, *, base_url: str | None = None) -> Com
     persisted as INCONCLUSIVE evidence — they block cutover, they are
     never parity. Evidence rows are written under the shadow alias.
     """
-    account = rating_run.account
     request = build_request(rating_run.input_snapshot, rating_run.input_digest)
     url = base_url or settings.LEGACY_BASE_URL
     try:
         result = calculate(request, base_url=url, timeout=settings.LEGACY_TIMEOUT_SECONDS)
     except LegacyFailure as exc:
-        cohort = _cohort_of(account)
-        with transaction.atomic(using=SHADOW_ALIAS):
-            if cohort is not None:
-                _gate_lock(cohort.id, using=SHADOW_ALIAS)
-            run_row, _ = ComparisonRun.objects.using(SHADOW_ALIAS).update_or_create(
-                snapshot_hash=rating_run.input_digest,
-                legacy_version_token="unavailable",
-                defaults={
-                    "account_id": account.id,
-                    "period_start": rating_run.period_start,
-                    "period_end": rating_run.period_end,
-                    "rating_run_id": rating_run.id,
-                    "legacy_calculation_id": None,
-                    "new_engine_version": rating_run.engine_version,
-                    "policy_identity": rating_run.policy_identity,
-                    "status": ComparisonRun.Status.INCONCLUSIVE,
-                    "failure_code": exc.code,
-                    "report_json": {"status": "inconclusive", "failure_code": exc.code},
-                    "created_at": timezone.now(),
-                },
-            )
-        return run_row
+        return _persist_inconclusive(rating_run, exc)
 
     return _persist_comparison(rating_run, result)
+
+
+def _persist_inconclusive(rating_run: RatingRun, exc: LegacyFailure) -> ComparisonRun:
+    """A failed legacy call is INCONCLUSIVE evidence — it blocks the
+    gate, it is never parity. Written under the shadow alias."""
+    account = rating_run.account
+    cohort = _cohort_of(account)
+    with transaction.atomic(using=SHADOW_ALIAS):
+        if cohort is not None:
+            _gate_lock(cohort.id, using=SHADOW_ALIAS)
+        run_row, _ = ComparisonRun.objects.using(SHADOW_ALIAS).update_or_create(
+            snapshot_hash=rating_run.input_digest,
+            legacy_version_token="unavailable",
+            defaults={
+                "account_id": account.id,
+                "period_start": rating_run.period_start,
+                "period_end": rating_run.period_end,
+                "rating_run_id": rating_run.id,
+                "legacy_calculation_id": None,
+                "new_engine_version": rating_run.engine_version,
+                "policy_identity": rating_run.policy_identity,
+                "status": ComparisonRun.Status.INCONCLUSIVE,
+                "failure_code": exc.code,
+                "report_json": {"status": "inconclusive", "failure_code": exc.code},
+                "created_at": timezone.now(),
+            },
+        )
+    return run_row
 
 
 def routing_for(account: Account) -> tuple[str, int]:
@@ -126,11 +132,19 @@ def calculate_for_billing(op, *, base_url: str | None = None) -> dict:
     """
     rating_run = op.rating_run
     request = build_request(rating_run.input_snapshot, rating_run.input_digest)
-    result = calculate(
-        request,
-        base_url=base_url or settings.LEGACY_BASE_URL,
-        timeout=settings.LEGACY_TIMEOUT_SECONDS,
-    )
+    try:
+        result = calculate(
+            request,
+            base_url=base_url or settings.LEGACY_BASE_URL,
+            timeout=settings.LEGACY_TIMEOUT_SECONDS,
+        )
+    except LegacyFailure as exc:
+        # Under shadow routing a failed authoritative attempt is still
+        # gate evidence — persist INCONCLUSIVE so the cutover sees the
+        # failed call rather than the earlier clean comparison.
+        if op.cohort_mode == Cohort.Mode.SHADOW:
+            _persist_inconclusive(rating_run, exc)
+        raise
     legacy_calc = _persist_legacy_result(result)
     # Pin the authoritative evidence on the op so issuance can record
     # which persisted legacy response produced its figures.

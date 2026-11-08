@@ -1250,3 +1250,111 @@ def test_invalid_line_identity_supersedes_prior_success(legacy):
         latest = run_comparison(run)
     assert latest.status == ComparisonRun.Status.INCONCLUSIVE
     assert any(b.startswith("inconclusive:") for b in evaluation_blockers(cohort, **GATE))
+
+
+def _response_with_lines(run, result, lines):
+    """A 200 body rebuilt from selected lines of a real response."""
+    payload = json.loads(_empty_legacy_response(run).read.return_value)
+    payload.update(
+        engine_version=result.engine_version,
+        catalogue_version=result.catalogue_version,
+    )
+    payload["lines"] = [
+        {**vars(line), "segment": [str(line.segment_from), str(line.segment_to)]} for line in lines
+    ]
+    payload["net"] = sum(line.amount for line in lines)
+    payload["gst"] = sum(line.gst for line in lines)
+    payload["total"] = payload["net"] + payload["gst"]
+    response = _empty_legacy_response(run)
+    response.read.return_value = json.dumps(payload, default=str).encode()
+    return response
+
+
+@pytest.mark.django_db(databases=["default", "shadow"], transaction=True)
+def test_omitted_daily_supply_cannot_issue(legacy):
+    """A response that bills all usage but drops the daily supply charge
+    is incomplete output — the operation fails, nothing issues."""
+    from unittest.mock import patch
+
+    from taryx.core.migration.legacy_adapter import build_request, calculate
+
+    cohort = _cohort(None, refs=("ACC-001",))
+    account, run = _rated(None)
+    complete = calculate(build_request(run.input_snapshot, run.input_digest), base_url=legacy)
+    lines = [line for line in complete.lines if line.element != "supply"]
+    assert len(lines) < len(complete.lines)
+    op = _admit(account, run, cohort, "missing-supply")
+    with patch(
+        "urllib.request.urlopen",
+        return_value=_response_with_lines(run, complete, lines),
+    ):
+        result = _process(op.operation_id, "http://legacy.invalid")
+    assert result.status == BillingOperation.Status.FAILED
+    assert result.invoice_id is None
+
+
+@pytest.mark.django_db(databases=["default", "shadow"], transaction=True)
+def test_out_of_range_agreement_id_is_inconclusive(legacy):
+    """A JSON numeric that materialises as infinity must route through
+    the failure taxonomy — INCONCLUSIVE supersedes an earlier pass."""
+    from unittest.mock import patch
+
+    from taryx.core.migration.legacy_adapter import build_request, calculate
+
+    cohort = _cohort(None, refs=("ACC-001",))
+    account, run = _rated(None)
+    first = run_comparison(run, base_url=legacy)
+    _approve_all(cohort, first)
+    complete = calculate(build_request(run.input_snapshot, run.input_digest), base_url=legacy)
+    response = _response_with_lines(run, complete, complete.lines)
+    payload = json.loads(response.read.return_value)
+    payload["lines"][0]["agreement_id"] = "EXPONENT_PLACEHOLDER"
+    response.read.return_value = (
+        json.dumps(payload).replace('"EXPONENT_PLACEHOLDER"', "1e309").encode()
+    )
+    with patch("urllib.request.urlopen", return_value=response):
+        latest = run_comparison(run)
+    assert latest.status == ComparisonRun.Status.INCONCLUSIVE
+    assert any(b.startswith("inconclusive:") for b in evaluation_blockers(cohort, **GATE))
+
+
+@pytest.mark.django_db(databases=["default", "shadow"], transaction=True)
+def test_malformed_shadow_billing_blocks_cutover_after_failed_operation(legacy):
+    """A malformed authoritative response during shadow billing persists
+    INCONCLUSIVE gate evidence — the cutover sees the failed call."""
+    from unittest.mock import patch
+
+    cohort = _cohort(None, mode=Cohort.Mode.SHADOW, refs=("ACC-001",))
+    account, run = _rated(None)
+    first = run_comparison(run, base_url=legacy)
+    actor = _approve_all(cohort, first)
+    op = _admit(account, run, cohort, "shadow-malformed")
+    with patch("urllib.request.urlopen", return_value=_empty_legacy_response(run)):
+        failed = _process(op.operation_id, "http://legacy.invalid")
+    assert failed.status == BillingOperation.Status.FAILED
+    assert failed.outbox_event.delivered_at is not None
+    with pytest.raises(MigrationError, match="inconclusive"):
+        transition_cohort(cohort.pk, "new_only", cohort.routing_revision, actor, **GATE)
+
+
+@pytest.mark.django_db(databases=["default", "shadow"], transaction=True)
+@pytest.mark.parametrize("code", ["timeout", "unavailable"])
+def test_transient_legacy_failure_stays_recoverable(code):
+    """Transient codes keep the operation PENDING and the outbox event
+    undelivered — only malformed responses fail terminally."""
+    from taryx.core.billing.services import CalculationUnavailable, process_operation
+    from taryx.core.migration.services import routing_for
+
+    cohort = _cohort(None, refs=("ACC-001",))
+    account, run = _rated(None)
+    op = _admit(account, run, cohort, "transient")
+    with pytest.raises(CalculationUnavailable):
+        process_operation(
+            op.operation_id,
+            digest_resolver=_digest,
+            routing_resolver=routing_for,
+            legacy_calculator=lambda _op: (_ for _ in ()).throw(CalculationUnavailable(code, code)),
+        )
+    op.refresh_from_db()
+    assert op.status == BillingOperation.Status.PENDING
+    assert op.outbox_event.delivered_at is None
