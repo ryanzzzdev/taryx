@@ -1,7 +1,7 @@
 # Bounded market integration
 
 Date: 2026-10-25
-Status: Extension design; exact workflow and schema are Proposed pending [BLK-002](../blockers.md#blk-002).
+Status: Workflow contract frozen 2026-11-08 — synthetic `taryx-market/1` supply-point transfer, transition table and fault scripts in [decision 005](../decisions/005-market-workflow-contract.md) (resolves BLK-002). Implementation pending TAR-015.
 Tasks: [TAR-014](../backlog.md#tar-014), [TAR-015](../backlog.md#tar-015).
 
 ## Boundary

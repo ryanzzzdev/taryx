@@ -24,13 +24,13 @@ Reopened 2026-10-25 by the [independent review](evidence/m1-exit-review.md): the
 ## BLK-002 — Exact market interaction and protocol
 
 - Identified: 2026-10-25
-- Status: Open
+- Status: Resolved
 - Affects: TAR-014–015; M4.
 - Impact: Adapter transitions, reconciliation and simulator behaviour need one consistent contract.
 - Evidence: The reviewed concept proposes a bounded transfer/role interaction but does not establish an actual AEMO procedure or supported protocol.
 - Blocks now: Market implementation only; core billing and migration can proceed.
 - Next action/owner: Implementing agent on TAR-014 documents the scenario, state table, protocol version, correlation, authentication and recovery rules. Use a clearly synthetic protocol unless primary-source research supports a named standard subset. Escalate only a material scope change to the user.
-- Resolution: Pending.
+- Resolution: Resolved 2026-11-08. Synthetic `taryx-market/1` protocol and supply-point transfer workflow frozen in [decision 005](decisions/005-market-workflow-contract.md) — scenario, versioned messages, auth/correlation, transition table, dedup, deadlines, reconciliation and deterministic fault scripts. Explicitly labelled synthetic; no MSATS/aseXML conformance claim.
 
 <a id="blk-003"></a>
 

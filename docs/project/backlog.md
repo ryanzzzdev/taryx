@@ -19,7 +19,7 @@ Task sections own status; index icons mirror them. See the [documentation guide]
 - 🚧 [TAR-011 — Implement isolated shadow comparison and gates](#tar-011)
 - 🚧 [TAR-012 — Deliver operator migration and cutover](#tar-012)
 - ✅ [TAR-013 — Demonstrate two isolated client instances](#tar-013)
-- 📋 [TAR-014 — Freeze the bounded market workflow](#tar-014)
+- ✅ [TAR-014 — Freeze the bounded market workflow](#tar-014)
 - 📋 [TAR-015 — Implement market adapter and counterparty simulator](#tar-015)
 - 📋 [TAR-016 — Verify recovery and correlated diagnostics](#tar-016)
 - 📋 [TAR-017 — Package and verify Kubernetes delivery](#tar-017)
@@ -545,9 +545,9 @@ Limits: shared physical Postgres server and broker — per the contract this dem
 - Area: integration
 - Milestone: M4
 - Priority: Normal
-- Status: Backlog 📋
+- Status: Done ✅
 - Depends on: TAR-012
-- References: [Contract](features/market-integration.md)
+- References: [Contract](features/market-integration.md), [Decision 005](decisions/005-market-workflow-contract.md)
 
 ### Outcome
 
@@ -561,11 +561,11 @@ Resolve BLK-002 into a reviewable transition/protocol contract.
 
 ### Completion evidence
 
-Not started; no implementation or verification evidence.
+Frozen 2026-11-08 in [decision 005](decisions/005-market-workflow-contract.md): synthetic `taryx-market/1` JSON/HTTP protocol (explicitly not an AEMO/MSATS claim), one scenario (supply-point transfer request, adapter → coordinator), versioned request/ack/callback/poll shapes, bearer-token + version-header ingress, `draft → submitted → (completed|rejected)` with `reconciling`/`failed` failure states, a frozen transition table covering duplicate/late/out-of-order/unknown-correlation/malformed events, inbox/outbox dedup rules, deadline + bounded-retry + reconciliation semantics, restart recovery, and nine deterministic simulator fault scripts. BLK-002 resolved.
 
 ### Notes
 
-Refine and mark Ready once dependencies pass; record relevant gate resolutions before dependent implementation.
+Contract-only task — no runtime code yet; TAR-015 implements the coordinator simulator and adapter against this table. Amendments to the transition table go through the decision record first.
 
 <a id="tar-015"></a>
 
