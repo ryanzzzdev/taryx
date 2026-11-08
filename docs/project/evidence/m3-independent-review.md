@@ -216,3 +216,10 @@ Codex round 3 (`m3-verdict-r3.txt`): **CHANGES_REQUESTED**, one P1 — member lo
 **Resolution**: member locks (`NO KEY UPDATE`), the shared gate lock and the pending-operations recheck now apply to **every** routing transition; only `evaluation_blockers` remains `NEW_ONLY`-specific. Rollback serializes with admission and issuance identically to cutover.
 
 Verification: the appended `test_rollback_serializes_with_new_billing` probe passes and is folded into `tests/test_migration.py` (34 migration tests); full `make check` re-run.
+
+
+## Review-loop closure — 2026-11-08 (round 4)
+
+Codex round 4 (`m3-verdict-r4.txt`): **verdict: APPROVED** — no remaining blocking findings. Every routing transition now serializes admission, issuance and evidence writes; the earlier admission, issuance and evidence protections stand. TAR-011/TAR-012 and M3 are complete.
+
+Loop summary (4 rounds, all findings remediated and folded into `tests/test_migration.py`): P2 gate-lock deadlock → `FOR NO KEY UPDATE` row locks; P1 admission/cutover race → `admit_issue` resolves routing under the account lock + routing revalidation under `lock_inputs`; P1 rollback bypass → serialization for every transition. Reviewer verification limitation retained: the Codex thread ran read-only, so findings and verdicts arrived via `-o` files and addenda/records were written by Devin.

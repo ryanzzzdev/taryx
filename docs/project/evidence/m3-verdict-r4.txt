@@ -1,0 +1,9 @@
+Reviewed `06a9eb4`: **no remaining blocking findings**.
+
+Every routing transition now takes the member and gate locks and rechecks pending operations. This closes the rollback gap while preserving the earlier admission, issuance and evidence protections.
+
+Devin records both admission/rollback probes and full `make check` passing. I verified the code and test changes; I could not independently rerun database tests in this read-only session.
+
+Record M3 and TAR-011/TAR-012 as complete, retaining that verification limitation. No files changed or commits made.
+
+verdict: APPROVED
