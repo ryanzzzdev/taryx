@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="auto">
+<head>
+<meta charset="utf-8">
+<title>Taryx — Sign in</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root{
+  --font:"Inter","Segoe UI",system-ui,sans-serif;
+  --mono:"JetBrains Mono","SF Mono",ui-monospace,Consolas,monospace;
+}
+[data-theme="light"],[data-theme="auto"]{
+  --bg:#eef0f2;--panel:#ffffff;--panel-head:#f8f9fb;--form:#fdfdfe;
+  --line:#dde1e6;--line-strong:#c3c9d1;
+  --tx:#20262e;--dim:#5a6472;--faint:#8d97a3;
+  --accent:#005fb8;--accent-2:#0a6ed1;--accent-tx:#ffffff;
+  --brand-bg:#17365d;--brand-tx:#cfdaea;
+  --ok:#107e3e;--warn:#e76500;--bad:#bb0000;--bad-bg:#fbe0e0;
+  --shadow:0 2px 12px rgba(30,40,50,.12);
+}
+@media (prefers-color-scheme:dark){[data-theme="auto"]{
+  --bg:#10141a;--panel:#171c24;--panel-head:#1c222b;--form:#151a21;
+  --line:#2a323d;--line-strong:#3b4552;
+  --tx:#d8dee6;--dim:#96a1ad;--faint:#6b7580;
+  --accent:#4d9de0;--accent-2:#64b0ec;--accent-tx:#0b1118;
+  --brand-bg:#0e1d33;--brand-tx:#9db4d0;
+  --ok:#5ecf8b;--warn:#f2a054;--bad:#ef7a70;--bad-bg:#381918;
+  --shadow:0 2px 14px rgba(0,0,0,.5);
+}}
+[data-theme="dark"]{
+  --bg:#10141a;--panel:#171c24;--panel-head:#1c222b;--form:#151a21;
+  --line:#2a323d;--line-strong:#3b4552;
+  --tx:#d8dee6;--dim:#96a1ad;--faint:#6b7580;
+  --accent:#4d9de0;--accent-2:#64b0ec;--accent-tx:#0b1118;
+  --brand-bg:#0e1d33;--brand-tx:#9db4d0;
+  --ok:#5ecf8b;--warn:#f2a054;--bad:#ef7a70;--bad-bg:#381918;
+  --shadow:0 2px 14px rgba(0,0,0,.5);
+}
+*{box-sizing:border-box}
+body{
+  margin:0;min-height:100vh;zoom:1.2;
+  font:14px/1.5 var(--font);color:var(--tx);background:var(--bg);
+  display:flex;align-items:center;justify-content:center;
+}
+.mono{font-family:var(--mono)}
+.dim{color:var(--dim)}.faint{color:var(--faint)}
+
+/* corner theme control */
+.corner{position:fixed;top:14px;right:14px;display:flex;align-items:center;gap:8px}
+.corner .env{
+  font:10px var(--font);padding:2px 7px;border:1px solid var(--warn);color:var(--warn);
+  border-radius:4px;text-transform:uppercase;letter-spacing:.5px;
+}
+.seg{display:flex;border:1px solid var(--line-strong);border-radius:4px;overflow:hidden}
+.seg button{border:0;background:var(--panel);color:var(--dim);padding:4px 10px;font:11px var(--font);cursor:pointer;text-transform:capitalize}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button.on{background:var(--accent-2);color:#fff;font-weight:600}
+
+/* ============ Card ============ */
+.card{
+  display:grid;grid-template-columns:300px 380px;min-height:400px;
+  background:var(--panel);border:1px solid var(--line);border-radius:8px;
+  box-shadow:var(--shadow);overflow:hidden;
+}
+
+/* brand panel */
+.brand{
+  background:var(--brand-bg);color:var(--brand-tx);padding:28px 24px;
+  display:flex;flex-direction:column;
+}
+.brand .logo{font-size:19px;font-weight:700;color:#fff;letter-spacing:.4px}
+.brand .logo em{font-style:normal;color:var(--accent-2)}
+.brand .tag{margin-top:10px;font-size:12px;line-height:1.6}
+.brand .foot{margin-top:auto;font:10.5px var(--mono);color:var(--brand-tx);opacity:.75;line-height:1.8}
+.brand ul{margin:14px 0 0;padding:0;list-style:none;font-size:11.5px;line-height:2}
+.brand li::before{content:"▸ ";color:var(--accent-2)}
+
+/* form panel */
+.form{display:flex;flex-direction:column;padding:26px 28px}
+.form h1{margin:0;font-size:16px;font-weight:650}
+.form .sub{font-size:11.5px;color:var(--dim);margin:2px 0 18px}
+label.f{display:block;margin-bottom:12px}
+label.f span{display:block;font:10.5px var(--font);font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--faint);margin-bottom:4px}
+input,select{
+  width:100%;padding:7px 10px;font:13px var(--font);
+  background:var(--form);color:var(--tx);border:1px solid var(--line-strong);border-radius:4px;
+}
+input:focus,select:focus{outline:2px solid var(--accent-2);outline-offset:-1px;border-color:var(--accent-2)}
+.signin{
+  width:100%;padding:8px;margin-top:4px;font:13.5px var(--font);font-weight:600;
+  background:var(--accent-2);color:#fff;border:1px solid var(--accent-2);border-radius:4px;cursor:pointer;
+}
+.signin:hover{filter:brightness(1.08)}
+.alert{
+  display:flex;gap:8px;align-items:center;margin:0 0 14px;padding:6px 10px;
+  background:var(--bad-bg);border:1px solid var(--bad);border-left-width:3px;border-radius:4px;
+  font-size:12px;color:var(--bad);
+}
+.alert b{font-family:var(--mono)}
+.hint{margin-top:auto;padding-top:14px;border-top:1px solid var(--line);font:10.5px var(--mono);color:var(--faint);line-height:1.8}
+.hint b{color:var(--dim);font-weight:600}
+.roles{display:flex;gap:6px;margin-top:8px}
+.roles .r{flex:1;text-align:center;padding:3px;border:1px solid var(--line);border-radius:4px;font:10.5px var(--mono);color:var(--dim)}
+.roles .r b{display:block;color:var(--tx)}
+
+footer{position:fixed;bottom:12px;left:0;right:0;text-align:center;font:10.5px var(--mono);color:var(--faint)}
+@media (max-width:780px){.card{grid-template-columns:1fr}.brand{display:none}}
+</style>
+</head>
+<body>
+
+<div class="corner">
+  <span class="env">aurora_energy · dev</span>
+  <div class="seg" id="themeSeg"><button data-t="light">light</button><button data-t="dark">dark</button><button data-t="auto">auto</button></div>
+</div>
+
+<div class="card">
+  <div class="brand">
+    <div class="logo">TARYX <em>Operator Console</em></div>
+    <div class="tag">Retail energy billing, financial ledger and safe migration platform.</div>
+    <ul>
+      <li>Explainable itemised bills</li>
+      <li>Balanced sealed journals</li>
+      <li>Shadow-engine cutover gates</li>
+    </ul>
+    <div class="foot">build r2026.11<br>policy au_nem-retail-catalogue/2026-10-25.3</div>
+  </div>
+
+  <form class="form" onsubmit="return false">
+    <h1>Sign in</h1>
+    <div class="sub">Operator workstation — session auth, CSRF protected</div>
+
+    <!-- demo of the error state; hidden in the happy path -->
+    <div class="alert" role="alert"><b>PERMISSION_DENIED</b> role “viewer” cannot bill accounts</div>
+
+    <label class="f"><span>User</span>
+      <select>
+        <option selected>operator</option>
+        <option>approver</option>
+        <option>viewer</option>
+      </select>
+    </label>
+    <label class="f"><span>Password</span>
+      <input type="password" value="············" autocomplete="off">
+    </label>
+    <button class="signin">Sign in</button>
+
+    <div class="hint">
+      dev identities: <b>taryx-&lt;role&gt;</b>
+      <div class="roles">
+        <span class="r"><b>viewer</b>read-only</span>
+        <span class="r"><b>operator</b>ingest·rate·bill</span>
+        <span class="r"><b>approver</b>quarantine·cutover</span>
+      </div>
+    </div>
+  </form>
+</div>
+
+<footer>taryx operator portal · design demo · static mock</footer>
+
+<script>
+(function(){
+  const seg=document.getElementById('themeSeg'),root=document.documentElement;
+  function apply(t){root.dataset.theme=t;localStorage.setItem('taryx-demo-theme',t);
+    seg.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));}
+  seg.addEventListener('click',e=>{if(e.target.dataset.t)apply(e.target.dataset.t)});
+  apply(localStorage.getItem('taryx-demo-theme')||'auto');
+})();
+</script>
+</body>
+</html>

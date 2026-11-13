@@ -21,7 +21,7 @@ Task sections own status; index icons mirror them. See the [documentation guide]
 - ✅ [TAR-013 — Demonstrate two isolated client instances](#tar-013)
 - ✅ [TAR-014 — Freeze the bounded market workflow](#tar-014)
 - ✅ [TAR-015 — Implement market adapter and counterparty simulator](#tar-015)
-- 📋 [TAR-016 — Verify recovery and correlated diagnostics](#tar-016)
+- ✅ [TAR-016 — Verify recovery and correlated diagnostics](#tar-016)
 - 📋 [TAR-017 — Package and verify Kubernetes delivery](#tar-017)
 - 📋 [TAR-018 — Measure and present the portfolio release](#tar-018)
 - 🚧 [TAR-019 — Evaluate the multi-agent implement/review orchestrator](#tar-019)
@@ -658,7 +658,7 @@ The adapter's market outbox is separate from `billing.OutboxEvent` (operation-li
 - Area: verification
 - Milestone: M5
 - Priority: Normal
-- Status: In progress 🚧
+- Status: Done ✅
 - Depends on: TAR-015
 - References: [Contract](features/verification.md)
 
@@ -677,7 +677,9 @@ Complete real-process fault evidence and actionable operational visibility.
 
 2026-11-13 diagnostics slice: structured JSON logs with bounded labels (`request_id`/`task_id`/`operation_id`/`correlation_id` bound via contextvars; celery signal task binding; `X-Request-ID` middleware; redaction inside the formatter), `/metrics` Prometheus counters on enum statuses only, `sentry-sdk==2.74.0` with `SENTRY_DSN`-gated init and a local in-process-transport capture test (no external account). 9 tests + live verification on compose. [Evidence](evidence/m5/diagnostics.md). Fault campaign and budget runs still open.
 
-2026-11-13 fault campaign: `scripts/fault-campaign.py` drives seven real-container scenarios — `docker kill --signal=KILL` on the worker at code-level fault points (`TARYX_BILLING_PRECOMMIT_SLEEP`/`TARYX_BILLING_POSTCOMMIT_SLEEP`/`TARYX_MARKET_SUBMIT_SLEEP`), broker and market `compose stop` outages, duplicate task dispatch and an abandoned consumer lease. All seven pass: zero financial effect before commit, exactly one after commit+kill and after duplicate delivery, durable outbox admission with the API responsive during broker outage, queued intent surviving a missing consumer, the market adapter restart recovering a `draft:1` workflow to `completed` via poll-first resend, and billing completing with the market coordinator down. [Evidence](evidence/m5/fault-campaign.md) + machine-readable [jsonl](evidence/m5/fault-campaign.jsonl). The two TAR-015 exit-evidence items (live adapter restart, billing-under-market-outage) are satisfied by this campaign. Frozen budget runs still open.
+2026-11-13 fault campaign: `scripts/fault-campaign.py` drives seven real-container scenarios — `docker kill --signal=KILL` on the worker at code-level fault points (`TARYX_BILLING_PRECOMMIT_SLEEP`/`TARYX_BILLING_POSTCOMMIT_SLEEP`/`TARYX_MARKET_SUBMIT_SLEEP`), broker and market `compose stop` outages, duplicate task dispatch and an abandoned consumer lease. All seven pass: zero financial effect before commit, exactly one after commit+kill and after duplicate delivery, durable outbox admission with the API responsive during broker outage, queued intent surviving a missing consumer, the market adapter restart recovering a `draft:1` workflow to `completed` via poll-first resend, and billing completing with the market coordinator down. [Evidence](evidence/m5/fault-campaign.md) + machine-readable [jsonl](evidence/m5/fault-campaign.jsonl). The two TAR-015 exit-evidence items (live adapter restart, billing-under-market-outage) are satisfied by this campaign.
+
+2026-11-13 budget runs: `scripts/measure-budgets.py` seeds 100 R1 accounts and ingests the frozen R1 workload (180k intervals) while probing `/healthz` (`SELECT 1`) and `/metrics` (status aggregations), then times a real SIGKILL recovery. Results: R1 ingest **32.9 s** (budget ≤ 90 s), API read p95 **23.1 ms healthz / 34.7 ms metrics** during ingestion (budget ≤ 500 ms), kill-to-complete **6.8 s** with exactly one invoice (budget ≤ 60 s). [Evidence](evidence/m5/budget-runs.md) + [jsonl](evidence/m5/budget-runs.jsonl). The first R1 attempt exposed a real defect: `_apply_selection` issued ~5 queries per interval (~1M for R1) and was killed uncommitted after 20+ min; it now runs the two-phase protocol at bulk granularity (one account lock per account, per-channel candidate/current fetches, in-memory winner evaluation, `ignore_conflicts` bulk create, strict per-interval fallback for lost create-races, bulk quarantine resolution). All Done-when items now have evidence.
 
 ### Notes
 
@@ -829,8 +831,10 @@ and a direction chosen between two static candidates.
 
 Static demos built 2026-11-13 at `docs/design/` — `design-a-console.html`
 (three-pane mission console) and `design-b-suite.html` (tabbed
-master-detail suite), seeded with realistic demo data. Awaiting user
-direction before touching `web/src/App.tsx`.
+master-detail suite), seeded with realistic demo data. `login.html`
+added with a shared split-panel sign-in; both designs scaled to the
+user-approved 120% density via CSS `zoom`. User likes both directions;
+final choice pending before touching `web/src/App.tsx`.
 
 ### Notes
 

@@ -181,32 +181,132 @@ def _resolve_channels(
 def _apply_selection(batch: IngestionBatch, affected: list[tuple[int, datetime]]) -> int:
     """Publish winners for affected intervals.
 
-    Phase 1 evaluates candidates without locks — the read a racing publisher
-    would have made. Phase 2 re-evaluates each interval under its
-    CurrentInterval row lock (created on first publication via insert retry),
-    so commits that landed mid-flight are seen before anything is written.
+    The per-interval work runs at bulk granularity: each involved account
+    row is locked once up front (row locks hold to the outer commit, so
+    per-interval re-locking was repeated work rather than extra safety),
+    then candidates and existing current rows are fetched per channel —
+    after the account locks, so a racing publication that holds those
+    locks commits its candidates before our reads. New currents go through
+    one ignore-conflicts insert; any interval whose create lost a race, or
+    whose settled row does not match the intended winner, falls back to
+    the strict per-interval path which re-reads under its row lock.
     """
+    channel_ids = {channel_id for channel_id, _ in affected}
+    ends_by_channel: dict[int, list[datetime]] = {}
     for channel_id, interval_end in affected:
-        select_current(
-            list(
-                IntervalRecord.objects.filter(channel_id=channel_id, interval_end_utc=interval_end)
+        ends_by_channel.setdefault(channel_id, []).append(interval_end)
+
+    def fetch_candidates() -> dict[tuple[int, datetime], list[IntervalRecord]]:
+        grouped: dict[tuple[int, datetime], list[IntervalRecord]] = {}
+        for channel_id, ends in ends_by_channel.items():
+            for record in IntervalRecord.objects.filter(
+                channel_id=channel_id, interval_end_utc__in=ends
+            ):
+                grouped.setdefault((channel_id, record.interval_end_utc), []).append(record)
+        return grouped
+
+    # Phase 1 evaluates candidates without locks — the read a racing
+    # publisher would have made. Results are discarded; phase 2 re-reads.
+    stale = fetch_candidates()
+    for key in affected:
+        select_current(stale.get(key, []))
+
+    accounts = dict(
+        MeterChannel.objects.filter(pk__in=channel_ids).values_list(
+            "pk", "supply_point__account_id"
+        )
+    )
+    list(
+        Account.objects.select_for_update()
+        .filter(pk__in=set(accounts.values()))
+        .order_by("pk")
+        .values_list("pk", flat=True)
+    )
+
+    currents: dict[tuple[int, datetime], CurrentInterval] = {}
+    for channel_id, ends in ends_by_channel.items():
+        for current in (
+            CurrentInterval.objects.select_for_update()
+            .filter(channel_id=channel_id, interval_end_utc__in=ends)
+            .order_by("interval_end_utc")
+        ):
+            currents[(channel_id, current.interval_end_utc)] = current
+    # Phase 2 re-read under the locks so commits that landed mid-flight
+    # are seen before anything is written.
+    grouped = fetch_candidates()
+
+    creates: list[CurrentInterval] = []
+    updates: list[CurrentInterval] = []
+    intended: dict[tuple[int, datetime], int] = {}
+    conflicts: list[tuple[int, datetime]] = []
+    for key in affected:
+        winner, conflict = select_current(grouped.get(key, []))
+        if conflict or winner is None:
+            conflicts.append(key)
+            continue
+        intended[key] = winner.id
+        settled_current = currents.get(key)
+        if settled_current is None:
+            creates.append(
+                CurrentInterval(
+                    channel_id=key[0],
+                    interval_end_utc=key[1],
+                    value=winner.value,
+                    quality=winner.quality,
+                    source_record=winner,
+                )
             )
+        else:
+            # An equivalent effective selection — same value, quality and
+            # precedence, only a newer batch identity — retains the original
+            # source pointer (see _publish_interval).
+            incumbent = settled_current.source_record
+            equivalent = (
+                incumbent is not None
+                and settled_current.value == winner.value
+                and settled_current.quality == winner.quality
+                and precedence(incumbent) == precedence(winner)
+            )
+            if not equivalent:
+                settled_current.value = winner.value
+                settled_current.quality = winner.quality
+                settled_current.source_record = winner
+                settled_current.selection_version += 1
+                settled_current.updated_at = timezone.now()
+                updates.append(settled_current)
+
+    if creates:
+        CurrentInterval.objects.bulk_create(creates, ignore_conflicts=True)
+    if updates:
+        CurrentInterval.objects.bulk_update(
+            updates,
+            ["value", "quality", "source_record", "selection_version", "updated_at"],
         )
 
-    accounts = {
-        channel_id: account_id
-        for channel_id, account_id in MeterChannel.objects.filter(
-            pk__in={channel_id for channel_id, _ in affected}
-        ).values_list("pk", "supply_point__account_id")
-    }
     accepted = 0
-    for channel_id, interval_end in affected:
+    # Verify what actually settled: a create that lost a race (or a row a
+    # racer overwrote) is re-evaluated under its own row lock.
+    settled: dict[tuple[int, datetime], int | None] = {}
+    for channel_id, ends in ends_by_channel.items():
+        for row in CurrentInterval.objects.filter(channel_id=channel_id, interval_end_utc__in=ends):
+            settled[(channel_id, row.interval_end_utc)] = row.source_record_id
+        published = [end for end in ends if (channel_id, end) in intended]
+        if published:
+            QuarantinedInterval.objects.filter(
+                channel_id=channel_id,
+                interval_end_utc__in=published,
+                status=QuarantinedInterval.Status.OPEN,
+            ).update(status=QuarantinedInterval.Status.RESOLVED, resolved_at=timezone.now())
+    for key, winner_id in intended.items():
+        if settled.get(key) == winner_id:
+            accepted += 1
+        else:
+            accepted += _publish_interval(batch, key[0], key[1], accounts[key[0]])
+    for channel_id, interval_end in conflicts:
         for attempt in range(3):
             try:
                 with transaction.atomic():
-                    accepted += _publish_interval(
-                        batch, channel_id, interval_end, accounts[channel_id]
-                    )
+                    _publish_interval(batch, channel_id, interval_end, accounts[channel_id])
                 break
             except IntegrityError:
                 if attempt == 2:
