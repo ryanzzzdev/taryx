@@ -9,6 +9,8 @@ always resumes from durable state. Callbacks dedup on
 import hashlib
 import json
 import logging
+import os
+import time
 from datetime import datetime, timedelta
 from uuid import UUID
 
@@ -159,6 +161,16 @@ def submit_workflow(correlation_id, *, client=None, now=None) -> TransferWorkflo
         if recovered is None:
             if workflow.attempts > conf["max_attempts"]:
                 return _fail(workflow, "submit attempts exhausted")
+            # TAR-016 fault campaign hook: pause between the committed
+            # attempt marker and the network call so an external SIGKILL
+            # lands exactly where a crash would leave uncertain evidence.
+            _delay = float(os.environ.get("TARYX_MARKET_SUBMIT_SLEEP") or 0)
+            if _delay > 0:
+                logger.warning(
+                    "fault point armed",
+                    extra={"fault_point": "market.submit", "delay_s": _delay},
+                )
+                time.sleep(_delay)
             try:
                 response = client.post("/transfers", _request_body(workflow))
             except (MarketTransport, MarketHttpError) as exc:

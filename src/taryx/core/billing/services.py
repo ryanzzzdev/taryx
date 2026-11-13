@@ -10,6 +10,7 @@ completion — or nothing at all.
 import hashlib
 import logging
 import os
+import time
 from collections.abc import Callable
 from decimal import Decimal
 
@@ -39,6 +40,15 @@ ACC_EXPORT_CREDIT = "4100"
 TOPIC_ISSUE = "billing.issue"
 
 logger = logging.getLogger("taryx.billing")
+
+
+def _fault_sleep(env_var: str, name: str) -> None:
+    """TAR-016 fault-campaign hook: opt-in delay so an external SIGKILL
+    lands at a precise transaction boundary. No-op when unset."""
+    delay = float(os.environ.get(env_var) or 0)
+    if delay > 0:
+        logger.warning("fault point armed", extra={"fault_point": name, "delay_s": delay})
+        time.sleep(delay)
 
 
 class AdmissionError(ValueError):
@@ -444,9 +454,11 @@ def process_operation(
                     revised=amounts,
                 )
 
+        _fault_sleep("TARYX_BILLING_PRECOMMIT_SLEEP", "billing.precommit")
         _finish(op, BillingOperation.Status.COMPLETE)
         if os.environ.get("TARYX_BILLING_CRASH") == "before_commit":
             os._exit(1)  # test-only crash point: die before the txn commits
+    _fault_sleep("TARYX_BILLING_POSTCOMMIT_SLEEP", "billing.postcommit")
     return op
 
 

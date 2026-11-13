@@ -20,7 +20,7 @@ Task sections own status; index icons mirror them. See the [documentation guide]
 - ✅ [TAR-012 — Deliver operator migration and cutover](#tar-012)
 - ✅ [TAR-013 — Demonstrate two isolated client instances](#tar-013)
 - ✅ [TAR-014 — Freeze the bounded market workflow](#tar-014)
-- 🚧 [TAR-015 — Implement market adapter and counterparty simulator](#tar-015)
+- ✅ [TAR-015 — Implement market adapter and counterparty simulator](#tar-015)
 - 📋 [TAR-016 — Verify recovery and correlated diagnostics](#tar-016)
 - 📋 [TAR-017 — Package and verify Kubernetes delivery](#tar-017)
 - 📋 [TAR-018 — Measure and present the portfolio release](#tar-018)
@@ -598,7 +598,7 @@ Contract-only task — no runtime code yet; TAR-015 implements the coordinator s
 - Area: integration
 - Milestone: M4
 - Priority: Normal
-- Status: In progress 🚧
+- Status: Done ✅
 - Depends on: TAR-013, TAR-014
 - References: [Contract](features/market-integration.md), [Decision 005](decisions/005-market-workflow-contract.md)
 
@@ -613,6 +613,8 @@ Complete one durable market workflow across owned adapter and external test doub
 - Uncertain outcomes reconcile; unrelated core work stays responsive; M4 exit evidence is recorded.
 
 ### Completion evidence
+
+2026-11-13: the two remaining exit-evidence items are satisfied by the TAR-016 fault campaign — `market-adapter-restart` (worker killed between the durable attempt marker and the counterparty POST; `draft:1` recovered to `completed` by the restarted worker's poll-first sweep) and `billing-under-market-outage` (billing op completed while the market coordinator was stopped). [Evidence](evidence/m5/fault-campaign.md). All Done-when items now have evidence.
 
 Round 5 at `98fad76`: **approved** remediation; M4-F8 resolved, 28 preserved/31 expanded probes pass and live imported modules match. Remains In progress for explicit market-outage billing availability and live adapter-restart exit evidence (or accepted allocation to TAR-016). No new code finding. [Review](evidence/m4/m4-review-r5.md).
 
@@ -674,6 +676,8 @@ Complete real-process fault evidence and actionable operational visibility.
 ### Completion evidence
 
 2026-11-13 diagnostics slice: structured JSON logs with bounded labels (`request_id`/`task_id`/`operation_id`/`correlation_id` bound via contextvars; celery signal task binding; `X-Request-ID` middleware; redaction inside the formatter), `/metrics` Prometheus counters on enum statuses only, `sentry-sdk==2.74.0` with `SENTRY_DSN`-gated init and a local in-process-transport capture test (no external account). 9 tests + live verification on compose. [Evidence](evidence/m5/diagnostics.md). Fault campaign and budget runs still open.
+
+2026-11-13 fault campaign: `scripts/fault-campaign.py` drives seven real-container scenarios — `docker kill --signal=KILL` on the worker at code-level fault points (`TARYX_BILLING_PRECOMMIT_SLEEP`/`TARYX_BILLING_POSTCOMMIT_SLEEP`/`TARYX_MARKET_SUBMIT_SLEEP`), broker and market `compose stop` outages, duplicate task dispatch and an abandoned consumer lease. All seven pass: zero financial effect before commit, exactly one after commit+kill and after duplicate delivery, durable outbox admission with the API responsive during broker outage, queued intent surviving a missing consumer, the market adapter restart recovering a `draft:1` workflow to `completed` via poll-first resend, and billing completing with the market coordinator down. [Evidence](evidence/m5/fault-campaign.md) + machine-readable [jsonl](evidence/m5/fault-campaign.jsonl). The two TAR-015 exit-evidence items (live adapter restart, billing-under-market-outage) are satisfied by this campaign. Frozen budget runs still open.
 
 ### Notes
 

@@ -131,6 +131,13 @@ services:
     command: celery -A taryx.config.celery:app worker -B --loglevel=INFO --without-gossip --without-mingle --without-heartbeat
     environment:
       <<: *taryx-env
+      # TAR-016 fault hooks — armed only while scripts/fault-campaign.py
+      # runs; unset everywhere else. Kept off the shared anchors so the
+      # api/drain paths stay unfaulted during recovery.
+      TARYX_BILLING_PRECOMMIT_SLEEP: ${TARYX_BILLING_PRECOMMIT_SLEEP:-}
+      TARYX_BILLING_POSTCOMMIT_SLEEP: ${TARYX_BILLING_POSTCOMMIT_SLEEP:-}
+      TARYX_BILLING_CRASH: ${TARYX_BILLING_CRASH:-}
+      TARYX_MARKET_SUBMIT_SLEEP: ${TARYX_MARKET_SUBMIT_SLEEP:-}
     depends_on:
       db:
         condition: service_healthy
