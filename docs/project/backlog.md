@@ -25,7 +25,7 @@ Task sections own status; index icons mirror them. See the [documentation guide]
 - ✅ [TAR-017 — Package and verify Kubernetes delivery](#tar-017)
 - 📋 [TAR-018 — Measure and present the portfolio release](#tar-018)
 - 🚧 [TAR-019 — Evaluate the multi-agent implement/review orchestrator](#tar-019)
-- 🚧 [TAR-020 — Design the operator portal UI](#tar-020)
+- ✅ [TAR-020 — Design the operator portal UI](#tar-020)
 
 ## Delivery notes
 
@@ -810,7 +810,7 @@ round including DB access.
 - Area: portal
 - Milestone: Not assigned
 - Priority: Normal
-- Status: In progress 🚧
+- Status: Done ✅
 - Depends on: None
 - References: [design demos](../design/index.html)
 
@@ -833,8 +833,20 @@ Static demos built 2026-11-13 at `docs/design/` — `design-a-console.html`
 (three-pane mission console) and `design-b-suite.html` (tabbed
 master-detail suite), seeded with realistic demo data. `login.html`
 added with a shared split-panel sign-in; both designs scaled to the
-user-approved 120% density via CSS `zoom`. User likes both directions;
-final choice pending before touching `web/src/App.tsx`.
+user-approved 120% density via CSS `zoom`.
+
+**Design B selected by the user 2026-11-13** and applied to the live
+portal: `web/src/theme.css` carries the token-based light/dark/auto
+theme, and `web/src/App.tsx` was restructured into the masthead +
+master-detail + side-column suite layout (quarantine, migration and
+audit panels) behind the unchanged GraphQL contract and role guards.
+Verified in the real app: `npm run typecheck`, `npm test` (6/6) and
+`npm run build` all pass; the containerised portals on :5174/:5175
+serve the new theme and code; theme mechanism confirmed end-to-end —
+the segment control writes `data-theme` to `<html>`, persists under
+the shared `taryx-demo-theme` localStorage key, and all three
+`[data-theme]` token blocks are served by the dev server. Login,
+`me` and `accounts` queries verified live through the portal proxy.
 
 ### Notes
 
