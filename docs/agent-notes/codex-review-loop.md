@@ -59,10 +59,10 @@ For each milestone M{N}, after implementation and its commit:
      resume <session-id> \
      --output-schema docs/project/evidence/verdict.schema.json \
      --json \
-     -o docs/project/evidence/m{N}-verdict-r{R}.json \
+     -o docs/project/evidence/m{N}/m{N}-verdict-r{R}.json \
      "M{N} implementation is committed at <sha>. Review per our
       conventions: write findings to
-      docs/project/evidence/m{N}-independent-review.md plus runnable
+      docs/project/evidence/m{N}/m{N}-independent-review.md plus runnable
       pytest probes, and update affected project records. Do not
       commit."
    ```
@@ -70,7 +70,7 @@ For each milestone M{N}, after implementation and its commit:
    Exec-level options (`-C`, `--approve-for-me`, `-c`) go **before**
    `resume` — they are not resume's own options. `--json` tees the
    event stream to stdout (capture it into
-   `m{N}-events-r{R}.jsonl`); `--output-schema` constrains the final
+   `m{N}/m{N}-events-r{R}.jsonl`); `--output-schema` constrains the final
    message, which `-o` saves — the verdict is a JSON artifact, not a
    prose marker. The human-readable review lives in the repo files
    Codex writes, not in `-o`.
@@ -84,7 +84,7 @@ For each milestone M{N}, after implementation and its commit:
      "You are the independent reviewer for Taryx milestone M{N}.
       Review conventions live in docs/project/documentation-guide.md
       and docs/agent-notes/. Reply READY." \
-     -o docs/project/evidence/m{N}-session-bootstrap.md
+     -o docs/project/evidence/m{N}/m{N}-session-bootstrap.md
    ```
 
    Record the new session id (from the `--json` event stream or
@@ -151,7 +151,7 @@ window mid-round, as happened at foundation R4 on 2026-11-08.
 
 On any interrupted turn:
 
-1. Keep the partial `m{N}-events-r{R}.jsonl` — it records how far the
+1. Keep the partial `m{N}/m{N}-events-r{R}.jsonl` — it records how far the
    turn got, and the `turn.failed` payload carries the error and any
    suggested retry time.
 2. Record the stop state in the journal: milestone, session id, round,

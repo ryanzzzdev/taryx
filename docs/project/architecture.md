@@ -1,8 +1,8 @@
 # Taryx architecture
 
-Current independent verification at `db18588`: one cutover evidence-update race remains (F2); see [review](evidence/m3-independent-review.md). Other prior finding probes pass.
+Current independent verification at `db18588`: one cutover evidence-update race remains (F2); see [review](evidence/m3/m3-independent-review.md). Other prior finding probes pass.
 Date: 2026-10-25
-Status: Planning baseline. Concept choices are accepted through the user's agreement with the reviewed project direction. Detailed contracts below are design selections within the requested planning work, subject to the named verification gates. M1 implementation is verified against the original review findings. M2 findings from the [independent review](evidence/m2-independent-review.md) are remediated and re-verified. Unimplemented sections remain design intent.
+Status: Planning baseline. Concept choices are accepted through the user's agreement with the reviewed project direction. Detailed contracts below are design selections within the requested planning work, subject to the named verification gates. M1 implementation is verified against the original review findings. M2 findings from the [independent review](evidence/m2/m2-independent-review.md) are remediated and re-verified. Unimplemented sections remain design intent.
 
 See [overview and Kraken sources](../../README.md), [scope decision](decisions/002-scope-and-architecture.md), [roadmap](roadmap.md) and [backlog](backlog.md).
 
@@ -71,15 +71,15 @@ A calculation is pinned to meter revision selection, tariff/agreement versions, 
 ## Legacy migration boundary
 
 Current verification (2026-11-08 UTC): M3 approved at `64ace7dda5a44ddede4a91f74d54eb85e03bfbe8`;
-[resumed independent review](evidence/m3-re-review.md#round-two-resumed-independent-verification).
+[resumed independent review](evidence/m3/m3-re-review.md#round-two-resumed-independent-verification).
 Malformed authoritative responses finish billing operations FAILED without
 financial issuance; SHADOW failures persist INCONCLUSIVE gate evidence through
 the same restricted writer as explicit comparison attempts. Transient failures
 remain PENDING for retry. Historical review statements below are superseded.
 
-Re-review at `f9f21df`: complete gate validation, successive source-change generations and malformed-value handling remain unverified/failed; see F1–F4 in the [review](evidence/m3-independent-review.md).
+Re-review at `f9f21df`: complete gate validation, successive source-change generations and malformed-value handling remain unverified/failed; see F1–F4 in the [review](evidence/m3/m3-independent-review.md).
 
-Implementation review at `c06e1fc` leaves this contract partially verified: policy preservation, commit-safe gate freshness, legacy version identity, recovery and financial generation identity need remediation. See [independent M3 review](evidence/m3-independent-review.md).
+Implementation review at `c06e1fc` leaves this contract partially verified: policy preservation, commit-safe gate freshness, legacy version identity, recovery and financial generation identity need remediation. See [independent M3 review](evidence/m3/m3-independent-review.md).
 
 Both calculators receive the same immutable input snapshot. The legacy service returns calculation evidence only; core remains the single invoice/ledger writer for this demonstration. This is a migration of calculation responsibility, not a claim to migrate an entire historical accounting database.
 
@@ -105,8 +105,8 @@ AWS EKS, Terraform, ArgoCD and public hosting are future options. They are Krake
 
 ## M4 independent verification — 2026-11-08
 
-At `2dbc5b0`, client policy composition is present, but credential isolation and the market adapter ownership/recovery contracts are not yet satisfied. TAR-013/TAR-015 reopened for [M4-F1–F8](evidence/m4-independent-review.md); intended boundaries above remain the contract, not verified implementation guarantees. M3 approval is unchanged.
+At `2dbc5b0`, client policy composition is present, but credential isolation and the market adapter ownership/recovery contracts are not yet satisfied. TAR-013/TAR-015 reopened for [M4-F1–F8](evidence/m4/m4-independent-review.md); intended boundaries above remain the contract, not verified implementation guarantees. M3 approval is unchanged.
 
-M4 round 2 at `d1831219` (2026-11-08): the reported superuser and broker-admin escalation paths are resolved, but shared runtime shadow credentials still cross databases (M4-F9). Crash recovery and validated core outcomes remain incomplete (M4-F5/F7/F8). [Independent evidence](evidence/m4-independent-review.md#round-2--independent-verification-2026-11-08); intended architecture is not yet fully verified.
+M4 round 2 at `d1831219` (2026-11-08): the reported superuser and broker-admin escalation paths are resolved, but shared runtime shadow credentials still cross databases (M4-F9). Crash recovery and validated core outcomes remain incomplete (M4-F5/F7/F8). [Independent evidence](evidence/m4/m4-independent-review.md#round-2--independent-verification-2026-11-08); intended architecture is not yet fully verified.
 
-M4 round 3 at `4b65cf58` (2026-11-08): accounts services now own all supply-point market-state writes, and client-specific shadow roles enforce the observed database boundary. Consumer schema/deduplication and retry validation/budget remain incomplete (F7/F8/F10); live image identities differ (F11). [Review](evidence/m4-independent-review.md#round-3--independent-verification-2026-11-08). M3 approval unchanged. R3 remediation (2026-11-08): `pending_transfer_id` correlation dedup in the accounts consumer, boolean `last_seq` rejection, POST-count attempt budget, and one shared `taryx-app:latest` image digest across both clients.
+M4 round 3 at `4b65cf58` (2026-11-08): accounts services now own all supply-point market-state writes, and client-specific shadow roles enforce the observed database boundary. Consumer schema/deduplication and retry validation/budget remain incomplete (F7/F8/F10); live image identities differ (F11). [Review](evidence/m4/m4-independent-review.md#round-3--independent-verification-2026-11-08). M3 approval unchanged. R3 remediation (2026-11-08): `pending_transfer_id` correlation dedup in the accounts consumer, boolean `last_seq` rejection, POST-count attempt budget, and one shared `taryx-app:latest` image digest across both clients.

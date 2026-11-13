@@ -1,0 +1,35 @@
+{
+  "reviewed_sha": "2704f119c5eba16c284fe93ffd5f86ba5d832847",
+  "verdict": "APPROVED",
+  "summary": "F1–F4 resolved. Required checks passed: 155 backend tests, 6 frontend tests and 25 independent probes. Review and affected records updated; no commit made.",
+  "findings": [],
+  "checks": [
+    {
+      "command": "UV_CACHE_DIR=/tmp/taryx-review-uv make check",
+      "outcome": "passed",
+      "evidence_path": "docs/project/evidence/m1/m1-independent-review.md"
+    },
+    {
+      "command": ".venv/bin/pytest -q docs/project/evidence/m1/m1_authoritative_probes.py docs/project/evidence/m1/m1_foundation_probes.py docs/project/evidence/m1/m1_followup_probes.py docs/project/evidence/m1/m1_review_probes.py docs/project/evidence/m2/m2_review_probes.py docs/project/evidence/m2/m2_followup_probes.py -c pyproject.toml --tb=short",
+      "outcome": "passed",
+      "evidence_path": "docs/project/evidence/m1/m1-independent-review.md"
+    },
+    {
+      "command": "git diff --check",
+      "outcome": "passed",
+      "evidence_path": "docs/project/evidence/m1/m1-independent-review.md"
+    }
+  ],
+  "verification_gaps": [
+    "No fresh interactive browser session; verified through source, API and frontend checks.",
+    "No fresh real broker outage or after-commit/before-ack worker-kill verification.",
+    "Hosted CI, deployment and broader operational readiness were not verified."
+  ],
+  "artifacts": [
+    "docs/project/evidence/m1/m1-independent-review.md",
+    "docs/project/backlog.md",
+    "docs/project/roadmap.md",
+    "docs/project/features/operator-and-clients.md",
+    "docs/project/journal/2026-11.md"
+  ]
+}

@@ -28,6 +28,7 @@ docs/project/
   features/*.md                  Behaviour and acceptance specifications, when needed
   decisions/001-short-title.md    Significant decisions and their reasoning
   evidence/<topic>/              Sanitised verification findings, when needed
+                                 (one folder per review unit: m1/, m2/, m3/...)
   journal/YYYY-MM.md             Historical work outcomes and verification
 ```
 

@@ -1,7 +1,7 @@
 # Legacy comparison and cohort migration
 
 Latest verification (2026-11-08 UTC): **approved** at `64ace7dda5a44ddede4a91f74d54eb85e03bfbe8`.
-TAR-010–012 are verified complete within the [review limits](../evidence/m3-re-review.md#round-two-resumed-independent-verification).
+TAR-010–012 are verified complete within the [review limits](../evidence/m3/m3-re-review.md#round-two-resumed-independent-verification).
 Missing import usage or daily supply fails response validation. Malformed
 legacy billing responses terminate the operation as FAILED without issuance;
 SHADOW failures persist INCONCLUSIVE gate evidence before propagating. Timeout
@@ -12,13 +12,13 @@ Latest verification (2026-11-08): **changes requested** at `7d6c633`;
 M3-RR-F1/F2 remediated the same day — strict per-field line validation and
 import-usage completeness reconciliation route malformed responses through
 INCONCLUSIVE evidence and a terminal FAILED operation rather than issuing
-partial invoices or retrying forever. [Fresh independent review](../evidence/m3-re-review.md).
+partial invoices or retrying forever. [Fresh independent review](../evidence/m3/m3-re-review.md).
 Earlier verification statements below are historical.
 
-Current independent verification at `db18588`: one cutover evidence-update race remains (F2); see [review](../evidence/m3-independent-review.md). Other prior finding probes pass.
+Current independent verification at `db18588`: one cutover evidence-update race remains (F2); see [review](../evidence/m3/m3-independent-review.md). Other prior finding probes pass.
 Date: 2026-10-25
-Status: implemented but reopened by [independent M3 review](../evidence/m3-independent-review.md); TAR-010/011/012 are not verified complete. Independent `legacy-sim` service (own sqlite schema, protocol `taryx-legacy/1`, catalogue `L-2003.4`) with characterised heritage GST-exempt policy and FIT-TRUNC-2003 defect (TAR-010); comparison evidence, scoped decisions and frozen cutover gates (TAR-011); routing-pinned billing, GraphQL controls, portal journey and audited transitions (TAR-012). Fictional policies and legacy defects are test scenarios, not Australian regulations.
-Current verification at `f9f21df`: latest-failure gating, complete approval revalidation, rollback corrections and malformed-value handling remain unresolved; see [review](../evidence/m3-independent-review.md).
+Status: implemented but reopened by [independent M3 review](../evidence/m3/m3-independent-review.md); TAR-010/011/012 are not verified complete. Independent `legacy-sim` service (own sqlite schema, protocol `taryx-legacy/1`, catalogue `L-2003.4`) with characterised heritage GST-exempt policy and FIT-TRUNC-2003 defect (TAR-010); comparison evidence, scoped decisions and frozen cutover gates (TAR-011); routing-pinned billing, GraphQL controls, portal journey and audited transitions (TAR-012). Fictional policies and legacy defects are test scenarios, not Australian regulations.
+Current verification at `f9f21df`: latest-failure gating, complete approval revalidation, rollback corrections and malformed-value handling remain unresolved; see [review](../evidence/m3/m3-independent-review.md).
 Tasks: [TAR-010](../backlog.md#tar-010), [TAR-011](../backlog.md#tar-011), [TAR-012](../backlog.md#tar-012).
 
 ## Scope and authority

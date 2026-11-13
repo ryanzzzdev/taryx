@@ -1,0 +1,60 @@
+{
+  "reviewed_sha": "c88b722f30526d8c57aef7ff89634ecd8a1fa983",
+  "verdict": "CHANGES_REQUESTED",
+  "summary": "Recorded three findings and two failing regression probes. Updated affected records; no commit made. Requested M1 scope maps to canonical M2.",
+  "findings": [
+    {
+      "id": "F1",
+      "severity": "medium",
+      "location": "src/taryx/core/billing/migrations/0002_financial_integrity.py:44",
+      "explanation": "Empty journals commit without triggering the minimum-posting/balance check, then seal permanently. PostgreSQL probe reproduces this."
+    },
+    {
+      "id": "F2",
+      "severity": "high",
+      "location": "src/taryx/core/billing/services.py:437–450",
+      "explanation": "A failing oldest outbox event aborts every drain, indefinitely starving later healthy operations. Repeated-drain probe reproduces this."
+    },
+    {
+      "id": "F3",
+      "severity": "medium",
+      "location": "web/src/App.tsx:429–454",
+      "explanation": "The portal shows totals and ledger legs but omits pinned bill line-item provenance, preventing the required bill-explanation journey."
+    }
+  ],
+  "checks": [
+    {
+      "command": "UV_CACHE_DIR=/tmp/taryx-review-uv make check",
+      "outcome": "passed",
+      "evidence_path": "docs/project/evidence/m1/m1-independent-review.md"
+    },
+    {
+      "command": ".venv/bin/pytest -q tests/test_billing.py --tb=short",
+      "outcome": "passed",
+      "evidence_path": "docs/project/evidence/m1/m1-independent-review.md"
+    },
+    {
+      "command": ".venv/bin/pytest -q docs/project/evidence/m1/m1_review_probes.py docs/project/evidence/m2/m2_review_probes.py docs/project/evidence/m2/m2_followup_probes.py -c pyproject.toml --tb=short",
+      "outcome": "passed",
+      "evidence_path": "docs/project/evidence/m1/m1-independent-review.md"
+    },
+    {
+      "command": ".venv/bin/pytest -q docs/project/evidence/m1/m1_foundation_probes.py -c pyproject.toml --tb=short",
+      "outcome": "failed",
+      "evidence_path": "docs/project/evidence/m1/m1-independent-review.md"
+    }
+  ],
+  "verification_gaps": [
+    "No fresh browser automation; F3 confirmed through source inspection.",
+    "Real broker interruption and worker termination after commit/before acknowledgement were not exercised.",
+    "Hosted CI, deployment and throughput campaigns were outside this local review."
+  ],
+  "artifacts": [
+    "docs/project/evidence/m1/m1-independent-review.md",
+    "docs/project/evidence/m1/m1_foundation_probes.py",
+    "docs/project/backlog.md",
+    "docs/project/roadmap.md",
+    "docs/project/features/operator-and-clients.md",
+    "docs/project/journal/2026-11.md"
+  ]
+}

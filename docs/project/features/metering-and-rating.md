@@ -1,7 +1,7 @@
 # Metering and rating
 
 Date: 2026-10-25
-Status: Supported subset, time conventions and numeric profile frozen by TAR-004 on 2026-10-25; quality-method and 400-record semantics corrected the same day after the [independent M1 review](../evidence/m1-exit-review.md) against MDFF v2.7. [BLK-001](../blockers.md#blk-001) resolved. Reference cases live in [rating-reference-cases.md](rating-reference-cases.md).
+Status: Supported subset, time conventions and numeric profile frozen by TAR-004 on 2026-10-25; quality-method and 400-record semantics corrected the same day after the [independent M1 review](../evidence/m1/m1-exit-review.md) against MDFF v2.7. [BLK-001](../blockers.md#blk-001) resolved. Reference cases live in [rating-reference-cases.md](rating-reference-cases.md).
 Tasks: [TAR-004](../backlog.md#tar-004), [TAR-005](../backlog.md#tar-005), [TAR-006](../backlog.md#tar-006).
 
 ## User outcome

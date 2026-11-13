@@ -1,0 +1,50 @@
+{
+  "reviewed_sha": "853842c9ba24c92aa7d487ca3546910eef7107e1",
+  "verdict": "CHANGES_REQUESTED",
+  "summary": "F7/F10/F11 reported cases pass; F8 retains a reproducible concurrency defect. Project checks pass. Records updated; no commit.",
+  "findings": [
+    {
+      "id": "M4-F8",
+      "severity": "high",
+      "location": "src/taryx/core/accounts/services.py:50-55",
+      "explanation": "The consumer validates an already-loaded supply point, then unconditionally saves registered state. If another worker delivers the old outcome and a new transfer starts after that read, the stale delivery incorrectly registers the new transfer. The expanded probe reproduces this. Make correlation validation and mutation atomic against current database state."
+    }
+  ],
+  "checks": [
+    {
+      "command": "Preserved M4 probes",
+      "outcome": "passed",
+      "evidence_path": "docs/project/evidence/m4/m4-probes-r4.txt"
+    },
+    {
+      "command": "Expanded M4 probes: 27 passed, 1 failed",
+      "outcome": "failed",
+      "evidence_path": "docs/project/evidence/m4/m4-probes-r4-expanded.txt"
+    },
+    {
+      "command": "make check: 221 backend, 6 frontend tests",
+      "outcome": "passed",
+      "evidence_path": "docs/project/evidence/m4/m4-check-r4.txt"
+    },
+    {
+      "command": "Live four-container image identity",
+      "outcome": "passed",
+      "evidence_path": "docs/project/evidence/m4/m4-container-images-r4.txt"
+    }
+  ],
+  "verification_gaps": [
+    "Live images match each other, but imported market code lacks the candidate's immediate at-cap failure branch.",
+    "No fresh-volume, live kill/restart, billing-under-outage, browser or hosted CI verification."
+  ],
+  "artifacts": [
+    "docs/project/evidence/m4/m4-review-r4.md",
+    "docs/project/evidence/m4/m4-verdict-r4.json",
+    "docs/project/evidence/m4/m4-probes/test_m4_round4.py",
+    "docs/project/evidence/m4/m4-live-source-r4.txt",
+    "docs/project/evidence/m4/m4-independent-review.md",
+    "docs/project/backlog.md",
+    "docs/project/roadmap.md",
+    "docs/project/features/market-integration.md",
+    "docs/project/journal/2026-11.md"
+  ]
+}

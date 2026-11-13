@@ -1,0 +1,49 @@
+{
+  "reviewed_sha": "c270a3223c399902d4776a1e860a885d1c35a190",
+  "verdict": "CHANGES_REQUESTED",
+  "summary": "F1 resolved. F2 and F3 remain partially unresolved. Updated review, probes and affected records; no commit made.",
+  "findings": [
+    {
+      "id": "F2",
+      "severity": "high",
+      "location": "src/taryx/core/billing/services.py:435–448",
+      "explanation": "After ten transient failures, an event is permanently excluded from normal draining. Dependency recovery leaves it PENDING with no supported operator requeue path. New probe reproduces this."
+    },
+    {
+      "id": "F3",
+      "severity": "medium",
+      "location": "web/src/App.tsx:476–490",
+      "explanation": "Legacy invoices display new-engine rating lines rather than authoritative legacy evidence. The probe produces a $8.68 legacy invoice whose displayed lines explain $8.65."
+    }
+  ],
+  "checks": [
+    {
+      "command": "UV_CACHE_DIR=/tmp/taryx-review-uv make check",
+      "outcome": "passed",
+      "evidence_path": "docs/project/evidence/m1/m1-independent-review.md"
+    },
+    {
+      "command": ".venv/bin/pytest -q docs/project/evidence/m1/m1_foundation_probes.py docs/project/evidence/m1/m1_followup_probes.py docs/project/evidence/m1/m1_review_probes.py docs/project/evidence/m2/m2_review_probes.py docs/project/evidence/m2/m2_followup_probes.py -c pyproject.toml --tb=short",
+      "outcome": "failed",
+      "evidence_path": "docs/project/evidence/m1/m1-independent-review.md"
+    },
+    {
+      "command": "git diff --check",
+      "outcome": "passed",
+      "evidence_path": "docs/project/evidence/m1/m1-independent-review.md"
+    }
+  ],
+  "verification_gaps": [
+    "No fresh browser automation; explanation checked through GraphQL and portal source.",
+    "Failure probes use synthetic calculator responses; no real broker outage or after-commit/before-ack worker kill.",
+    "Hosted CI and deployment were not exercised."
+  ],
+  "artifacts": [
+    "docs/project/evidence/m1/m1-independent-review.md",
+    "docs/project/evidence/m1/m1_followup_probes.py",
+    "docs/project/backlog.md",
+    "docs/project/roadmap.md",
+    "docs/project/features/operator-and-clients.md",
+    "docs/project/journal/2026-11.md"
+  ]
+}

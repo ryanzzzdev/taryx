@@ -1,0 +1,59 @@
+{
+  "reviewed_sha": "7d6c633285d98ed7afd0ed42c8c873a55c4f9faf",
+  "verdict": "CHANGES_REQUESTED",
+  "summary": "HEAD verified. Two high-severity findings reopen TAR-010–012. Required checks and 17 prior probes pass; three new probes fail. Records updated; no commit made.",
+  "findings": [
+    {
+      "id": "M3-RR-F1",
+      "severity": "high",
+      "location": "src/taryx/core/migration/legacy_adapter.py:144–157",
+      "explanation": "Response validation checks arithmetic but not output completeness. A response omitting usage components issued a 1.21 invoice for a snapshot whose new-engine total is 8.65. Missing output must be rejected before authoritative issuance and recorded as INCONCLUSIVE."
+    },
+    {
+      "id": "M3-RR-F2",
+      "severity": "high",
+      "location": "src/taryx/core/migration/legacy_adapter.py:130–142",
+      "explanation": "An invalid line identity such as element: [] passes parsing and crashes comparison with TypeError. No INCONCLUSIVE observation is persisted, leaving previous approved evidence eligible and the cutover gate clear. Validate protocol fields and route malformed responses through LegacyFailure."
+    }
+  ],
+  "checks": [
+    {
+      "command": "git rev-parse HEAD",
+      "outcome": "passed",
+      "evidence_path": "docs/project/evidence/m3/m3-re-review.md"
+    },
+    {
+      "command": "UV_CACHE_DIR=/tmp/taryx-review-uv make check",
+      "outcome": "passed",
+      "evidence_path": "docs/project/evidence/m3/m3-re-review.md"
+    },
+    {
+      "command": "pytest: five preserved M3 probe files (17 passed)",
+      "outcome": "passed",
+      "evidence_path": "docs/project/evidence/m3/m3-re-review.md"
+    },
+    {
+      "command": ".venv/bin/pytest -q docs/project/evidence/m3/m3_re_review_probes.py",
+      "outcome": "failed",
+      "evidence_path": "docs/project/evidence/m3/m3-re-review.md"
+    },
+    {
+      "command": "Probe lint/format, git diff --check, documentation links/status/UTF-8 verification",
+      "outcome": "passed",
+      "evidence_path": "docs/project/evidence/m3/m3-re-review.md"
+    }
+  ],
+  "verification_gaps": [
+    "No fresh interactive browser journey; frontend verification used existing tests, typecheck, build and source inspection.",
+    "Hosted CI, clean installation, container rebuild, deployment and process-kill campaigns were not performed."
+  ],
+  "artifacts": [
+    "docs/project/evidence/m3/m3-re-review.md",
+    "docs/project/evidence/m3/m3_re_review_probes.py",
+    "docs/project/evidence/m3/m3-exit-review.md",
+    "docs/project/backlog.md",
+    "docs/project/roadmap.md",
+    "docs/project/features/legacy-migration.md",
+    "docs/project/journal/2026-11.md"
+  ]
+}

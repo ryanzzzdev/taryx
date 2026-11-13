@@ -2,7 +2,7 @@
 
 Date: 2026-10-25
 Status: TAR-007/TAR-008 slices implemented and re-verified after independent-review remediation — commit-safe locked input revalidation, quarantine-aware digests, net-credit posting, transaction-scoped journal sealing, immutable rating snapshots. [Decision 003](../decisions/003-financial-and-migration-integrity.md) records the integrity model. The operator journey (TAR-009) is implemented; client isolation and remaining slices remain planning contracts.
-Re-review at `de0e08d` reopened rating snapshot/membership and browser account-recovery; remediated and re-verified — rating-line membership sealed, band windows pinned in the digest, account-scoped portal state isolated. See the [review](../evidence/m2-independent-review.md).
+Re-review at `de0e08d` reopened rating snapshot/membership and browser account-recovery; remediated and re-verified — rating-line membership sealed, band windows pinned in the digest, account-scoped portal state isolated. See the [review](../evidence/m2/m2-independent-review.md).
 Tasks: [TAR-007](../backlog.md#tar-007), [TAR-008](../backlog.md#tar-008), [TAR-009](../backlog.md#tar-009).
 
 ## Bill lifecycle
