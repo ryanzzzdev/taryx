@@ -17,6 +17,7 @@ from taryx.core.market.services import (
 from taryx.core.migration.legacy_adapter import LegacyFailure
 from taryx.core.migration.services import calculate_for_billing, routing_for
 from taryx.core.pricing.services import compute_input_digest
+from taryx.diagnostics import bind_context
 
 
 def legacy_calculator(op) -> dict:
@@ -42,12 +43,13 @@ def digest_resolver(account: Account, period_start, period_end) -> str:
 
 @shared_task(name="taryx.billing.process_operation")
 def process_billing_operation(operation_id: str) -> str:
-    return process_operation(
-        operation_id,
-        digest_resolver=digest_resolver,
-        routing_resolver=routing_for,
-        legacy_calculator=legacy_calculator,
-    ).status
+    with bind_context(operation_id=operation_id):
+        return process_operation(
+            operation_id,
+            digest_resolver=digest_resolver,
+            routing_resolver=routing_for,
+            legacy_calculator=legacy_calculator,
+        ).status
 
 
 @shared_task(name="taryx.billing.drain_outbox")
@@ -63,7 +65,8 @@ def drain_outbox_task() -> int:
 
 @shared_task(name="taryx.market.submit")
 def market_submit(correlation_id: str) -> str:
-    return submit_workflow(correlation_id).state
+    with bind_context(correlation_id=correlation_id):
+        return submit_workflow(correlation_id).state
 
 
 @shared_task(name="taryx.market.sweep")

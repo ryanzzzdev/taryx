@@ -34,6 +34,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "taryx.interfaces.middleware.RequestIdMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -112,3 +113,42 @@ CELERY_IMPORTS = ["taryx.interfaces.tasks"]
 CELERY_TASK_TRACK_STARTED = True
 CELERY_WORKER_ENABLE_REMOTE_CONTROL = False
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+CELERY_WORKER_HIJACK_ROOT_LOGGER = False
+
+# Correlated diagnostics (TAR-016): one JSON event per log record with
+# bounded labels — ts/level/logger/msg plus the request/task/operation/
+# correlation ids bound by taryx.diagnostics. Sensitive values are
+# redacted inside the formatter, not by caller discipline.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "filters": {"context": {"()": "taryx.diagnostics.ContextFilter"}},
+    "formatters": {"json": {"()": "taryx.diagnostics.JsonFormatter"}},
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "json",
+            "filters": ["context"],
+        }
+    },
+    "root": {"handlers": ["console"], "level": "WARNING"},
+    "loggers": {
+        "taryx": {"handlers": ["console"], "level": "INFO", "propagate": False},
+    },
+}
+
+# Optional Sentry capture path: active only when SENTRY_DSN is set; the
+# package is a declared dependency so local capture-path tests run
+# without any external account. Missing DSN simply disables export.
+SENTRY_DSN = os.environ.get("SENTRY_DSN", "")
+if SENTRY_DSN:
+    import sentry_sdk
+    from sentry_sdk.integrations.celery import CeleryIntegration
+    from sentry_sdk.integrations.django import DjangoIntegration
+
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        integrations=[DjangoIntegration(), CeleryIntegration()],
+        send_default_pii=False,
+        traces_sample_rate=0.0,
+    )

@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="auto">
+<head>
+<meta charset="utf-8">
+<title>Taryx — Design B · Enterprise Suite</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+/* ============ Theme tokens ============ */
+:root{
+  --font: "Inter","Segoe UI",system-ui,sans-serif;
+  --mono: "JetBrains Mono","SF Mono",ui-monospace,Consolas,monospace;
+  --fs:12.5px; --fs-s:11.5px; --fs-xs:10.5px;
+  --r:4px;
+}
+[data-theme="light"], [data-theme="auto"]{
+  --bg:#f4f5f7; --bg-panel:#ffffff; --bg-head:#f8f9fb; --bg-hover:#f0f4f9;
+  --bg-sel:#e8f0fa; --bg-stripe:#fafbfc; --bg-form:#fdfdfe;
+  --line:#dde1e6; --line-strong:#c3c9d1;
+  --tx:#20262e; --tx-dim:#5a6472; --tx-faint:#8d97a3;
+  --accent:#005fb8; --accent-2:#0a6ed1; --accent-tx:#ffffff;
+  --nav-bg:#17365d; --nav-tx:#cfdaea; --nav-sel:#ffffff;
+  --ok:#107e3e; --ok-bg:#e2f3e7; --warn:#e76500; --warn-bg:#fdeede;
+  --bad:#bb0000; --bad-bg:#fbe0e0; --info:#005fb8; --info-bg:#e0effc;
+  --credit:#7d3c98; --shadow:0 1px 3px rgba(30,40,50,.10);
+}
+@media (prefers-color-scheme: dark){ [data-theme="auto"]{
+  --bg:#10141a; --bg-panel:#171c24; --bg-head:#1c222b; --bg-hover:#222b36;
+  --bg-sel:#1d3249; --bg-stripe:#1a202a; --bg-form:#151a21;
+  --line:#2a323d; --line-strong:#3b4552;
+  --tx:#d8dee6; --tx-dim:#96a1ad; --tx-faint:#6b7580;
+  --accent:#4d9de0; --accent-2:#64b0ec; --accent-tx:#0b1118;
+  --nav-bg:#0e1d33; --nav-tx:#9db4d0; --nav-sel:#ffffff;
+  --ok:#5ecf8b; --ok-bg:#14301f; --warn:#f2a054; --warn-bg:#342310;
+  --bad:#ef7a70; --bad-bg:#381918; --info:#64b0ec; --info-bg:#152a3e;
+  --credit:#c58fe8; --shadow:0 1px 3px rgba(0,0,0,.45);
+}}
+[data-theme="dark"]{
+  --bg:#10141a; --bg-panel:#171c24; --bg-head:#1c222b; --bg-hover:#222b36;
+  --bg-sel:#1d3249; --bg-stripe:#1a202a; --bg-form:#151a21;
+  --line:#2a323d; --line-strong:#3b4552;
+  --tx:#d8dee6; --tx-dim:#96a1ad; --tx-faint:#6b7580;
+  --accent:#4d9de0; --accent-2:#64b0ec; --accent-tx:#0b1118;
+  --nav-bg:#0e1d33; --nav-tx:#9db4d0; --nav-sel:#ffffff;
+  --ok:#5ecf8b; --ok-bg:#14301f; --warn:#f2a054; --warn-bg:#342310;
+  --bad:#ef7a70; --bad-bg:#381918; --info:#64b0ec; --info-bg:#152a3e;
+  --credit:#c58fe8; --shadow:0 1px 3px rgba(0,0,0,.45);
+}
+
+/* ============ Base ============ */
+*{box-sizing:border-box}
+body{margin:0;font:var(--fs)/1.45 var(--font);color:var(--tx);background:var(--bg)}
+a{color:var(--accent-2);text-decoration:none}
+a:hover{text-decoration:underline}
+.mono{font-family:var(--mono);font-size:var(--fs-s)}
+.dim{color:var(--tx-dim)}.faint{color:var(--tx-faint)}
+.num{font-family:var(--mono);font-size:var(--fs-s);text-align:right;white-space:nowrap}
+.neg{color:var(--credit)}
+.wrap{max-width:1560px;margin:0 auto;padding:0 14px}
+
+/* ============ Masthead ============ */
+.masthead{background:var(--nav-bg);color:var(--nav-tx);height:44px;display:flex;align-items:center;gap:4px;padding:0 14px}
+.masthead .logo{font-weight:700;color:#fff;font-size:14px;letter-spacing:.4px;margin-right:14px}
+.masthead .logo em{font-style:normal;color:var(--accent-2)}
+.tabs{display:flex;height:100%}
+.tabs a{
+  display:flex;align-items:center;padding:0 14px;color:var(--nav-tx);font-size:var(--fs-s);
+  font-weight:500;border-bottom:2px solid transparent;
+}
+.tabs a:hover{text-decoration:none;color:#fff}
+.tabs a.on{color:var(--nav-sel);border-bottom-color:var(--accent-2);background:rgba(255,255,255,.06)}
+.masthead .env{font-size:var(--fs-xs);padding:1px 6px;border:1px solid var(--warn);color:var(--warn);border-radius:var(--r);text-transform:uppercase;letter-spacing:.5px;margin-left:10px}
+.masthead .right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.seg{display:flex;border:1px solid rgba(255,255,255,.25);border-radius:var(--r);overflow:hidden}
+.seg button{border:0;background:transparent;color:var(--nav-tx);padding:3px 9px;font:var(--fs-xs) var(--font);cursor:pointer;text-transform:capitalize}
+.seg button.on{background:var(--accent-2);color:#fff;font-weight:600}
+.masthead .user{font-size:var(--fs-s);color:var(--nav-tx)}
+.masthead .user b{color:#fff}
+
+/* ============ Sub-header ============ */
+.subhead{background:var(--bg-panel);border-bottom:1px solid var(--line-strong)}
+.subhead .wrap{display:flex;align-items:center;gap:14px;height:38px}
+.crumb{font-size:var(--fs-s);color:var(--tx-dim)}
+.crumb b{color:var(--tx);font-weight:600}
+.filters{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:var(--fs-xs)}
+.filters label{color:var(--tx-faint);text-transform:uppercase;letter-spacing:.4px;font-weight:600}
+.filters input,.filters select{
+  font:var(--fs-s) var(--mono);padding:2px 6px;border:1px solid var(--line-strong);
+  border-radius:var(--r);background:var(--bg-form);color:var(--tx);
+}
+.btn{
+  font:var(--fs-s) var(--font);padding:3px 10px;border:1px solid var(--line-strong);
+  border-radius:var(--r);background:var(--bg-panel);color:var(--tx);cursor:pointer;
+}
+.btn:hover{background:var(--bg-hover);border-color:var(--accent)}
+.btn.primary{background:var(--accent-2);border-color:var(--accent-2);color:#fff;font-weight:600}
+.btn:disabled{opacity:.45;cursor:default}
+.btn.xs{padding:1px 7px;font-size:var(--fs-xs)}
+
+/* ============ Layout ============ */
+.layout{display:grid;grid-template-columns:1fr 340px;gap:12px;padding:12px 0 24px}
+.col{display:flex;flex-direction:column;gap:12px;min-width:0}
+
+/* ============ Cards & fieldsets ============ */
+.card{background:var(--bg-panel);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
+.card>.head{
+  display:flex;align-items:center;gap:10px;padding:6px 12px;border-bottom:1px solid var(--line);
+  background:var(--bg-head);border-radius:var(--r) var(--r) 0 0;
+}
+.card>.head h2{margin:0;font-size:12.5px;font-weight:600}
+.card>.head .tools{margin-left:auto;display:flex;gap:6px;align-items:center}
+.card>.bd{padding:8px 12px}
+.card>.bd.flush{padding:0}
+
+fieldset.grp{
+  border:1px solid var(--line);border-radius:var(--r);margin:0 0 10px;padding:6px 10px 8px;
+  background:var(--bg-form);
+}
+fieldset.grp legend{
+  font-size:var(--fs-xs);font-weight:700;letter-spacing:.6px;text-transform:uppercase;
+  color:var(--tx-dim);padding:0 6px;
+}
+
+/* ============ Tables ============ */
+table{border-collapse:collapse;width:100%}
+caption{
+  text-align:left;font-size:var(--fs-xs);font-weight:700;letter-spacing:.6px;text-transform:uppercase;
+  color:var(--tx-faint);padding:5px 12px;border-bottom:1px solid var(--line);background:var(--bg-head);
+}
+th{
+  text-align:left;font-size:var(--fs-xs);font-weight:600;color:var(--tx-dim);
+  padding:4px 10px;border-bottom:1px solid var(--line-strong);background:var(--bg-head);white-space:nowrap;
+}
+td{padding:3.5px 10px;border-bottom:1px solid var(--line);font-size:var(--fs-s);vertical-align:top}
+tbody tr:nth-child(even){background:var(--bg-stripe)}
+tbody tr:hover td{background:var(--bg-hover)}
+tbody tr.sel td{background:var(--bg-sel);box-shadow:inset 3px 0 0 var(--accent-2)}
+tbody tr:last-child td{border-bottom:0}
+th.r,td.r{text-align:right;font-family:var(--mono);font-size:var(--fs-s)}
+td .mono{font-family:var(--mono);font-size:var(--fs-s)}
+tr.total td{border-top:1.5px solid var(--line-strong);font-weight:700;background:var(--bg-head)}
+
+/* status */
+.chip{display:inline-block;padding:0 6px;border-radius:9px;font-size:var(--fs-xs);font-weight:600;line-height:16px;white-space:nowrap}
+.c-ok{background:var(--ok-bg);color:var(--ok)}
+.c-warn{background:var(--warn-bg);color:var(--warn)}
+.c-bad{background:var(--bad-bg);color:var(--bad)}
+.c-info{background:var(--info-bg);color:var(--info)}
+.c-dim{background:var(--bg-hover);color:var(--tx-dim);border:1px solid var(--line)}
+
+/* detail header */
+.dhead{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.dhead h1{margin:0;font-size:16px;font-weight:650}
+.dhead .sub{font-size:var(--fs-s);color:var(--tx-dim)}
+
+/* property sheet: label/value grid */
+.props{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:0}
+.props .p{display:flex;padding:3px 10px 3px 0;font-size:var(--fs-s);border-bottom:1px solid var(--line)}
+.props .p b{width:92px;flex:none;color:var(--tx-faint);font-weight:500;font-size:var(--fs-xs);text-transform:uppercase;letter-spacing:.4px;padding-top:1px}
+.props .p span{font-family:var(--mono);font-size:var(--fs-s)}
+
+/* pipeline */
+.pipe{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.step{border:1px solid var(--line);border-radius:var(--r);background:var(--bg-panel)}
+.step .sh{display:flex;align-items:center;gap:7px;padding:4px 9px;border-bottom:1px solid var(--line);background:var(--bg-head);font-size:var(--fs-s);font-weight:600}
+.step .sh .n{width:15px;height:15px;border-radius:50%;background:var(--accent-2);color:#fff;font-size:10px;font-weight:700;display:inline-flex;align-items:center;justify-content:center}
+.step .sh .chip{margin-left:auto}
+.step .sb{padding:5px 9px;font-size:var(--fs-xs);font-family:var(--mono);color:var(--tx-dim);line-height:1.75}
+.step .sf{padding:4px 9px;border-top:1px solid var(--line);display:flex;gap:6px;align-items:center}
+.step textarea{width:100%;height:30px;resize:vertical;font:var(--fs-xs) var(--mono);background:var(--bg-form);color:var(--tx);border:1px solid var(--line);border-radius:var(--r);padding:3px 5px;margin:4px 0 2px}
+.step input[type=text]{font:var(--fs-xs) var(--mono);padding:2px 5px;border:1px solid var(--line);border-radius:var(--r);background:var(--bg-form);color:var(--tx);width:130px}
+
+/* side lists */
+.qitem{border:1px solid var(--warn);border-left-width:3px;border-radius:var(--r);padding:5px 8px;margin-bottom:6px}
+.qitem .qh{display:flex;gap:8px;align-items:center;font-size:var(--fs-s);font-weight:600}
+.qitem .qb{font-size:var(--fs-xs);color:var(--tx-dim);font-family:var(--mono);margin:2px 0}
+.cand{display:flex;align-items:center;gap:7px;font-size:var(--fs-xs);font-family:var(--mono);padding:1.5px 0}
+
+.diffbox{border:1px solid var(--line);border-radius:var(--r);padding:4px 8px;margin:5px 0;background:var(--bg-form)}
+.diffbox .dh{display:flex;gap:8px;align-items:center;font-size:var(--fs-s)}
+.diffbox .db{font-size:var(--fs-xs);font-family:var(--mono);color:var(--tx-dim);margin:2px 0}
+
+.audit{font-family:var(--mono);font-size:var(--fs-xs)}
+.audit td{padding:2.5px 8px 2.5px 0;border-bottom:1px solid var(--line)}
+.audit .t{color:var(--tx-faint);white-space:nowrap}
+
+/* split */
+.split{display:grid;grid-template-columns:1.6fr 1fr;gap:0}
+.split>*:first-child{border-right:1px solid var(--line)}
+.mini-cap{font-size:var(--fs-xs);font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--tx-faint);padding:5px 10px;border-bottom:1px solid var(--line);background:var(--bg-head)}
+
+@media (max-width:1100px){.layout{grid-template-columns:1fr}.pipe{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<!-- ============ Masthead ============ -->
+<div class="masthead">
+  <span class="logo">TARYX <em>Operator Console</em></span>
+  <nav class="tabs">
+    <a href="#">Overview</a>
+    <a href="#" class="on">Accounts &amp; Billing</a>
+    <a href="#">Quarantine <span class="chip c-warn" style="margin-left:5px">2</span></a>
+    <a href="#">Migration</a>
+    <a href="#">Reports</a>
+  </nav>
+  <span class="env">aurora_energy · dev</span>
+  <div class="right">
+    <div class="seg" id="themeSeg"><button data-t="light">light</button><button data-t="dark">dark</button><button data-t="auto">auto</button></div>
+    <span class="user"><b>operator</b> · operator</span>
+    <button class="btn xs">Sign out</button>
+  </div>
+</div>
+
+<!-- ============ Filter bar ============ -->
+<div class="subhead"><div class="wrap">
+  <span class="crumb">Accounts &amp; Billing <span class="faint">›</span> <b>ACC-001</b></span>
+  <div class="filters">
+    <label>Period</label>
+    <input type="text" value="2026-03-02" size="10">
+    <span class="faint">→</span>
+    <input type="text" value="2026-03-03" size="10">
+    <label>Status</label>
+    <select><option>All</option><option>Billed</option><option>Rated</option><option>Exception</option></select>
+    <button class="btn primary xs">Apply</button>
+  </div>
+</div></div>
+
+<div class="wrap"><div class="layout">
+
+  <!-- ============ Main column ============ -->
+  <div class="col">
+
+    <!-- master table -->
+    <div class="card">
+      <table>
+        <caption>Accounts — 3 records</caption>
+        <thead><tr>
+          <th>Reference</th><th>Name</th><th>NMI</th><th>Channels</th><th>Agreement</th><th>Last bill</th><th class="r">Total</th><th>Status</th>
+        </tr></thead>
+        <tbody>
+          <tr class="sel">
+            <td class="mono"><b>ACC-001</b></td><td>Meridian Heights Bakery</td>
+            <td class="mono">4102000001</td><td class="mono">E1↓ B1↑</td>
+            <td class="mono">T-FLAT-FIT</td><td class="mono">2026-03-03</td>
+            <td class="r">69.52</td><td><span class="chip c-ok">settled</span></td>
+          </tr>
+          <tr>
+            <td class="mono"><b>ACC-002</b></td><td>Collins Wharf Grocer</td>
+            <td class="mono">4102000002</td><td class="mono">E1↓</td>
+            <td class="mono">T-TOU</td><td class="mono">—</td>
+            <td class="r">—</td><td><span class="chip c-warn">rated</span></td>
+          </tr>
+          <tr>
+            <td class="mono"><b>ACC-003</b></td><td>Harbour Lane Studio</td>
+            <td class="mono">4102000003</td><td class="mono">E1↓ B1↑</td>
+            <td class="mono">T-FLAT-FIT-HERITAGE</td><td class="mono">2026-03-01</td>
+            <td class="r">71.20</td><td><span class="chip c-bad">quarantine</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- account detail -->
+    <div class="card">
+      <div class="head">
+        <div class="dhead">
+          <h1>ACC-001 — Meridian Heights Bakery</h1>
+          <span class="chip c-ok">SETTLED</span>
+          <span class="sub">arrears <b class="mono">$0.00</b></span>
+        </div>
+        <div class="tools">
+          <button class="btn xs">Export</button>
+          <button class="btn xs">History</button>
+        </div>
+      </div>
+      <div class="bd">
+        <fieldset class="grp">
+          <legend>Account</legend>
+          <div class="props">
+            <div class="p"><b>NMI</b><span>4102000001</span></div>
+            <div class="p"><b>Channels</b><span>E1 import · B1 export · 30min</span></div>
+            <div class="p"><b>Agreement</b><span>T-FLAT-FIT v1 · 2026-01-01 →</span></div>
+            <div class="p"><b>Client</b><span>aurora_energy</span></div>
+            <div class="p"><b>Cohort</b><span>Legacy Cohort A · SHADOW</span></div>
+            <div class="p"><b>Policy</b><span>au_nem-retail-catalogue/2026-10-25.3</span></div>
+          </div>
+        </fieldset>
+
+        <fieldset class="grp">
+          <legend>Billing pipeline — 2026-03-02 → 2026-03-03</legend>
+          <div class="pipe">
+            <div class="step">
+              <div class="sh"><span class="n">1</span>Ingest NEM12<span class="chip c-ok">ACCEPTED</span></div>
+              <div class="sb">
+                <input type="text" value="day1_base.nem12">
+                <textarea spellcheck="false">100|NEM12|20260302
+200|4102000001|...</textarea>
+                batch #118 · 288 accepted · 2 quarantined
+              </div>
+              <div class="sf"><button class="btn primary xs">Ingest</button></div>
+            </div>
+            <div class="step">
+              <div class="sh"><span class="n">2</span>Rate<span class="chip c-ok">RUN #41</span></div>
+              <div class="sb">
+                total <b>$69.52</b> incl GST · 3 lines<br>
+                digest a3f9c1e7b2d4…<br>
+                engine 1.4.0 · policy 2026-10-25.3
+              </div>
+              <div class="sf"><button class="btn xs">Re-rate</button></div>
+            </div>
+            <div class="step">
+              <div class="sh"><span class="n">3</span>Bill / correct<span class="chip c-ok">SUCCEEDED</span></div>
+              <div class="sb">
+                op 7c2e94d1-… polled 800ms<br>
+                → <a href="#">INV-00042</a> <b>$69.52</b><br>
+                journal J-118 balanced · sealed
+              </div>
+              <div class="sf"><button class="btn xs">Bill period</button></div>
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset class="grp" style="margin-bottom:0">
+          <legend>Issued documents</legend>
+          <div class="split">
+            <div>
+              <div class="mini-cap">INV-00042 — rating lines · run #41 · digest a3f9c1e7…</div>
+              <table>
+                <thead><tr>
+                  <th>#</th><th>Tariff</th><th>Element</th><th>Band</th><th class="r">Qty</th><th>Unit</th><th class="r">Rate</th><th class="r">Amount</th><th class="r">GST</th><th>Basis</th>
+                </tr></thead>
+                <tbody>
+                  <tr><td class="mono">1</td><td class="mono">T-FLAT-FIT</td><td>supply</td><td class="faint">—</td>
+                    <td class="r">2</td><td class="mono">day</td><td class="r">1.2500</td><td class="r">2.50</td><td class="r">0.25</td>
+                    <td class="faint" style="font-size:var(--fs-xs)">daily supply ×2d</td></tr>
+                  <tr><td class="mono">2</td><td class="mono">T-FLAT-FIT</td><td>import</td><td class="mono">flat</td>
+                    <td class="r">187.50</td><td class="mono">kWh</td><td class="r">0.3400</td><td class="r">63.75</td><td class="r">6.38</td>
+                    <td class="faint" style="font-size:var(--fs-xs)">96 int. E1</td></tr>
+                  <tr><td class="mono">3</td><td class="mono">T-FLAT-FIT</td><td>export_credit</td><td class="faint">—</td>
+                    <td class="r">42.00</td><td class="mono">kWh</td><td class="r">0.0800</td><td class="r neg">−3.36</td><td class="r">0.00</td>
+                    <td class="faint" style="font-size:var(--fs-xs)">96 int. B1</td></tr>
+                  <tr class="total"><td colspan="7">Segment 2026-03-02 → 2026-03-03</td>
+                    <td class="r">62.89</td><td class="r">6.63</td><td class="mono">$69.52</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div>
+              <div class="mini-cap">Journal J-118 — balanced · sealed</div>
+              <table>
+                <thead><tr><th>Acct</th><th>Memo</th><th class="r">Dr</th><th class="r">Cr</th></tr></thead>
+                <tbody>
+                  <tr><td class="mono">1100</td><td class="faint" style="font-size:var(--fs-xs)">receivable INV-00042</td><td class="r">69.52</td><td class="r"></td></tr>
+                  <tr><td class="mono">4000</td><td class="faint" style="font-size:var(--fs-xs)">energy+supply</td><td class="r"></td><td class="r">66.25</td></tr>
+                  <tr><td class="mono">4100</td><td class="faint" style="font-size:var(--fs-xs)">feed-in credit</td><td class="r"></td><td class="r">3.36</td></tr>
+                  <tr><td class="mono">2200</td><td class="faint" style="font-size:var(--fs-xs)">gst</td><td class="r"></td><td class="r">6.63</td></tr>
+                  <tr class="total"><td colspan="2">Σ</td><td class="r">69.52</td><td class="r">72.24</td></tr>
+                </tbody>
+              </table>
+              <div class="mini-cap">Document register</div>
+              <table>
+                <thead><tr><th>Doc</th><th>Period</th><th class="r">Total</th><th>Adj.</th></tr></thead>
+                <tbody>
+                  <tr><td class="mono"><a href="#">INV-00042</a></td><td class="mono">03-02→03-03</td><td class="r"><b>69.52</b></td><td class="mono">—</td></tr>
+                  <tr><td class="mono"><a href="#">INV-00041</a></td><td class="mono">02-27→02-28</td><td class="r">64.61</td><td class="mono"><a href="#">ADJ-00007</a> gen1 <span class="neg">Δ+4.18</span></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </fieldset>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ Side column ============ -->
+  <div class="col">
+
+    <div class="card">
+      <div class="head"><h2>Open quarantines</h2><div class="tools"><span class="chip c-warn">2 open</span></div></div>
+      <div class="bd">
+        <div class="qitem">
+          <div class="qh"><span class="mono">#91 · ACC-003·E1</span><span class="faint mono">03-02 14:00</span><span class="chip c-warn" style="margin-left:auto">conflict</span></div>
+          <div class="qb">duplicate register — revision conflict on interval end</div>
+          <div class="cand"><span>rec1187</span><b>3.42</b><span class="chip c-dim">E</span><span class="faint">est</span><button class="btn xs" style="margin-left:auto">select</button></div>
+          <div class="cand"><span>rec1203</span><b>3.41</b><span class="chip c-ok">A</span><span class="faint">actual</span><button class="btn xs" style="margin-left:auto">select</button></div>
+        </div>
+        <div class="qitem" style="margin-bottom:0">
+          <div class="qh"><span class="mono">#92 · ACC-002·E1</span><span class="faint mono">03-02 09:30</span><span class="chip c-warn" style="margin-left:auto">conflict</span></div>
+          <div class="qb">quality downgrade A→F without replacement event</div>
+          <div class="cand"><span>rec1190</span><b>1.15</b><span class="chip c-ok">A</span><button class="btn xs" style="margin-left:auto">select</button></div>
+          <div class="cand"><span>rec1199</span><b>1.18</b><span class="chip c-dim">F</span><button class="btn xs" style="margin-left:auto">select</button></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="head"><h2>Migration — Legacy Cohort A</h2><div class="tools"><span class="chip c-info">SHADOW r3</span></div></div>
+      <div class="bd">
+        <div class="props" style="grid-template-columns:1fr 1fr;margin-bottom:6px">
+          <div class="p"><b>Eval</b><span>03-01 → 03-07</span></div>
+          <div class="p"><b>Members</b><span>ACC-001, ACC-003</span></div>
+          <div class="p"><b>New eng.</b><span>r2026.11</span></div>
+          <div class="p"><b>Legacy</b><span>v9.4.2</span></div>
+        </div>
+        <div class="diffbox">
+          <div class="dh"><b class="mono">cmp#18</b><span>ACC-001</span><span class="chip c-ok">MATCHED</span></div>
+        </div>
+        <div class="diffbox">
+          <div class="dh"><b class="mono">cmp#19</b><span>ACC-003</span><span class="chip c-bad">DIFFERS</span><span class="chip c-warn" style="margin-left:auto">undecided</span></div>
+          <div class="db">supply/flat.amount: new <b>1.90</b> ≠ legacy <b>1.95</b><br>heritage supply proration over tariff change 01-15</div>
+          <div style="display:flex;gap:5px;margin-top:3px">
+            <button class="btn xs">preserve policy</button>
+            <button class="btn xs">approve correction</button>
+          </div>
+        </div>
+        <div style="display:flex;gap:5px">
+          <button class="btn xs">Start shadow</button>
+          <button class="btn primary xs">Cut over to new</button>
+          <button class="btn xs">Roll back</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="head"><h2>Audit trail — today</h2><div class="tools"><a href="#" style="font-size:var(--fs-xs)">view all</a></div></div>
+      <div class="bd">
+        <table class="audit"><tbody>
+          <tr><td class="t">14:22:07</td><td><span class="chip c-ok">ok</span></td><td>INV-00042 sealed · J-118 balanced</td></tr>
+          <tr><td class="t">14:21:55</td><td><span class="chip c-info">op</span></td><td>billAccount · op 7c2e… key persisted</td></tr>
+          <tr><td class="t">14:20:41</td><td><span class="chip c-ok">ok</span></td><td>run #41 → $69.52 · 3 lines</td></tr>
+          <tr><td class="t">14:19:02</td><td><span class="chip c-warn">q</span></td><td>batch #118 · 2 intervals quarantined</td></tr>
+          <tr><td class="t">14:18:30</td><td><span class="chip c-info">op</span></td><td>ingest day1_base.nem12 · 288 accepted</td></tr>
+          <tr><td class="t">13:55:12</td><td><span class="chip c-ok">ok</span></td><td>ADJ-00007 gen1 Δ+4.18 → INV-00041</td></tr>
+          <tr><td class="t">13:47:48</td><td><span class="chip c-info">op</span></td><td>cmp#19 DIFFERS · 1 undecided diff</td></tr>
+          <tr><td class="t">13:40:00</td><td><span class="chip c-dim">sys</span></td><td>shadow sweep · 2 comparisons</td></tr>
+        </tbody></table>
+      </div>
+    </div>
+
+  </div>
+</div></div>
+
+<script>
+(function(){
+  const seg=document.getElementById('themeSeg'), root=document.documentElement;
+  function apply(t){root.dataset.theme=t;localStorage.setItem('taryx-demo-theme',t);
+    seg.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));}
+  seg.addEventListener('click',e=>{if(e.target.dataset.t)apply(e.target.dataset.t)});
+  apply(localStorage.getItem('taryx-demo-theme')||'auto');
+})();
+</script>
+</body>
+</html>

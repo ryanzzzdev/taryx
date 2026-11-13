@@ -8,6 +8,7 @@ always resumes from durable state. Callbacks dedup on
 
 import hashlib
 import json
+import logging
 from datetime import datetime, timedelta
 from uuid import UUID
 
@@ -34,6 +35,8 @@ from taryx.core.market.models import (
 
 OUTCOMES = {"completed", "rejected"}
 State = TransferWorkflow.State
+
+logger = logging.getLogger("taryx.market")
 
 
 def _conf() -> dict:
@@ -87,6 +90,13 @@ def _fail(workflow: TransferWorkflow, detail: str) -> TransferWorkflow:
     workflow.state = State.FAILED
     workflow.detail = detail[:500]
     workflow.save()
+    logger.warning(
+        "transfer workflow failed",
+        extra={
+            "correlation_id": str(workflow.correlation_id),
+            "reason": detail[:200],
+        },
+    )
     account_services.clear_pending_transfer(workflow.supply_point, workflow.correlation_id)
     return workflow
 
@@ -264,6 +274,14 @@ def apply_callback(payload: dict, *, now=None) -> dict:
             )
         else:
             _clear_pending(workflow.supply_point, workflow.correlation_id)
+        logger.info(
+            "transfer outcome applied",
+            extra={
+                "correlation_id": str(correlation_id),
+                "outcome": outcome,
+                "seq": seq,
+            },
+        )
     return {"status": outcome}
 
 
@@ -387,4 +405,14 @@ def drain_market_outbox(*, now=None) -> int:
             event.attempts += 1
             event.last_error = str(exc)[:500]
             event.save(update_fields=["attempts", "last_error"])
+            logger.warning(
+                "market outbox delivery failed",
+                extra={
+                    "correlation_id": str(event.workflow.correlation_id),
+                    "attempt": event.attempts,
+                    "error": str(exc)[:200],
+                },
+            )
+    if delivered:
+        logger.info("market outbox drained", extra={"delivered": delivered})
     return delivered

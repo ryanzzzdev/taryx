@@ -8,6 +8,7 @@ dependencies = [
     "graphene-django==3.2.3",
     "celery==5.6.3",
     "psycopg[binary]==3.3.6",
+    "sentry-sdk==2.74.0",
 ]
 
 [dependency-groups]

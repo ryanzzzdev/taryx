@@ -8,6 +8,7 @@ completion — or nothing at all.
 """
 
 import hashlib
+import logging
 import os
 from collections.abc import Callable
 from decimal import Decimal
@@ -36,6 +37,8 @@ ACC_ENERGY_REVENUE = "4000"
 ACC_EXPORT_CREDIT = "4100"
 
 TOPIC_ISSUE = "billing.issue"
+
+logger = logging.getLogger("taryx.billing")
 
 
 class AdmissionError(ValueError):
@@ -283,6 +286,14 @@ def _finish(op: BillingOperation, status: str, detail: str = "") -> BillingOpera
     op.save(update_fields=["status", "detail", "completed_at", "invoice", "adjustment"])
     op.outbox_event.delivered_at = op.completed_at
     op.outbox_event.save(update_fields=["delivered_at"])
+    logger.info(
+        "billing operation finished",
+        extra={
+            "operation_id": str(op.operation_id),
+            "outcome": status,
+            "account": op.account.reference,
+        },
+    )
     return op
 
 
@@ -477,6 +488,14 @@ def drain_outbox(
             event.attempts += 1
             event.last_error = f"{type(exc).__name__}: {exc}"[:400]
             event.save(update_fields=["attempts", "last_error"])
+            logger.warning(
+                "outbox delivery failed",
+                extra={
+                    "operation_id": str(event.operation.operation_id),
+                    "attempt": event.attempts,
+                    "error": type(exc).__name__,
+                },
+            )
             failures.append(exc)
     if failures:
         raise failures[0]

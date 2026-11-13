@@ -1,6 +1,6 @@
 # Taryx backlog
 
-Updated: 2026-10-25
+Updated: 2026-11-13
 
 Task sections own status; index icons mirror them. See the [documentation guide](documentation-guide.md#task-records).
 
@@ -25,6 +25,7 @@ Task sections own status; index icons mirror them. See the [documentation guide]
 - 📋 [TAR-017 — Package and verify Kubernetes delivery](#tar-017)
 - 📋 [TAR-018 — Measure and present the portfolio release](#tar-018)
 - 🚧 [TAR-019 — Evaluate the multi-agent implement/review orchestrator](#tar-019)
+- 🚧 [TAR-020 — Design the operator portal UI](#tar-020)
 
 ## Delivery notes
 
@@ -34,7 +35,7 @@ Foundation review **approved** at `2704f119c5eba16c284fe93ffd5f86ba5d832847` aft
 
 M2 re-review findings are remediated and verified (both follow-up probes pass; see the [review](evidence/m2/m2-independent-review.md)). Independent M3 re-review of `f9f21df` found F1–F4; all resolved and re-verified (13/13 preserved probes pass). Next action: close the remaining F2 cutover race in TAR-011/TAR-012 before M4. Later tasks remain Backlog until their dependencies and detailed contracts are ready. Portal/API slices can develop alongside their backend tasks; TAR-009 and TAR-012 own integrated acceptance. Observability hooks and correctness tests accompany implementation; TAR-016 owns the full cross-service campaign, not the first tests.
 
-The architecture and functional scope are the planning baseline; exact schemas, dependency versions and open profiles are refined in their named tasks. Split large tasks into new IDs before starting if necessary; preserve existing history. Next unused ID: TAR-020. M1 metering completion is confirmed by the round-two review above; prior M2 billing approval is retained.
+The architecture and functional scope are the planning baseline; exact schemas, dependency versions and open profiles are refined in their named tasks. Split large tasks into new IDs before starting if necessary; preserve existing history. Next unused ID: TAR-021. M1 metering completion is confirmed by the round-two review above; prior M2 billing approval is retained.
 
 Re-review of `db18588` found one remaining F2 commit-window race; resolved by a shared cohort advisory-lock protocol between cutover and all gate-affecting writers — see the [third remediation addendum](evidence/m3/m3-independent-review.md#third-remediation-addendum--2026-10-25).
 
@@ -655,7 +656,7 @@ The adapter's market outbox is separate from `billing.OutboxEvent` (operation-li
 - Area: verification
 - Milestone: M5
 - Priority: Normal
-- Status: Backlog 📋
+- Status: In progress 🚧
 - Depends on: TAR-015
 - References: [Contract](features/verification.md)
 
@@ -672,7 +673,7 @@ Complete real-process fault evidence and actionable operational visibility.
 
 ### Completion evidence
 
-Not started; no implementation or verification evidence.
+2026-11-13 diagnostics slice: structured JSON logs with bounded labels (`request_id`/`task_id`/`operation_id`/`correlation_id` bound via contextvars; celery signal task binding; `X-Request-ID` middleware; redaction inside the formatter), `/metrics` Prometheus counters on enum statuses only, `sentry-sdk==2.74.0` with `SENTRY_DSN`-gated init and a local in-process-transport capture test (no external account). 9 tests + live verification on compose. [Evidence](evidence/m5/diagnostics.md). Fault campaign and budget runs still open.
 
 ### Notes
 
@@ -794,3 +795,42 @@ and corrected permission claims. Codex's own audit run wrote into the
 repo under --approve-for-me — first live repo-write evidence.
 Remaining: provision the M4 review session, one full schema-verdict
 round including DB access.
+
+<a id="tar-020"></a>
+
+## TAR-020 — Design the operator portal UI
+
+- Repository: taryx
+- Area: portal
+- Milestone: Not assigned
+- Priority: Normal
+- Status: In progress 🚧
+- Depends on: None
+- References: [design demos](../design/index.html)
+
+### Outcome
+
+Replace the primitive black/white portal styling with an enterprise
+operations-console design: high information density on desktop (flat
+visibility rather than layered disclosure), dark/light/auto themes,
+and a direction chosen between two static candidates.
+
+### Done when
+
+- User selects a direction (or a merge) between the two demo pages.
+- Chosen design applied to `web/` behind the existing GraphQL contract,
+  with theme switching verified in the real app.
+
+### Completion evidence
+
+Static demos built 2026-11-13 at `docs/design/` — `design-a-console.html`
+(three-pane mission console) and `design-b-suite.html` (tabbed
+master-detail suite), seeded with realistic demo data. Awaiting user
+direction before touching `web/src/App.tsx`.
+
+### Notes
+
+Both candidates share a localStorage theme key so light/dark/auto
+compares identically. Density approach: ~12px base type, monospace
+numerals, status chips, all rating lines and journal postings visible
+without expansion.

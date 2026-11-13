@@ -5,6 +5,7 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from graphene_django.views import GraphQLView
 
 from taryx.interfaces.callbacks import transfer_callback
+from taryx.interfaces.metrics import metrics
 
 
 def healthz(request):
@@ -18,6 +19,7 @@ def healthz(request):
 
 urlpatterns = [
     path("healthz", healthz),
+    path("metrics", metrics),
     # Session-authenticated, CSRF-enforced (decision 004). ensure_csrf_cookie
     # lets GET/GraphiQL responses carry the csrftoken cookie the portal
     # echoes back as X-CSRFToken on mutations.
