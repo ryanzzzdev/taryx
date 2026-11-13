@@ -11,8 +11,8 @@ This is the initial delivery sequence, not a calendar commitment. The earlier 6�
 | M1 — Foundation and domain profile | Reproducible workspace, sourced profile and metering history | Complete | Planning baseline |
 | M2 — Explainable bills and corrections | End-to-end operator billing with financial integrity | Complete | M1 |
 | M3 — Safe legacy migration | Characterisation, shadow comparison and controlled cohort cutover | Complete | M2 |
-| M4 — Client variation and market boundary | Second isolated client and bounded integration | In progress | M3 |
-| M5 — Operational portfolio delivery | Recovery evidence, Kubernetes and reproducible demonstration | Planned | M4 |
+| M4 — Client variation and market boundary | Second isolated client and bounded integration | Complete | M3 |
+| M5 — Operational portfolio delivery | Recovery evidence, Kubernetes and reproducible demonstration | In progress | M4 |
 
 Setup and planning completion refer only to [TAR-001](backlog.md#tar-001) and [TAR-002](backlog.md#tar-002). Core product value is demonstrated at M3; M4 and M5 extend it. Changes to that scope require an explicit record, not silent omission of unfinished extensions.
 
