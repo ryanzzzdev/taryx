@@ -83,3 +83,21 @@ is unrestricted (ingress-side policies only); DNS relies on cluster
 DNS. `runserver` is used for the api container (same as compose) — no
 production ingress/TLS is claimed. Secrets are literal dev values in
 `01-secrets.yaml`, matching the compose defaults.
+
+## Failed rollout cannot advance (2026-11-13)
+
+Deliberately broke the `wait-migrated` initContainer on the `api`
+deployment (`command: exit 1`) and restarted the rollout. Observed:
+
+- new replica stuck `Init:Error` / `Init:CrashLoopBackOff` — the
+  migration gate cannot be outrun even by a manual rollout;
+- old replica stayed `1/1 Running` and `http://172.22.0.2:30001/healthz`
+  kept answering `200` — a failed rollout stalls rather than dropping
+  the service (bounded availability: the previous version keeps
+  serving; there is no zero-downtime guarantee);
+- restoring the init command rolled the deployment out cleanly.
+
+Recovery path recorded: fix the failing migration/init (or
+`kubectl rollout undo` to the last good revision — note the restart
+annotation creates its own revision, so `--to-revision` or a direct
+patch is needed when multiple revisions carry the defect).

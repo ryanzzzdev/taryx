@@ -1,0 +1,97 @@
+Script started on 2026-11-14 01:22:07+11:00 [COMMAND="bash scripts/demo-journey.sh" <not executed on terminal>]
+
+=== 1. CLEAN SETUP — fresh volumes, full stack ===
+taryx-api-1 Up 15 seconds
+taryx-api-sg-1 Up 13 seconds
+taryx-broker-1 Up 31 seconds (healthy)
+taryx-db-1 Up 31 seconds (healthy)
+taryx-legacy-1 Up 31 seconds (healthy)
+taryx-legacy-sg-1 Up 15 seconds (healthy)
+taryx-market-1 Up 31 seconds (healthy)
+taryx-market-sg-1 Up 15 seconds (healthy)
+taryx-web-1 Up 14 seconds
+taryx-web-sg-1 Up 13 seconds
+taryx-worker-1 Up 15 seconds
+taryx-worker-sg-1 Up 13 seconds
+
+=== 2. SEED — deterministic demo estate (3 accounts, users, cohort) ===
+ACC-001: Meridian Heights Bakery (1 NMI, 2 channels)
+ACC-002: Collins Wharf Grocer (1 NMI, 1 channels)
+ACC-003: Harbour Lane Studio (1 NMI, 2 channels)
+user viewer: role viewer
+user operator: role operator
+user approver: role approver
+cohort Legacy Cohort A: legacy_only (2 accounts)
+client southgrid_retail (Southgrid Retail)
+ACC-001: Bayview Corner Store (1 NMI, 2 channels)
+ACC-002: Jetty Road Pharmacy (1 NMI, 1 channels)
+ACC-003: Marina Parade Cellars (1 NMI, 2 channels)
+user viewer: role viewer
+user operator: role operator
+user approver: role approver
+cohort Legacy Cohort A: legacy_only (2 accounts)
+
+=== 3. METERING — NEM12 ingestion, two channels ===
+day1.nem12: published (96 intervals, 96 selected, 0 quarantined)
+B1|48
+E1|48
+
+=== 4. RATING + BILLING — 2026-03-02, ACC-001 ===
+run 1: 3 lines, net 7.82, gst 0.83, total 8.65 (digest 7a111748a9ad…)
+demo-bill-1: admitted (pending), enqueued
+INV-000001|8.68|4|t
+
+=== 5. CORRECTION — revised interval file arrives; re-rate and re-bill ===
+day1_rev1.nem12: published (48 intervals, 48 selected, 0 quarantined)
+run 2: 3 lines, net 7.91, gst 0.84, total 8.75 (digest 26185cc7f5bc…)
+demo-bill-1-rev: admitted (pending), enqueued
+ADJ-000001|0.10|legacy
+0
+
+=== 6. MIGRATION — shadow comparison, decisions, cutover ===
+acc3.nem12: published (96 intervals, 96 selected, 0 quarantined)
+38 objects imported automatically (use -v 2 for details).
+
+cohort: Legacy Cohort A mode=legacy_only rev=1
+ACC-001: comparison difference diffs=4
+ACC-003: comparison difference diffs=1
+blockers: []
+entered shadow mode rev=2
+cutover: mode=new_only rev=3
+
+=== 7. POST-CUTOVER BILLING — ACC-003 under new routing ===
+demo-cohort-bill: admitted (pending), enqueued
+ACC-001|INV-000001|legacy
+ACC-003|INV-000002|new
+
+=== 8. CLIENT ISOLATION — southgrid stack, own database ===
+38 objects imported automatically (use -v 2 for details).
+
+southgrid accounts: ['ACC-001', 'ACC-002', 'ACC-003']
+psql: error: connection to server on socket "/var/run/postgresql/.s.PGSQL.5432" failed: FATAL:  permission denied for database "taryx"
+DETAIL:  User does not have CONNECT privilege.
+
+=== 9. MARKET — transfer request through the deterministic counterparty ===
+38 objects imported automatically (use -v 2 for details).
+
+workflow a231132d-539b-4013-83f1-de24edbf5581 state draft
+a231132d-539b-4013-83f1-de24edbf5581|completed|1
+4102000001|registered
+4102000002|none
+4102000003|none
+
+=== 10. DIAGNOSTICS — metrics surface + correlated logs ===
+taryx_billing_operations{status="complete"} 3
+taryx_market_workflows{state="completed"} 1
+taryx_market_outbox_pending 0
+taryx_market_exceptions_total 0
+taryx_market_inbox_total 1
+taryx_build_info{client="aurora_energy"} 1
+worker-1  | {"ts":"2026-11-13T14:23:42.647609+00:00","level":"INFO","logger":"taryx.market","msg":"market outbox drained","task_id":"220b1cbb-16ef-4e54-ba0e-4487ec6aa558","task_name":"taryx.market.drain","fields":{"delivered":1}}
+worker-1  | {"ts":"2026-11-13T14:23:42.647897+00:00","level":"INFO","logger":"celery.app.trace","msg":"Task taryx.market.drain[220b1cbb-16ef-4e54-ba0e-4487ec6aa558] succeeded in 0.04697646002750844s: 1","task_id":"220b1cbb-16ef-4e54-ba0e-4487ec6aa558","task_name":"taryx.market.drain","fields":{"data":"{'id': '220b1cbb-16ef-4e54-ba0e-4487ec6aa558', 'name': 'taryx.market.drain', 'return_value': '1', 'runtime': 0.04697646002750844, 'args': '()', 'kwargs': '{}'}"}}
+worker-1  | {"ts":"2026-11-13T14:23:42.656648+00:00","level":"INFO","logger":"celery.app.trace","msg":"Task taryx.market.sweep[1b954151-2d20-4ab9-b242-61028f51e348] succeeded in 0.024827246030326933s: {'retried': 0, 'reconciling': 0, 'resolved': 0, 'failed': 0}","task_id":"1b954151-2d20-4ab9-b242-61028f51e348","task_name":"taryx.market.sweep","fields":{"data":"{'id': '1b954151-2d20-4ab9-b242-61028f51e348', 'name': 'taryx.market.sweep', 'return_value': \"{'retried': 0, 'reconciling': 0, 'resolved': 0, 'failed': 0}\", 'runtime': 0.024827246030326933, 'args': '()', 'kwargs': '{}'}"}}
+
+=== JOURNEY COMPLETE ===
+2 invoices, 1 adjustments, 240 intervals
+
+Script done on 2026-11-14 01:23:51+11:00 [COMMAND_EXIT_CODE="0"]

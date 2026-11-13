@@ -710,7 +710,7 @@ Reproduce the application on kind with controlled rollouts and worker lifecycle.
 
 ### Completion evidence
 
-2026-11-13 kind delivery: `deploy/k8s/manifests/` + `install.sh`/`reset.sh` bring up the full two-client stack on a fresh cluster — db/broker StatefulSets on PVCs, per-client Jobs (`db-init`, `broker-provision`, `migrate-aurora`, `migrate-southgrid`), api/worker pods per client on one image, sims on `emptyDir`. The `wait-migrated` initContainer held all four app pods in `Init` until each client's migration Job completed — failed or pending migrations cannot be outrun. Exercised: unlabeled pod blocked from db/broker by NetworkPolicy while `api:8000` stayed open; cross-client `psql` denied both directions; `--grace-period=0` pod kill left the op `pending` with zero effect and drain produced exactly one invoice; graceful delete let warm shutdown finish the in-flight task; `worker` at 2 replicas with duplicate deliveries produced one invoice per operation with the queue drained to 0; `reset.sh` wiped PVCs and reinstalled to seed-only state. [Evidence](evidence/m5/kubernetes.md), [README](deploy/k8s/README.md).
+2026-11-13 kind delivery: `deploy/k8s/manifests/` + `install.sh`/`reset.sh` bring up the full two-client stack on a fresh cluster — db/broker StatefulSets on PVCs, per-client Jobs (`db-init`, `broker-provision`, `migrate-aurora`, `migrate-southgrid`), api/worker pods per client on one image, sims on `emptyDir`. The `wait-migrated` initContainer held all four app pods in `Init` until each client's migration Job completed — failed or pending migrations cannot be outrun. Exercised: unlabeled pod blocked from db/broker by NetworkPolicy while `api:8000` stayed open; cross-client `psql` denied both directions; `--grace-period=0` pod kill left the op `pending` with zero effect and drain produced exactly one invoice; graceful delete let warm shutdown finish the in-flight task; `worker` at 2 replicas with duplicate deliveries produced one invoice per operation with the queue drained to 0; `reset.sh` wiped PVCs and reinstalled to seed-only state. [Evidence](evidence/m5/kubernetes.md), [README](../../deploy/k8s/README.md).
 
 ### Notes
 
@@ -724,7 +724,7 @@ Refine and mark Ready once dependencies pass; record relevant gate resolutions b
 - Area: verification
 - Milestone: M5
 - Priority: Normal
-- Status: Backlog 📋
+- Status: Done ✅
 - Depends on: TAR-017
 - References: [Contract](features/verification.md)
 
@@ -741,7 +741,7 @@ Deliver a reproducible complete demo with measured evidence and honest limitatio
 
 ### Completion evidence
 
-Not started; no implementation or verification evidence.
+2026-11-13 measured portfolio release: [portfolio-run](evidence/m5/portfolio-run.md) — R1 billing batch 8.3 s for 100 accounts × 30-day periods (p95 0.386 s/op, ≤2 s/≤5 min budgets), fresh-period ingest repeats 48.2/51.4 s (≤90 s), peak stack 5.76 GiB (≤8 GiB), queue depth 0, 100 ops → 100 invoices → 0 unbalanced journals. Recorded full journey on a clean stack — [demo-journey.txt](evidence/m5/demo-journey.txt) via `scripts/demo-journey.sh`: setup→seed→ingest→bill→correction→cohort cutover→isolation→market→diagnostics. [Verification audit](evidence/m5/verification-audit.md): matrix rows all covered (M1–M4 independently approved), gates BLK-001/2/3 resolved, doc links clean, README setup verified live. Honest gap recorded: whole-estate same-day revision ingest ~450 s — over the 90 s budget, outside the declared workload. [Walkthrough](evidence/m5/walkthrough.md) covers claims boundary — local only, no cloud/hosted CI/live-market claim. M5 independent review remains owed before the milestone closes.
 
 ### Notes
 

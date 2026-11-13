@@ -10,8 +10,8 @@ TAR-010–012 reopened for M3-RR-F1/F2. See the [fresh re-review](m3-re-review.m
 The implementation assessments and completion statements below are historical.
 
 Date: 2026-10-25. Reviewer: Devin (SWE-2 High), campaign checkpoints TAR-010/011/012.
-Scope: [M3 exit criteria](../roadmap.md#m3--safe-legacy-migration). Contract:
-[legacy-migration](../features/legacy-migration.md).
+Scope: [M3 exit criteria](../../roadmap.md#m3--safe-legacy-migration). Contract:
+[legacy-migration](../../features/legacy-migration.md).
 
 Verdict: independent review of `c06e1fc` raised eight findings; all are remediated with the eight preserved probes now passing as permanent regressions — see [independent review](m3-independent-review.md#remediation-addendum--2026-10-25). The evidence below is the original implementer assessment, retained as history.
 

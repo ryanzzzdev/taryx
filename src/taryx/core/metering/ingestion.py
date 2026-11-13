@@ -278,9 +278,12 @@ def _apply_selection(batch: IngestionBatch, affected: list[tuple[int, datetime]]
     if creates:
         CurrentInterval.objects.bulk_create(creates, ignore_conflicts=True)
     if updates:
+        # CASE-per-row updates degrade super-linearly on large batches;
+        # chunking keeps each statement's WHEN list bounded.
         CurrentInterval.objects.bulk_update(
             updates,
             ["value", "quality", "source_record", "selection_version", "updated_at"],
+            batch_size=2000,
         )
 
     accepted = 0

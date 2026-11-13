@@ -29,6 +29,9 @@ R1_NMIS = [f"420000{i + 1:04d}" for i in range(100)]  # 4200000001..4200000100
 B1_NMIS = set(R1_NMIS[::4])  # 25% carry an export channel
 R1_DAYS = [f"202604{d:02d}" for d in range(1, 31)]
 R1_VALUE = os.environ.get("R1_VALUE", "0.5")  # vary per rerun — content-hash differs
+# Revisions must carry a LATER load/update stamp to out-rank the prior
+# records (equal precedence + different value is a real quarantine).
+R1_STAMP = os.environ.get("R1_STAMP", "20260331120000")
 
 
 def seed_r1_accounts():
@@ -46,7 +49,7 @@ def seed_r1_accounts():
     )
 
 
-def r1_nem12() -> str:
+def r1_nem12(days: list[str] | None = None) -> str:
     vals = ",".join([R1_VALUE] * 48)
     lines = ["100,NEM12,20260430120000,TARYX,TARYX"]
     for nmi in R1_NMIS:
@@ -54,8 +57,8 @@ def r1_nem12() -> str:
             if suffix == "B1" and nmi not in B1_NMIS:
                 continue
             lines.append(f"200,{nmi},E1B1,,{suffix},NEM100,1000001,kWh,30,")
-            for day in R1_DAYS:
-                lines.append(f"300,{day},{vals},A,,,20260331120000,20260331120000")
+            for day in days or R1_DAYS:
+                lines.append(f"300,{day},{vals},A,,,{R1_STAMP},{R1_STAMP}")
     lines.append("900")
     return "\n".join(lines) + "\n"
 

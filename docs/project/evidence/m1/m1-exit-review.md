@@ -75,4 +75,4 @@ Verification: `uv run pytest docs/project/evidence/m1/m1_review_probes.py` → 1
 
 ## Independent confirmation at 2a46650
 
-2026-10-25: Saved M1 probes pass 10/10 and the full documented suite passes 92 tests plus lint/types/import/frontend checks. The five original M1 findings are resolved; M1 remains Complete. M2 has separate findings in [the independent review](m2-independent-review.md). No new M1 performance or clean-install claim is made.
+2026-10-25: Saved M1 probes pass 10/10 and the full documented suite passes 92 tests plus lint/types/import/frontend checks. The five original M1 findings are resolved; M1 remains Complete. M2 has separate findings in [the independent review](../m2/m2-independent-review.md). No new M1 performance or clean-install claim is made.

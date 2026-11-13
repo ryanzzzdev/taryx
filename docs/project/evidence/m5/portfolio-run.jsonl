@@ -1,0 +1,4 @@
+{"scenario": "r1-billing-batch", "accounts": 100, "period": "2026-04-01..2026-05-01 (30 days)", "batch_wall_s": 8.3, "op_latency_s": {"n": 100, "p50": 0.2, "p95": 0.386, "max": 0.477}, "invoices": 100, "unbalanced_journals": 0, "budget": {"per_account_p95_s": 2.0, "batch_s": 300}, "result": "PASS", "note": "reconstructed from persisted op timestamps (prior run)"}
+{"scenario": "r1-ingest-repeat-may", "period": "2026-05 (30 days, fresh)", "wall_s": 48.2, "tail": "r1-may.nem12: published (180000 intervals, 180000 selected, 0 quarantined)", "result": "PASS"}
+{"scenario": "r1-ingest-repeat-june", "period": "2026-06 (30 days, fresh)", "wall_s": 51.4, "tail": "r1-june.nem12: published (180000 intervals, 180000 selected, 0 quarantined)", "result": "PASS"}
+{"scenario": "resource-observation", "peak_stack_gib": 5.764, "max_queue_depth": 0, "samples": 16, "budget": {"stack_gib": 8.0}, "result": "PASS"}

@@ -138,4 +138,4 @@ Exit criteria:
 
 Local completion does not imply green hosted CI, cloud deployment or production regulatory readiness. Report each separately. Public hosting, AWS/Terraform/ArgoCD and a second territory remain future candidates.
 
-Status note 2026-11-13: TAR-016 Done (diagnostics, seven-scenario fault campaign, frozen-budget runs — including an R1 ingest defect found and fixed via bulk two-phase selection); TAR-017 Done (kind delivery, migration gate, boundary/lifecycle/scaling/reset evidence). TAR-018 measurement and presentation remains, then the milestone-level independent review is owed.
+Status note 2026-11-13: TAR-016 Done (diagnostics, seven-scenario fault campaign, frozen-budget runs — including an R1 ingest defect found and fixed via bulk two-phase selection); TAR-017 Done (kind delivery, migration gate, boundary/lifecycle/scaling/reset evidence). TAR-018 Done — measured budgets pass (batch 8.3s/p95 0.386s, ingests 48–51s, mem 5.76GiB), journey recorded, audit+walkthrough written, one honest revision-ingest gap documented. The milestone-level independent review is owed.
