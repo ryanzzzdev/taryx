@@ -1,0 +1,117 @@
+# API + worker for both clients — all four pods run the same image
+# (same-build evidence). The wait-migrated initContainer blocks until
+# `migrate --check` passes, so a failed or pending migration Job can
+# never be outrun by the workload.
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: api, namespace: taryx, labels: {app.kubernetes.io/part-of: taryx, taryx.dev/role: api, taryx.dev/client: aurora}}
+spec:
+  replicas: 1
+  selector: {matchLabels: {taryx.dev/role: api, taryx.dev/client: aurora}}
+  template:
+    metadata: {labels: {app.kubernetes.io/part-of: taryx, taryx.dev/role: api, taryx.dev/client: aurora}}
+    spec:
+      initContainers:
+        - name: wait-migrated
+          image: taryx-app:latest
+          imagePullPolicy: IfNotPresent
+          command: ["sh", "-c", "until python manage.py migrate --check >/dev/null 2>&1; do echo 'waiting for migrate job'; sleep 3; done"]
+          envFrom: [{configMapRef: {name: taryx-env-aurora}}]
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom: {secretKeyRef: {name: taryx-secrets, key: aurora-db-pass}}
+          resources:
+            requests: {cpu: 50m, memory: 128Mi}
+            limits: {cpu: 200m, memory: 256Mi}
+      containers:
+        - name: api
+          image: taryx-app:latest
+          imagePullPolicy: IfNotPresent
+          command: ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+          envFrom: [{configMapRef: {name: taryx-env-aurora}}]
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom: {secretKeyRef: {name: taryx-secrets, key: aurora-db-pass}}
+            - name: POSTGRES_SHADOW_PASSWORD
+              valueFrom: {secretKeyRef: {name: taryx-secrets, key: aurora-shadow-pass}}
+            - name: CELERY_BROKER_URL
+              valueFrom: {secretKeyRef: {name: taryx-secrets, key: aurora-amqp-url}}
+            - name: MARKET_TOKEN
+              valueFrom: {secretKeyRef: {name: taryx-secrets, key: aurora-market-token}}
+            - name: MARKET_CALLBACK_TOKEN
+              valueFrom: {secretKeyRef: {name: taryx-secrets, key: aurora-market-token}}
+          ports: [{containerPort: 8000}]
+          readinessProbe:
+            httpGet: {path: /healthz, port: 8000}
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: /healthz, port: 8000}
+            periodSeconds: 15
+          resources:
+            requests: {cpu: 250m, memory: 256Mi}
+            limits: {cpu: "1", memory: 1Gi}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: api, namespace: taryx, labels: {app.kubernetes.io/part-of: taryx, taryx.dev/client: aurora}}
+spec:
+  type: NodePort
+  selector: {taryx.dev/role: api, taryx.dev/client: aurora}
+  ports: [{port: 8000, targetPort: 8000, nodePort: 30001}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: api-sg, namespace: taryx, labels: {app.kubernetes.io/part-of: taryx, taryx.dev/role: api, taryx.dev/client: southgrid}}
+spec:
+  replicas: 1
+  selector: {matchLabels: {taryx.dev/role: api, taryx.dev/client: southgrid}}
+  template:
+    metadata: {labels: {app.kubernetes.io/part-of: taryx, taryx.dev/role: api, taryx.dev/client: southgrid}}
+    spec:
+      initContainers:
+        - name: wait-migrated
+          image: taryx-app:latest
+          imagePullPolicy: IfNotPresent
+          command: ["sh", "-c", "until python manage.py migrate --check >/dev/null 2>&1; do echo 'waiting for migrate job'; sleep 3; done"]
+          envFrom: [{configMapRef: {name: taryx-env-sg}}]
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom: {secretKeyRef: {name: taryx-secrets, key: sg-db-pass}}
+          resources:
+            requests: {cpu: 50m, memory: 128Mi}
+            limits: {cpu: 200m, memory: 256Mi}
+      containers:
+        - name: api
+          image: taryx-app:latest
+          imagePullPolicy: IfNotPresent
+          command: ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+          envFrom: [{configMapRef: {name: taryx-env-sg}}]
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom: {secretKeyRef: {name: taryx-secrets, key: sg-db-pass}}
+            - name: POSTGRES_SHADOW_PASSWORD
+              valueFrom: {secretKeyRef: {name: taryx-secrets, key: sg-shadow-pass}}
+            - name: CELERY_BROKER_URL
+              valueFrom: {secretKeyRef: {name: taryx-secrets, key: sg-amqp-url}}
+            - name: MARKET_TOKEN
+              valueFrom: {secretKeyRef: {name: taryx-secrets, key: sg-market-token}}
+            - name: MARKET_CALLBACK_TOKEN
+              valueFrom: {secretKeyRef: {name: taryx-secrets, key: sg-market-token}}
+          ports: [{containerPort: 8000}]
+          readinessProbe:
+            httpGet: {path: /healthz, port: 8000}
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: /healthz, port: 8000}
+            periodSeconds: 15
+          resources:
+            requests: {cpu: 250m, memory: 256Mi}
+            limits: {cpu: "1", memory: 1Gi}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: api-sg, namespace: taryx, labels: {app.kubernetes.io/part-of: taryx, taryx.dev/client: southgrid}}
+spec:
+  type: NodePort
+  selector: {taryx.dev/role: api, taryx.dev/client: southgrid}
+  ports: [{port: 8000, targetPort: 8000, nodePort: 30002}]

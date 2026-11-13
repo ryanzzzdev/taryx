@@ -1,0 +1,69 @@
+# Ingress-side boundaries. Egress is left open (DNS discovery stays
+# simple); the credential layer (per-client DB roles and broker vhosts)
+# enforces what the network permits.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: default-deny-ingress, namespace: taryx}
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+---
+# db accepts connections only from taryx application/job pods.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: db-ingress, namespace: taryx}
+spec:
+  podSelector: {matchLabels: {taryx.dev/role: db}}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchExpressions:
+              - {key: taryx.dev/role, operator: In, values: [api, worker, job]}
+      ports: [{port: 5432}]
+---
+# broker AMQP from app pods; the management API only from the
+# provisioning Job.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: broker-ingress, namespace: taryx}
+spec:
+  podSelector: {matchLabels: {taryx.dev/role: broker}}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchExpressions:
+              - {key: taryx.dev/role, operator: In, values: [api, worker]}
+      ports: [{port: 5672}]
+    - from:
+        - podSelector:
+            matchLabels: {taryx.dev/job: broker-provision}
+      ports: [{port: 15672}]
+---
+# Simulators accept only app-pod traffic.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: sim-ingress, namespace: taryx}
+spec:
+  podSelector: {matchLabels: {taryx.dev/role: sim}}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchExpressions:
+              - {key: taryx.dev/role, operator: In, values: [api, worker]}
+      ports:
+        - {port: 8090}
+        - {port: 8091}
+---
+# The API is the deployment edge: reachable from anywhere (NodePort
+# clients, in-cluster market-sim callbacks, operators).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: api-ingress, namespace: taryx}
+spec:
+  podSelector: {matchLabels: {taryx.dev/role: api}}
+  policyTypes: [Ingress]
+  ingress:
+    - ports: [{port: 8000}]

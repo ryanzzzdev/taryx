@@ -1,0 +1,30 @@
+# Non-secret client configuration; passwords/URLs come from taryx-secrets.
+apiVersion: v1
+kind: ConfigMap
+metadata: {name: taryx-env-aurora, namespace: taryx}
+data:
+  POSTGRES_HOST: db
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: taryx
+  POSTGRES_USER: taryx_app
+  POSTGRES_SHADOW_USER: taryx_shadow
+  DJANGO_DEBUG: "true"
+  TARYX_CLIENT: aurora_energy
+  LEGACY_BASE_URL: http://legacy:8090
+  MARKET_BASE_URL: http://market:8091
+  MARKET_CALLBACK_URL: http://api:8000/callbacks/transfers
+---
+apiVersion: v1
+kind: ConfigMap
+metadata: {name: taryx-env-sg, namespace: taryx}
+data:
+  POSTGRES_HOST: db
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: taryx_southgrid
+  POSTGRES_USER: taryx_sg
+  POSTGRES_SHADOW_USER: taryx_shadow_sg
+  DJANGO_DEBUG: "true"
+  TARYX_CLIENT: southgrid_retail
+  LEGACY_BASE_URL: http://legacy-sg:8090
+  MARKET_BASE_URL: http://market-sg:8091
+  MARKET_CALLBACK_URL: http://api-sg:8000/callbacks/transfers

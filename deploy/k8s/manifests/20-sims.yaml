@@ -1,0 +1,131 @@
+# Counterparty simulators — synthetic state only, so /data is an
+# explicit emptyDir (ephemeral by design: a pod restart resets the sim,
+# which is the documented reset boundary; durable state lives in
+# postgres/rabbitmq PVCs).
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: legacy, namespace: taryx, labels: {app.kubernetes.io/part-of: taryx, taryx.dev/role: sim}}
+spec:
+  replicas: 1
+  selector: {matchLabels: {taryx.dev/role: sim, taryx.dev/sim: legacy}}
+  template:
+    metadata: {labels: {app.kubernetes.io/part-of: taryx, taryx.dev/role: sim, taryx.dev/sim: legacy}}
+    spec:
+      containers:
+        - name: sim
+          image: taryx-legacy-sim:latest
+          imagePullPolicy: IfNotPresent
+          env: [{name: LEGACY_DB, value: /data/legacy_calc.db}]
+          ports: [{containerPort: 8090}]
+          volumeMounts: [{name: data, mountPath: /data}]
+          readinessProbe:
+            httpGet: {path: /healthz, port: 8090}
+            periodSeconds: 5
+          resources:
+            requests: {cpu: 50m, memory: 64Mi}
+            limits: {cpu: 200m, memory: 128Mi}
+      volumes: [{name: data, emptyDir: {}}]
+---
+apiVersion: v1
+kind: Service
+metadata: {name: legacy, namespace: taryx, labels: {app.kubernetes.io/part-of: taryx}}
+spec:
+  selector: {taryx.dev/sim: legacy}
+  ports: [{port: 8090, targetPort: 8090}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: legacy-sg, namespace: taryx, labels: {app.kubernetes.io/part-of: taryx, taryx.dev/role: sim}}
+spec:
+  replicas: 1
+  selector: {matchLabels: {taryx.dev/role: sim, taryx.dev/sim: legacy-sg}}
+  template:
+    metadata: {labels: {app.kubernetes.io/part-of: taryx, taryx.dev/role: sim, taryx.dev/sim: legacy-sg}}
+    spec:
+      containers:
+        - name: sim
+          image: taryx-legacy-sim:latest
+          imagePullPolicy: IfNotPresent
+          env: [{name: LEGACY_DB, value: /data/legacy_calc.db}]
+          ports: [{containerPort: 8090}]
+          volumeMounts: [{name: data, mountPath: /data}]
+          readinessProbe:
+            httpGet: {path: /healthz, port: 8090}
+            periodSeconds: 5
+          resources:
+            requests: {cpu: 50m, memory: 64Mi}
+            limits: {cpu: 200m, memory: 128Mi}
+      volumes: [{name: data, emptyDir: {}}]
+---
+apiVersion: v1
+kind: Service
+metadata: {name: legacy-sg, namespace: taryx, labels: {app.kubernetes.io/part-of: taryx}}
+spec:
+  selector: {taryx.dev/sim: legacy-sg}
+  ports: [{port: 8090, targetPort: 8090}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: market, namespace: taryx, labels: {app.kubernetes.io/part-of: taryx, taryx.dev/role: sim}}
+spec:
+  replicas: 1
+  selector: {matchLabels: {taryx.dev/role: sim, taryx.dev/sim: market}}
+  template:
+    metadata: {labels: {app.kubernetes.io/part-of: taryx, taryx.dev/role: sim, taryx.dev/sim: market}}
+    spec:
+      containers:
+        - name: sim
+          image: taryx-market-sim:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: MARKET_TOKEN
+              valueFrom: {secretKeyRef: {name: taryx-secrets, key: aurora-market-token}}
+          ports: [{containerPort: 8091}]
+          volumeMounts: [{name: data, mountPath: /data}]
+          readinessProbe:
+            httpGet: {path: /healthz, port: 8091}
+            periodSeconds: 5
+          resources:
+            requests: {cpu: 50m, memory: 64Mi}
+            limits: {cpu: 200m, memory: 128Mi}
+      volumes: [{name: data, emptyDir: {}}]
+---
+apiVersion: v1
+kind: Service
+metadata: {name: market, namespace: taryx, labels: {app.kubernetes.io/part-of: taryx}}
+spec:
+  selector: {taryx.dev/sim: market}
+  ports: [{port: 8091, targetPort: 8091}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: market-sg, namespace: taryx, labels: {app.kubernetes.io/part-of: taryx, taryx.dev/role: sim}}
+spec:
+  replicas: 1
+  selector: {matchLabels: {taryx.dev/role: sim, taryx.dev/sim: market-sg}}
+  template:
+    metadata: {labels: {app.kubernetes.io/part-of: taryx, taryx.dev/role: sim, taryx.dev/sim: market-sg}}
+    spec:
+      containers:
+        - name: sim
+          image: taryx-market-sim:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: MARKET_TOKEN
+              valueFrom: {secretKeyRef: {name: taryx-secrets, key: sg-market-token}}
+          ports: [{containerPort: 8091}]
+          volumeMounts: [{name: data, mountPath: /data}]
+          readinessProbe:
+            httpGet: {path: /healthz, port: 8091}
+            periodSeconds: 5
+          resources:
+            requests: {cpu: 50m, memory: 64Mi}
+            limits: {cpu: 200m, memory: 128Mi}
+      volumes: [{name: data, emptyDir: {}}]
+---
+apiVersion: v1
+kind: Service
+metadata: {name: market-sg, namespace: taryx, labels: {app.kubernetes.io/part-of: taryx}}
+spec:
+  selector: {taryx.dev/sim: market-sg}
+  ports: [{port: 8091, targetPort: 8091}]

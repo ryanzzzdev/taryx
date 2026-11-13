@@ -97,6 +97,8 @@ Excludes migration of an entire historical accounting database. Routing rollback
 
 Round 5 at `98fad76`: remediation **approved**, F8 and live code-freshness gap closed; TAR-013 Done. M4/TAR-015 remain In progress for explicit billing-under-market-outage and live adapter-restart exit evidence or accepted allocation to TAR-016. [Review and verification limits](evidence/m4/m4-review-r5.md). Earlier review statements below are historical.
 
+2026-11-13: the allocated exit evidence landed in the TAR-016 fault campaign (`market-adapter-restart` and `billing-under-market-outage` scenarios) — TAR-015 is Done and M4 is complete with its independent approval at `98fad76`.
+
 Authorised round 4 at `853842c9ba24c92aa7d487ca3546910eef7107e1`: **changes requested**. F7/F10/F11 reported cases pass; F8 retains a stale-consumer concurrency window. All four live image digests match, but imported market code omits part of the candidate remediation. M4 remains In progress. [Round-4 evidence](evidence/m4/m4-review-r4.md).
 
 Round 3 (2026-11-08): **changes requested** at `4b65cf58`. M4-F5/F9 resolved; F7/F8 remain, with new F10 submission-budget and F11 image-identity gaps. TAR-013/TAR-015 In progress; TAR-014 Done. M4 remains In progress. Three-round cap reached: driver escalation required before another review. [Review](evidence/m4/m4-independent-review.md#round-3--independent-verification-2026-11-08).
@@ -135,3 +137,5 @@ Exit criteria:
 - Another developer can follow tested setup/reset/demo instructions; a recording and explanation show the full journey and limitations.
 
 Local completion does not imply green hosted CI, cloud deployment or production regulatory readiness. Report each separately. Public hosting, AWS/Terraform/ArgoCD and a second territory remain future candidates.
+
+Status note 2026-11-13: TAR-016 Done (diagnostics, seven-scenario fault campaign, frozen-budget runs — including an R1 ingest defect found and fixed via bulk two-phase selection); TAR-017 Done (kind delivery, migration gate, boundary/lifecycle/scaling/reset evidence). TAR-018 measurement and presentation remains, then the milestone-level independent review is owed.

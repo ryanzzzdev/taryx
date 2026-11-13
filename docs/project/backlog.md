@@ -22,7 +22,7 @@ Task sections own status; index icons mirror them. See the [documentation guide]
 - ✅ [TAR-014 — Freeze the bounded market workflow](#tar-014)
 - ✅ [TAR-015 — Implement market adapter and counterparty simulator](#tar-015)
 - ✅ [TAR-016 — Verify recovery and correlated diagnostics](#tar-016)
-- 📋 [TAR-017 — Package and verify Kubernetes delivery](#tar-017)
+- ✅ [TAR-017 — Package and verify Kubernetes delivery](#tar-017)
 - 📋 [TAR-018 — Measure and present the portfolio release](#tar-018)
 - 🚧 [TAR-019 — Evaluate the multi-agent implement/review orchestrator](#tar-019)
 - 🚧 [TAR-020 — Design the operator portal UI](#tar-020)
@@ -693,7 +693,7 @@ Refine and mark Ready once dependencies pass; record relevant gate resolutions b
 - Area: deployment
 - Milestone: M5
 - Priority: Normal
-- Status: Backlog 📋
+- Status: Done ✅
 - Depends on: TAR-016
 - References: [Contract](architecture.md)
 
@@ -710,7 +710,7 @@ Reproduce the application on kind with controlled rollouts and worker lifecycle.
 
 ### Completion evidence
 
-Not started; no implementation or verification evidence.
+2026-11-13 kind delivery: `deploy/k8s/manifests/` + `install.sh`/`reset.sh` bring up the full two-client stack on a fresh cluster — db/broker StatefulSets on PVCs, per-client Jobs (`db-init`, `broker-provision`, `migrate-aurora`, `migrate-southgrid`), api/worker pods per client on one image, sims on `emptyDir`. The `wait-migrated` initContainer held all four app pods in `Init` until each client's migration Job completed — failed or pending migrations cannot be outrun. Exercised: unlabeled pod blocked from db/broker by NetworkPolicy while `api:8000` stayed open; cross-client `psql` denied both directions; `--grace-period=0` pod kill left the op `pending` with zero effect and drain produced exactly one invoice; graceful delete let warm shutdown finish the in-flight task; `worker` at 2 replicas with duplicate deliveries produced one invoice per operation with the queue drained to 0; `reset.sh` wiped PVCs and reinstalled to seed-only state. [Evidence](evidence/m5/kubernetes.md), [README](deploy/k8s/README.md).
 
 ### Notes
 

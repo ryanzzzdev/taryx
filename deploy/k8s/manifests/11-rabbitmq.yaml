@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: broker
+  namespace: taryx
+  labels: {app.kubernetes.io/part-of: taryx, taryx.dev/role: broker}
+spec:
+  serviceName: broker
+  replicas: 1
+  selector:
+    matchLabels: {taryx.dev/role: broker}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/part-of: taryx, taryx.dev/role: broker}
+    spec:
+      containers:
+        - name: rabbitmq
+          image: rabbitmq:4.3.7-management-alpine
+          env:
+            - name: RABBITMQ_DEFAULT_USER
+              valueFrom: {secretKeyRef: {name: taryx-secrets, key: broker-admin-user}}
+            - name: RABBITMQ_DEFAULT_PASS
+              valueFrom: {secretKeyRef: {name: taryx-secrets, key: broker-admin-pass}}
+            - name: RABBITMQ_DEFAULT_VHOST
+              value: taryx
+          ports:
+            - {containerPort: 5672}
+            - {containerPort: 15672}
+          volumeMounts:
+            - {name: data, mountPath: /var/lib/rabbitmq}
+          readinessProbe:
+            exec: {command: ["rabbitmq-diagnostics", "-q", "ping"]}
+            timeoutSeconds: 10
+            periodSeconds: 5
+            failureThreshold: 24
+          resources:
+            requests: {cpu: 250m, memory: 256Mi}
+            limits: {cpu: 500m, memory: 512Mi}
+  volumeClaimTemplates:
+    - metadata: {name: data}
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources: {requests: {storage: 1Gi}}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: broker
+  namespace: taryx
+  labels: {app.kubernetes.io/part-of: taryx, taryx.dev/role: broker}
+spec:
+  clusterIP: None
+  # Headless records resolve before readiness so provisioning Jobs can
+  # reach the management API during the node's slow first boot.
+  publishNotReadyAddresses: true
+  selector: {taryx.dev/role: broker}
+  ports:
+    - {name: amqp, port: 5672, targetPort: 5672}
+    - {name: mgmt, port: 15672, targetPort: 15672}
