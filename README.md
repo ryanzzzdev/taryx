@@ -4,7 +4,19 @@
 
 Taryx is a portfolio project exploring how an energy retailer can produce explainable bills, handle corrected meter data and safely replace a legacy billing system while continuing to serve customers. Its architecture follows publicly documented principles from Kraken Customer: a layered Django modular monolith, specialised asynchronous workers, client-specific configuration and carefully bounded external integrations.
 
-Taryx is implemented end-to-end: metering ingestion, rating, billing and corrections, shadow-engine migration, two isolated client retailers, bounded market integration, correlated diagnostics, a real-process fault campaign, Kubernetes packaging and a measured portfolio release. Milestones M1–M4 passed independent review; the M5 implementation is complete and its independent review is pending. Canonical plans and task status live in the documents below.
+Implemented features:
+
+- Versioned NEM12 interval ingestion with revisions, conflict detection and quarantine
+- Deterministic itemised rating against versioned tariffs, with GST
+- Durable billing operations, immutable invoices and successive corrections
+- Balanced double-entry journals with idempotency safeguards
+- Shadow-engine comparison, scoped discrepancy decisions and cohort cutover
+- Two isolated client retailers on one image — separate databases, policies and queues
+- Bounded market transfer workflow with deterministic counterparty simulators
+- Correlated structured logs, a `/metrics` endpoint and an optional Sentry path
+- Enterprise-console operator portal (React/GraphQL) with light/dark/auto themes
+- Kubernetes delivery on kind: migration Jobs, network policies, rollout gates
+- Measured recovery, batch and ingest budgets with recorded fault scenarios
 
 ## Project idea
 
