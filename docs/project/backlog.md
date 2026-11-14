@@ -21,9 +21,9 @@ Task sections own status; index icons mirror them. See the [documentation guide]
 - ✅ [TAR-013 — Demonstrate two isolated client instances](#tar-013)
 - ✅ [TAR-014 — Freeze the bounded market workflow](#tar-014)
 - ✅ [TAR-015 — Implement market adapter and counterparty simulator](#tar-015)
-- ✅ [TAR-016 — Verify recovery and correlated diagnostics](#tar-016)
-- ✅ [TAR-017 — Package and verify Kubernetes delivery](#tar-017)
-- ✅ [TAR-018 — Measure and present the portfolio release](#tar-018)
+- 🚧 [TAR-016 — Verify recovery and correlated diagnostics](#tar-016)
+- 🚧 [TAR-017 — Package and verify Kubernetes delivery](#tar-017)
+- 🚧 [TAR-018 — Measure and present the portfolio release](#tar-018)
 - 🚧 [TAR-019 — Evaluate the multi-agent implement/review orchestrator](#tar-019)
 - ✅ [TAR-020 — Design the operator portal UI](#tar-020)
 
@@ -658,7 +658,7 @@ The adapter's market outbox is separate from `billing.OutboxEvent` (operation-li
 - Area: verification
 - Milestone: M5
 - Priority: Normal
-- Status: Done ✅
+- Status: In progress 🚧
 - Depends on: TAR-015
 - References: [Contract](features/verification.md)
 
@@ -674,6 +674,8 @@ Complete real-process fault evidence and actionable operational visibility.
 - Frozen recovery and API-responsiveness budgets pass under the declared workload.
 
 ### Completion evidence
+
+2026-11-14 independent M5 review at `9a2c5ba0237d2d5bce65a5bfdedf32ce0a384f41`: **CHANGES_REQUESTED**; reopened for verification gate/timing and Kubernetes upgrade gaps. [Findings and runnable probes](evidence/m5/review-r1/review.md). Historical implementation evidence below is retained; remediate and rerun affected checks before re-review.
 
 2026-11-13 diagnostics slice: structured JSON logs with bounded labels (`request_id`/`task_id`/`operation_id`/`correlation_id` bound via contextvars; celery signal task binding; `X-Request-ID` middleware; redaction inside the formatter), `/metrics` Prometheus counters on enum statuses only, `sentry-sdk==2.74.0` with `SENTRY_DSN`-gated init and a local in-process-transport capture test (no external account). 9 tests + live verification on compose. [Evidence](evidence/m5/diagnostics.md). Fault campaign and budget runs still open.
 
@@ -693,7 +695,7 @@ Refine and mark Ready once dependencies pass; record relevant gate resolutions b
 - Area: deployment
 - Milestone: M5
 - Priority: Normal
-- Status: Done ✅
+- Status: In progress 🚧
 - Depends on: TAR-016
 - References: [Contract](architecture.md)
 
@@ -710,6 +712,8 @@ Reproduce the application on kind with controlled rollouts and worker lifecycle.
 
 ### Completion evidence
 
+2026-11-14 independent M5 review at `9a2c5ba0237d2d5bce65a5bfdedf32ce0a384f41`: **CHANGES_REQUESTED**; reopened for verification gate/timing and Kubernetes upgrade gaps. [Findings and runnable probes](evidence/m5/review-r1/review.md). Historical implementation evidence below is retained; remediate and rerun affected checks before re-review.
+
 2026-11-13 kind delivery: `deploy/k8s/manifests/` + `install.sh`/`reset.sh` bring up the full two-client stack on a fresh cluster — db/broker StatefulSets on PVCs, per-client Jobs (`db-init`, `broker-provision`, `migrate-aurora`, `migrate-southgrid`), api/worker pods per client on one image, sims on `emptyDir`. The `wait-migrated` initContainer held all four app pods in `Init` until each client's migration Job completed — failed or pending migrations cannot be outrun. Exercised: unlabeled pod blocked from db/broker by NetworkPolicy while `api:8000` stayed open; cross-client `psql` denied both directions; `--grace-period=0` pod kill left the op `pending` with zero effect and drain produced exactly one invoice; graceful delete let warm shutdown finish the in-flight task; `worker` at 2 replicas with duplicate deliveries produced one invoice per operation with the queue drained to 0; `reset.sh` wiped PVCs and reinstalled to seed-only state. [Evidence](evidence/m5/kubernetes.md), [README](../../deploy/k8s/README.md).
 
 ### Notes
@@ -724,7 +728,7 @@ Refine and mark Ready once dependencies pass; record relevant gate resolutions b
 - Area: verification
 - Milestone: M5
 - Priority: Normal
-- Status: Done ✅
+- Status: In progress 🚧
 - Depends on: TAR-017
 - References: [Contract](features/verification.md)
 
@@ -740,6 +744,8 @@ Deliver a reproducible complete demo with measured evidence and honest limitatio
 - README setup is verified; hosted CI/cloud/live-market claims are explicitly distinguished from local results.
 
 ### Completion evidence
+
+2026-11-14 independent M5 review at `9a2c5ba0237d2d5bce65a5bfdedf32ce0a384f41`: **CHANGES_REQUESTED**; reopened for verification gate/timing and Kubernetes upgrade gaps. [Findings and runnable probes](evidence/m5/review-r1/review.md). Historical implementation evidence below is retained; remediate and rerun affected checks before re-review.
 
 2026-11-13 measured portfolio release: [portfolio-run](evidence/m5/portfolio-run.md) — R1 billing batch 8.3 s for 100 accounts × 30-day periods (p95 0.386 s/op, ≤2 s/≤5 min budgets), fresh-period ingest repeats 48.2/51.4 s (≤90 s), peak stack 5.76 GiB (≤8 GiB), queue depth 0, 100 ops → 100 invoices → 0 unbalanced journals. Recorded full journey on a clean stack — [demo-journey.txt](evidence/m5/demo-journey.txt) via `scripts/demo-journey.sh`: setup→seed→ingest→bill→correction→cohort cutover→isolation→market→diagnostics. [Verification audit](evidence/m5/verification-audit.md): matrix rows all covered (M1–M4 independently approved), gates BLK-001/2/3 resolved, doc links clean, README setup verified live. Honest gap recorded: whole-estate same-day revision ingest ~450 s — over the 90 s budget, outside the declared workload. [Walkthrough](evidence/m5/walkthrough.md) covers claims boundary — local only, no cloud/hosted CI/live-market claim. M5 independent review remains owed before the milestone closes.
 

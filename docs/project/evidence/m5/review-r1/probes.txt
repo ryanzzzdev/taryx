@@ -1,0 +1,8 @@
+[batch] PASS wall=1s op_p95=0.1s
+billing with zero invoices and unbalanced journal: PASS
+[duplicate-task-delivery] PASS: duplicate deliveries produced exactly one invoice
+duplicate campaign with two invoices/unbalanced journal: PASS: duplicate deliveries produced exactly one invoice
+[ingest] seeding 100 R1 accounts
+[ingest] starting R1 ingest (180000 intervals)
+[ingest] PASS wall=0.0s healthz_p95=1.0ms metrics_p95=1.0ms
+failed ingest: PASS ingestion failed

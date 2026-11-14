@@ -1,0 +1,64 @@
+All checks passed!
+126 files already formatted
+Success: no issues found in 110 source files
+
+╔══╗─────────▶╔╗ ╔╗      ╔╗◀───┐
+╚╣╠╝◀─────┐  ╔╝╚╗║║────▶╔╝╚╗   │
+ ║║   ╔══╦══╦╩╗╔╝║║  ╔╦═╩╗╔╝╔═╦══╗
+ ║║╔══╣╔╗║╔╗║╔╣║ ║║ ╔╬╣╔╗║║ ║│║╔═╝
+╔╣╠╣║║║╚╝║╚╝║║║╚╗║╚═╝║║║║║╚╗║═╣║
+╚══╩╩╩╣╔═╩══╩╝╚═╝╚═══╩╩╝╚╩═╩╩═╩╝
+  └──▶║║                    ▲ 
+      ╚╝────────────────────┘
+
+
+---------
+Contracts
+---------
+
+Analyzed 110 files, 96 dependencies.
+------------------------------------
+
+Domain layers: clients over territories over core KEPT
+Client packages are independent KEPT
+Core cannot import outer wiring KEPT
+
+Contracts: 3 kept, 0 broken.
+
+╔══╗─────────▶╔╗ ╔╗      ╔╗◀───┐
+╚╣╠╝◀─────┐  ╔╝╚╗║║────▶╔╝╚╗   │
+ ║║   ╔══╦══╦╩╗╔╝║║  ╔╦═╩╗╔╝╔═╦══╗
+ ║║╔══╣╔╗║╔╗║╔╣║ ║║ ╔╬╣╔╗║║ ║│║╔═╝
+╔╣╠╣║║║╚╝║╚╝║║║╚╗║╚═╝║║║║║╚╗║═╣║
+╚══╩╩╩╣╔═╩══╩╝╚═╝╚═══╩╩╝╚╩═╩╩═╩╝
+  └──▶║║                    ▲ 
+      ╚╝────────────────────┘
+
+
+---------
+Contracts
+---------
+
+Analyzed 111 files, 97 dependencies.
+------------------------------------
+
+Domain layers: clients over territories over core KEPT
+Client packages are independent KEPT
+Core cannot import outer wiring BROKEN
+
+Contracts: 2 kept, 1 broken.
+
+
+----------------
+Broken contracts
+----------------
+
+Core cannot import outer wiring
+-------------------------------
+
+taryx.core is not allowed to import taryx.interfaces:
+
+-   taryx.core._boundary_violation_probe -> taryx.interfaces.tasks (l.2)
+
+
+OK: deliberate core -> interfaces violation was rejected.

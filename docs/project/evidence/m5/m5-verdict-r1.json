@@ -1,0 +1,64 @@
+{
+  "reviewed_sha": "9a2c5ba0237d2d5bce65a5bfdedf32ce0a384f41",
+  "verdict": "CHANGES_REQUESTED",
+  "summary": "Four findings recorded; TAR-016–018 reopened and M5 remains In progress. All 234 backend tests pass. TAR-020 excluded. No commit made.",
+  "findings": [
+    {
+      "id": "M5-F1",
+      "severity": "high",
+      "location": "scripts/fault-campaign.py:310; scripts/portfolio-run.py:103",
+      "explanation": "Verification can report PASS despite duplicate invoices, missing invoices or unbalanced journals. Independent probes reproduce these false positives."
+    },
+    {
+      "id": "M5-F2",
+      "severity": "medium",
+      "location": "scripts/measure-budgets.py:125–151",
+      "explanation": "The ingestion gate ignores subprocess failure and drops failed HTTP requests. Reused fixtures can also measure deduplication instead of ingestion."
+    },
+    {
+      "id": "M5-F3",
+      "severity": "medium",
+      "location": "scripts/portfolio-run.py:123–155",
+      "explanation": "Billing latency excludes rating. Reruns reuse historical operations, so saved timings and resource samples do not establish whole-run billing budgets."
+    },
+    {
+      "id": "M5-F4",
+      "severity": "medium",
+      "location": "deploy/k8s/install.sh:34–40",
+      "explanation": "Fixed-name completed migration Jobs do not rerun for upgrades; unchanged latest image references do not trigger deployment rollouts. A repeatable schema-upgrade procedure and evidence are missing."
+    }
+  ],
+  "checks": [
+    {
+      "command": "uv run --frozen pytest -q",
+      "outcome": "passed",
+      "evidence_path": "docs/project/evidence/m5/review-r1/pytest.txt"
+    },
+    {
+      "command": "Ruff lint/format, mypy, import-boundary checks",
+      "outcome": "passed",
+      "evidence_path": "docs/project/evidence/m5/review-r1/static-checks.txt"
+    },
+    {
+      "command": "python3 docs/project/evidence/m5/review-r1/probes.py",
+      "outcome": "passed",
+      "evidence_path": "docs/project/evidence/m5/review-r1/probes.txt"
+    }
+  ],
+  "verification_gaps": [
+    "Fresh installation, schema upgrade, destructive fault campaign and R1 measurements were not independently rerun.",
+    "Browser journey, hosted CI and Sentry export were not rerun.",
+    "Live image source identity was not established; the network probe verified only unlabeled-pod PostgreSQL isolation."
+  ],
+  "artifacts": [
+    "docs/project/evidence/m5/review-r1/review.md",
+    "docs/project/evidence/m5/review-r1/probes.py",
+    "docs/project/evidence/m5/review-r1/probes.txt",
+    "docs/project/evidence/m5/review-r1/network-probe.sh",
+    "docs/project/evidence/m5/review-r1/pytest.txt",
+    "docs/project/evidence/m5/review-r1/static-checks.txt",
+    "docs/project/backlog.md",
+    "docs/project/roadmap.md",
+    "docs/project/journal/2026-11.md"
+  ]
+}
