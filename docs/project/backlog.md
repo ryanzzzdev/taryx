@@ -22,7 +22,7 @@ Task sections own status; index icons mirror them. See the [documentation guide]
 - ✅ [TAR-014 — Freeze the bounded market workflow](#tar-014)
 - ✅ [TAR-015 — Implement market adapter and counterparty simulator](#tar-015)
 - 🚧 [TAR-016 — Verify recovery and correlated diagnostics](#tar-016)
-- 🚧 [TAR-017 — Package and verify Kubernetes delivery](#tar-017)
+- ✅ [TAR-017 — Package and verify Kubernetes delivery](#tar-017)
 - 🚧 [TAR-018 — Measure and present the portfolio release](#tar-018)
 - 🚧 [TAR-019 — Evaluate the multi-agent implement/review orchestrator](#tar-019)
 - ✅ [TAR-020 — Design the operator portal UI](#tar-020)
@@ -675,9 +675,13 @@ Complete real-process fault evidence and actionable operational visibility.
 
 ### Completion evidence
 
+2026-11-14 round-two independent review at `1c7e61d308a6961d9107ca4ba099f15548188682`: **CHANGES_REQUESTED** overall. M5-F1/F2 remain partially open: post-commit redelivery observation and ingest publication/process-exit gates. M5-F3/F4 are closed. Fix remaining gates and rerun affected evidence before re-review. [Review and probes](evidence/m5/review-r2/review.md). Earlier review/remediation statements below are historical.
+
 2026-11-14 independent M5 review at `9a2c5ba0237d2d5bce65a5bfdedf32ce0a384f41`: **CHANGES_REQUESTED**; reopened for verification gate/timing and Kubernetes upgrade gaps. [Findings and runnable probes](evidence/m5/review-r1/review.md). Historical implementation evidence below is retained; remediate and rerun affected checks before re-review.
 
 2026-11-14 R1 remediation: every fault-campaign `observe()` now asserts the financial invariants itself (exactly one invoice, zero unbalanced journals, expected terminal state); the duplicate scenario waits for broker queues to drain; the script exits non-zero on any FAIL. `measure-budgets.py` fails on ingest exit code, counts dropped HTTP probes as availability breaches, verifies the published current-interval count, and defaults its revision stamp to the run timestamp (no dedupe). Campaign rerun: 7/7 PASS under the enforced gates; budget rerun PASS (ingest 30.1 s, kill-recovery 6.8 s). Preserved probes now assert the corrected FAIL behaviour.
+
+2026-11-14 R2 remediation (verify round): post-commit redelivery scenario now waits for drained queues before observing (the op was already complete, so op status alone could not prove the duplicate ran). Ingest budget gate now checks the submitted batch's own outcome — published status, full selection, zero quarantine — so a rejected/duplicate/quarantined batch cannot pass on a populated estate; `main()` propagates FAIL to the exit code; kill-recovery op ids are run-stamped. Campaign rerun 7/7 PASS (days 17–21); budget rerun PASS (August fresh ingest 30.9 s, kill-recovery 6.8 s).
 
 2026-11-13 diagnostics slice: structured JSON logs with bounded labels (`request_id`/`task_id`/`operation_id`/`correlation_id` bound via contextvars; celery signal task binding; `X-Request-ID` middleware; redaction inside the formatter), `/metrics` Prometheus counters on enum statuses only, `sentry-sdk==2.74.0` with `SENTRY_DSN`-gated init and a local in-process-transport capture test (no external account). 9 tests + live verification on compose. [Evidence](evidence/m5/diagnostics.md). Fault campaign and budget runs still open.
 
@@ -697,7 +701,7 @@ Refine and mark Ready once dependencies pass; record relevant gate resolutions b
 - Area: deployment
 - Milestone: M5
 - Priority: Normal
-- Status: In progress 🚧
+- Status: Done ✅
 - Depends on: TAR-016
 - References: [Contract](architecture.md)
 
@@ -713,6 +717,8 @@ Reproduce the application on kind with controlled rollouts and worker lifecycle.
 - Network/credential boundaries and resource limits are exercised, not just configured.
 
 ### Completion evidence
+
+2026-11-14 round-two independent review at `1c7e61d308a6961d9107ca4ba099f15548188682`: **CHANGES_REQUESTED** overall. M5-F4 closed after independent live idempotent upgrade and migration-failure control-flow probe; delivery completion confirmed. [Review and probes](evidence/m5/review-r2/review.md). Earlier review/remediation statements below are historical.
 
 2026-11-14 independent M5 review at `9a2c5ba0237d2d5bce65a5bfdedf32ce0a384f41`: **CHANGES_REQUESTED**; reopened for verification gate/timing and Kubernetes upgrade gaps. [Findings and runnable probes](evidence/m5/review-r1/review.md). Historical implementation evidence below is retained; remediate and rerun affected checks before re-review.
 
@@ -749,9 +755,13 @@ Deliver a reproducible complete demo with measured evidence and honest limitatio
 
 ### Completion evidence
 
+2026-11-14 round-two independent review at `1c7e61d308a6961d9107ca4ba099f15548188682`: **CHANGES_REQUESTED** overall. M5-F1/F2 remain partially open: post-commit redelivery observation and ingest publication/process-exit gates. M5-F3/F4 are closed. Fix remaining gates and rerun affected evidence before re-review. [Review and probes](evidence/m5/review-r2/review.md). Earlier review/remediation statements below are historical.
+
 2026-11-14 independent M5 review at `9a2c5ba0237d2d5bce65a5bfdedf32ce0a384f41`: **CHANGES_REQUESTED**; reopened for verification gate/timing and Kubernetes upgrade gaps. [Findings and runnable probes](evidence/m5/review-r1/review.md). Historical implementation evidence below is retained; remediate and rerun affected checks before re-review.
 
 2026-11-14 R1 remediation: the batch phase now measures a fresh identified batch from before rating through completion — `whole_run_s` = rate + issue per account (p95 0.554 s ≤ 2 s), 100 invoices, zero unbalanced journals, non-zero exit on FAIL. Reruns on an already-measured tag refuse instead of reconstructing; repeats take `REPEAT_MONTHS`/`BILL_MONTH`/`BILL_TAG`. Resource samples are tagged by phase. Fresh-run evidence regenerated in `portfolio-run.{md,jsonl}`.
+
+2026-11-14 R2 remediation (verify round): repeat ingests also gate on the submitted batch's outcome (published, full selection, zero quarantine) — not wall time alone. Day generators now use real month lengths (a 30-day file cannot cover a 31-day billing period). Rerun: June fresh batch whole-run p95 0.47 s, 100 invoices, zero unbalanced; Sep/Oct fresh ingests 29.1/30.7 s; peak 6.36 GiB.
 
 2026-11-13 measured portfolio release: [portfolio-run](evidence/m5/portfolio-run.md) — R1 billing batch 8.3 s for 100 accounts × 30-day periods (p95 0.386 s/op, ≤2 s/≤5 min budgets), fresh-period ingest repeats 48.2/51.4 s (≤90 s), peak stack 5.76 GiB (≤8 GiB), queue depth 0, 100 ops → 100 invoices → 0 unbalanced journals. Recorded full journey on a clean stack — [demo-journey.txt](evidence/m5/demo-journey.txt) via `scripts/demo-journey.sh`: setup→seed→ingest→bill→correction→cohort cutover→isolation→market→diagnostics. [Verification audit](evidence/m5/verification-audit.md): matrix rows all covered (M1–M4 independently approved), gates BLK-001/2/3 resolved, doc links clean, README setup verified live. Honest gap recorded: whole-estate same-day revision ingest ~450 s — over the 90 s budget, outside the declared workload. [Walkthrough](evidence/m5/walkthrough.md) covers claims boundary — local only, no cloud/hosted CI/live-market claim. M5 independent review remains owed before the milestone closes.
 

@@ -126,6 +126,8 @@ Status note 2026-11-08: all three scoped tasks implemented and verified (TAR-013
 
 ## M5 — Operational portfolio delivery
 
+2026-11-14 round-two review at `1c7e61d`: **CHANGES_REQUESTED**. M5-F3/F4 closed; TAR-017 Done after independent upgrade rerun. TAR-016/TAR-018 remain In progress for residual M5-F1/F2 (redelivery observation and batch-specific ingest/exit gates). [Round-two findings](evidence/m5/review-r2/review.md). Earlier status statements below are historical.
+
 2026-11-14 independent review at `9a2c5ba`: **CHANGES_REQUESTED**; TAR-016–018 reopened for false-positive verification gates, incomplete billing timing and repeatable schema-upgrade delivery. M5 remains In progress. [Review](evidence/m5/review-r1/review.md). Earlier Done statements describe implementation evidence and are superseded by this review.
 
 2026-11-14 R1 remediation applied: invariant-enforcing campaign/budget gates (7/7 + budgets rerun PASS), whole-run billing measurement (rate+issue p95 0.554 s, 100 invoices), repeatable k8s upgrade path demonstrated live (recreated Jobs applied a pending migration, `--rollout` rolled all Deployments). Awaiting re-review.

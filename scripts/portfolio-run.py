@@ -11,6 +11,7 @@ April 2026 data, 180k intervals). Output:
 docs/project/evidence/m5/portfolio-run.{jsonl,md}
 """
 
+import calendar
 import importlib.util
 import json
 import os
@@ -223,7 +224,9 @@ def phase_ingest_repeats():
     recs = []
     for label, month in ((f"m{m:02d}", m) for m in months):
         value = f"0.{month}5"
-        days = [f"2026{month:02d}{d:02d}" for d in range(1, 31)]
+        days = [
+            f"2026{month:02d}{d:02d}" for d in range(1, calendar.monthrange(2026, month)[1] + 1)
+        ]
         os.environ["R1_VALUE"] = value
         _s = importlib.util.spec_from_file_location("measure", ROOT / "scripts/measure-budgets.py")
         m = importlib.util.module_from_spec(_s)
@@ -241,13 +244,25 @@ def phase_ingest_repeats():
         t0 = time.perf_counter()
         out = fc.api("ingest_nem12", f"/tmp/r1-{label}.nem12").stdout
         wall = time.perf_counter() - t0
+        # Per-batch outcome, not just wall: a rejected/duplicate/
+        # quarantined batch is a FAIL even when fast.
+        expected = content.count("\n300,") * 48
+        status, selected, quarantined = m.ingest_outcome(out)
         recs.append(
             {
                 "scenario": f"r1-ingest-repeat-{label}",
                 "period": f"2026-{month:02d} (30 days)",
                 "wall_s": round(wall, 1),
+                "batch_status": status,
+                "batch_selected": selected,
+                "batch_quarantined": quarantined,
                 "tail": out.strip().splitlines()[-1][:160],
-                "result": "PASS" if wall <= 90 else "FAIL",
+                "result": "PASS"
+                if wall <= 90
+                and status == "published"
+                and selected == expected
+                and quarantined == 0
+                else "FAIL",
             }
         )
         print(f"[ingest {label}] {recs[-1]['result']} {recs[-1]['wall_s']}s", flush=True)

@@ -1,0 +1,91 @@
+test_billing_counts_and_balances_enforced (__main__.GateTests.test_billing_counts_and_balances_enforced) ... [batch] FAIL wall=1s whole_p95=0.15s invoices=0
+ok
+test_budget_main_returns_failure (__main__.GateTests.test_budget_main_returns_failure) ... FAIL
+test_duplicate_batch_with_old_intervals_rejected (__main__.GateTests.test_duplicate_batch_with_old_intervals_rejected) ... 
+-> /tmp/tmp4isil6jh/budget-runs.md
+[ingest] seeding 100 R1 accounts
+[ingest] starting R1 ingest (180000 intervals)
+[ingest] PASS wall=0.0s healthz_p95=1.0ms metrics_p95=1.0ms
+FAIL
+test_duplicate_scenario_enforces_invariant (__main__.GateTests.test_duplicate_scenario_enforces_invariant) ... [duplicate-task-delivery] FAIL: FAIL: 2 invoices
+ok
+test_http_failure_rejected (__main__.GateTests.test_http_failure_rejected) ... [ingest] seeding 100 R1 accounts
+[ingest] starting R1 ingest (180000 intervals)
+[ingest] FAIL wall=0.0s healthz_p95=1.0ms metrics_p95=1.0ms
+ok
+test_ingest_nonzero_exit_rejected (__main__.GateTests.test_ingest_nonzero_exit_rejected) ... [ingest] seeding 100 R1 accounts
+[ingest] starting R1 ingest (180000 intervals)
+[ingest] FAIL wall=0.0s healthz_p95=1.0ms metrics_p95=1.0ms
+ok
+test_old_batch_not_reconstructed (__main__.GateTests.test_old_batch_not_reconstructed) ... ok
+test_postcommit_waits_for_redelivery (__main__.GateTests.test_postcommit_waits_for_redelivery) ... [sigkill-after-commit] PASS: committed invoice survived the kill; explicit redelivery added nothing
+FAIL
+test_quarantined_batch_rejected (__main__.GateTests.test_quarantined_batch_rejected) ... [ingest] seeding 100 R1 accounts
+[ingest] starting R1 ingest (180000 intervals)
+[ingest] PASS wall=0.0s healthz_p95=1.0ms metrics_p95=1.0ms
+FAIL
+test_rating_included_in_budget (__main__.GateTests.test_rating_included_in_budget) ... [batch] FAIL wall=1s whole_p95=3.1s invoices=100
+ok
+test_rejected_batch_with_old_intervals_rejected (__main__.GateTests.test_rejected_batch_with_old_intervals_rejected) ... [ingest] seeding 100 R1 accounts
+[ingest] starting R1 ingest (180000 intervals)
+[ingest] PASS wall=0.0s healthz_p95=1.0ms metrics_p95=1.0ms
+FAIL
+
+======================================================================
+FAIL: test_budget_main_returns_failure (__main__.GateTests.test_budget_main_returns_failure)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/ryan/work/code/personal/taryx/docs/project/evidence/m5/review-r2/probes.py", line 61, in test_budget_main_returns_failure
+    self.assertEqual(m.main(), 1)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+AssertionError: None != 1
+
+======================================================================
+FAIL: test_duplicate_batch_with_old_intervals_rejected (__main__.GateTests.test_duplicate_batch_with_old_intervals_rejected)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/ryan/work/code/personal/taryx/docs/project/evidence/m5/review-r2/probes.py", line 53, in test_duplicate_batch_with_old_intervals_rejected
+    self.assertEqual(self.ingest('r1.nem12: duplicate')['result'], 'FAIL')
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'PASS' != 'FAIL'
+- PASS
++ FAIL
+
+
+======================================================================
+FAIL: test_postcommit_waits_for_redelivery (__main__.GateTests.test_postcommit_waits_for_redelivery)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/ryan/work/code/personal/taryx/docs/project/evidence/m5/review-r2/probes.py", line 81, in test_postcommit_waits_for_redelivery
+    self.assertTrue(drain.called, 'complete predates redelivery; observing it again cannot establish consumption')
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true : complete predates redelivery; observing it again cannot establish consumption
+
+======================================================================
+FAIL: test_quarantined_batch_rejected (__main__.GateTests.test_quarantined_batch_rejected)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/ryan/work/code/personal/taryx/docs/project/evidence/m5/review-r2/probes.py", line 56, in test_quarantined_batch_rejected
+    self.assertEqual(self.ingest('r1.nem12: published (180000 intervals, 0 selected, 180000 quarantined)')['result'], 'FAIL')
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'PASS' != 'FAIL'
+- PASS
++ FAIL
+
+
+======================================================================
+FAIL: test_rejected_batch_with_old_intervals_rejected (__main__.GateTests.test_rejected_batch_with_old_intervals_rejected)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/ryan/work/code/personal/taryx/docs/project/evidence/m5/review-r2/probes.py", line 50, in test_rejected_batch_with_old_intervals_rejected
+    self.assertEqual(self.ingest('r1.nem12: rejected (unknown_nmi)')['result'], 'FAIL')
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'PASS' != 'FAIL'
+- PASS
++ FAIL
+
+
+----------------------------------------------------------------------
+Ran 11 tests in 0.029s
+
+FAILED (failures=5)

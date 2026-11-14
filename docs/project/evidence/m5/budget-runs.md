@@ -1,4 +1,4 @@
-# TAR-016 frozen-budget runs — 2026-11-14 01:51 UTC
+# TAR-016 frozen-budget runs — 2026-11-14 02:03 UTC
 
 Reference environment per features/metering-and-rating.md §Measurement profile (14-core, ~30 GiB RAM, Docker/Compose on NVMe).
 Probes: `/healthz` issues `SELECT 1`; `/metrics` runs status-count aggregations. SIGKILL recovery is timed from `docker kill` to op
@@ -9,8 +9,10 @@ complete via the documented procedure (restart worker + drain outbox).
 {
   "scenario": "r1-ingest-api-p95",
   "intervals": 180000,
-  "current_intervals": 180192,
-  "ingest_seconds": 30.1,
+  "batch_status": "published",
+  "batch_selected": 180000,
+  "batch_quarantined": 0,
+  "ingest_seconds": 30.9,
   "ingest_rc": 0,
   "ingest_tail": "r1.nem12: published (180000 intervals, 180000 selected, 0 quarantined)",
   "request_failures": {
@@ -22,18 +24,18 @@ complete via the documented procedure (restart worker + drain outbox).
     "ingest_s": 90
   },
   "healthz": {
-    "n": 277,
-    "p50_ms": 20.8,
-    "p95_ms": 23.5,
-    "max_ms": 26.2,
-    "baseline_p95_ms": 28.7
+    "n": 283,
+    "p50_ms": 20.7,
+    "p95_ms": 22.9,
+    "max_ms": 25.7,
+    "baseline_p95_ms": 29.6
   },
   "metrics": {
-    "n": 277,
-    "p50_ms": 30.2,
+    "n": 283,
+    "p50_ms": 30.5,
     "p95_ms": 34.8,
-    "max_ms": 38.5,
-    "baseline_p95_ms": 30.4
+    "max_ms": 37.0,
+    "baseline_p95_ms": 37.5
   },
   "result": "PASS"
 }
@@ -45,7 +47,7 @@ complete via the documented procedure (restart worker + drain outbox).
   "scenario": "sigkill-recovery-budget",
   "kill_to_complete_s": 6.8,
   "budget_s": 60,
-  "op": "budget-kill",
+  "op": "budget-kill-1794621820",
   "invoices": 1,
   "unbalanced_journals": 0,
   "result": "PASS"

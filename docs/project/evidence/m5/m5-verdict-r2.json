@@ -1,0 +1,70 @@
+{
+  "reviewed_sha": "1c7e61d308a6961d9107ca4ba099f15548188682",
+  "verdict": "CHANGES_REQUESTED",
+  "summary": "F3/F4 closed; F1/F2 remain partially open. TAR-017 marked Done; M5 remains In progress. All 234 backend tests pass. Records updated; no commit made.",
+  "findings": [
+    {
+      "id": "M5-F1",
+      "severity": "medium",
+      "location": "scripts/fault-campaign.py:254–267",
+      "explanation": "The post-commit scenario checks an already-complete operation before confirming redelivery consumption. It can claim no duplicate effect before the duplicate task runs."
+    },
+    {
+      "id": "M5-F2",
+      "severity": "medium",
+      "location": "scripts/measure-budgets.py:132–163, main(); scripts/portfolio-run.py:245–257",
+      "explanation": "Existing database intervals let rejected, duplicate or quarantined ingests pass. Publication must be checked per submitted batch. The budget script also exits zero after recording FAIL."
+    }
+  ],
+  "checks": [
+    {
+      "command": "python3 docs/project/evidence/m5/review-r1/probes.py",
+      "outcome": "passed",
+      "evidence_path": "docs/project/evidence/m5/review-r2/original-probes.txt"
+    },
+    {
+      "command": "python3 docs/project/evidence/m5/review-r2/probes.py",
+      "outcome": "failed",
+      "evidence_path": "docs/project/evidence/m5/review-r2/probes.txt"
+    },
+    {
+      "command": "bash deploy/k8s/install.sh --rollout",
+      "outcome": "passed",
+      "evidence_path": "docs/project/evidence/m5/review-r2/upgrade.txt"
+    },
+    {
+      "command": "python3 docs/project/evidence/m5/review-r2/upgrade-gate-probe.py",
+      "outcome": "passed",
+      "evidence_path": "docs/project/evidence/m5/review-r2/upgrade-gate-probe.txt"
+    },
+    {
+      "command": "uv run --frozen pytest -q",
+      "outcome": "passed",
+      "evidence_path": "docs/project/evidence/m5/review-r2/pytest.txt"
+    },
+    {
+      "command": "Ruff, mypy and import-boundary checks",
+      "outcome": "passed",
+      "evidence_path": "docs/project/evidence/m5/review-r2/static-checks.txt"
+    }
+  ],
+  "verification_gaps": [
+    "Full fault and performance campaigns were inspected but not independently rerun.",
+    "Live upgrade rerun was idempotent; pending-migration application relies on retained implementer evidence.",
+    "Fresh cluster reset, browser journey, hosted CI and Sentry export were not rerun."
+  ],
+  "artifacts": [
+    "docs/project/evidence/m5/review-r2/review.md",
+    "docs/project/evidence/m5/review-r2/probes.py",
+    "docs/project/evidence/m5/review-r2/probes.txt",
+    "docs/project/evidence/m5/review-r2/original-probes.txt",
+    "docs/project/evidence/m5/review-r2/upgrade-gate-probe.py",
+    "docs/project/evidence/m5/review-r2/upgrade-gate-probe.txt",
+    "docs/project/evidence/m5/review-r2/upgrade.txt",
+    "docs/project/evidence/m5/review-r2/pytest.txt",
+    "docs/project/evidence/m5/review-r2/static-checks.txt",
+    "docs/project/backlog.md",
+    "docs/project/roadmap.md",
+    "docs/project/journal/2026-11.md"
+  ]
+}

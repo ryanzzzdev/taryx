@@ -1,0 +1,22 @@
+PASS: failed migration wait exits nonzero before rollout restart; Jobs recreated
+apply -f deploy/k8s/manifests/00-namespace.yaml
+apply -f deploy/k8s/manifests/01-secrets.yaml
+apply -f deploy/k8s/manifests/02-env.yaml
+-n taryx create configmap taryx-db-init --from-file=db/init/01-shadow-role.sql --from-file=db/init/02-clients.sql --dry-run=client -o yaml
+apply -f -
+-n taryx create configmap taryx-broker-init --from-file=provision.py=broker/init/provision.py --dry-run=client -o yaml
+apply -f -
+apply -f deploy/k8s/manifests/10-postgres.yaml
+apply -f deploy/k8s/manifests/11-rabbitmq.yaml
+apply -f deploy/k8s/manifests/20-sims.yaml
+apply -f deploy/k8s/manifests/60-networkpolicy.yaml
+apply -f deploy/k8s/manifests/40-api.yaml
+apply -f deploy/k8s/manifests/50-worker.yaml
+-n taryx wait --for=condition=ready pod -l taryx.dev/role=db --timeout=120s
+-n taryx delete job db-init broker-provision migrate-aurora migrate-southgrid --ignore-not-found
+apply -f deploy/k8s/manifests/30-jobs.yaml
+-n taryx wait --for=condition=ready pod -l taryx.dev/role=broker --timeout=120s
+-n taryx wait --for=condition=complete job/db-init --timeout=120s
+-n taryx wait --for=condition=complete job/broker-provision --timeout=120s
+-n taryx wait --for=condition=complete job/migrate-aurora --timeout=300s
+

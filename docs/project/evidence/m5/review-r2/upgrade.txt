@@ -1,0 +1,85 @@
+namespace/taryx unchanged
+secret/taryx-secrets configured
+configmap/taryx-env-aurora unchanged
+configmap/taryx-env-sg unchanged
+configmap/taryx-db-init unchanged
+configmap/taryx-broker-init unchanged
+statefulset.apps/db configured
+service/db unchanged
+statefulset.apps/broker configured
+service/broker unchanged
+deployment.apps/legacy unchanged
+service/legacy unchanged
+deployment.apps/legacy-sg unchanged
+service/legacy-sg unchanged
+deployment.apps/market unchanged
+service/market unchanged
+deployment.apps/market-sg unchanged
+service/market-sg unchanged
+networkpolicy.networking.k8s.io/default-deny-ingress unchanged
+networkpolicy.networking.k8s.io/db-ingress configured
+networkpolicy.networking.k8s.io/broker-ingress configured
+networkpolicy.networking.k8s.io/sim-ingress configured
+networkpolicy.networking.k8s.io/api-ingress configured
+deployment.apps/api unchanged
+service/api unchanged
+deployment.apps/api-sg unchanged
+service/api-sg unchanged
+deployment.apps/worker unchanged
+deployment.apps/worker-sg unchanged
+pod/db-0 condition met
+job.batch "db-init" deleted from taryx namespace
+job.batch "broker-provision" deleted from taryx namespace
+job.batch "migrate-aurora" deleted from taryx namespace
+job.batch "migrate-southgrid" deleted from taryx namespace
+job.batch/db-init created
+job.batch/broker-provision created
+job.batch/migrate-aurora created
+job.batch/migrate-southgrid created
+pod/broker-0 condition met
+job.batch/db-init condition met
+job.batch/broker-provision condition met
+job.batch/migrate-aurora condition met
+job.batch/migrate-southgrid condition met
+deployment.apps/api restarted
+deployment.apps/worker restarted
+deployment.apps/api-sg restarted
+deployment.apps/worker-sg restarted
+Waiting for deployment "api" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "api" rollout to finish: 1 old replicas are pending termination...
+deployment "api" successfully rolled out
+deployment "worker" successfully rolled out
+deployment "api-sg" successfully rolled out
+deployment "worker-sg" successfully rolled out
+pod/legacy-dd7f48f9b-jc49j condition met
+pod/legacy-sg-744b76998f-5srlb condition met
+pod/market-7db4ddc779-sdxzd condition met
+pod/market-sg-6fb8894cd-qm6xk condition met
+install complete; aurora api on node port 30001, southgrid on 30002
+NAME                STATUS     COMPLETIONS   DURATION   AGE
+broker-provision    Complete   1/1           6s         57s
+db-init             Complete   1/1           5s         57s
+migrate-aurora      Complete   1/1           11s        57s
+migrate-southgrid   Complete   1/1           10s        56s
+Defaulted container "api" out of: api, wait-migrated (init)
+audit
+ [X] 0001_initial
+ [X] 0002_upgrade_boundary_probe
+Operations to perform:
+  Apply all migrations: accounts, audit, auth, billing, contenttypes, market, metering, migration, pricing, sessions
+Running migrations:
+  No migrations to apply.
+client aurora_energy (Aurora Energy)
+ACC-001: Meridian Heights Bakery (1 NMI, 2 channels)
+ACC-002: Collins Wharf Grocer (1 NMI, 1 channels)
+ACC-003: Harbour Lane Studio (1 NMI, 2 channels)
+user viewer: role viewer
+user operator: role operator
+user approver: role approver
+cohort Legacy Cohort A: legacy_only (2 accounts)
+NAME                      IMAGE
+api-77c96d8fdd-vcz5t      sha256:e2184fc140f94b2952de910e4d3a70579ea7c5b7d71dafd56c5c051d8473b45e
+api-sg-7f4f47c48c-lmkhn   sha256:e2184fc140f94b2952de910e4d3a70579ea7c5b7d71dafd56c5c051d8473b45e
+NAME                         IMAGE
+worker-5688d5b676-f8cqk      sha256:e2184fc140f94b2952de910e4d3a70579ea7c5b7d71dafd56c5c051d8473b45e
+worker-sg-5cb7ff5d7c-9mnwg   sha256:e2184fc140f94b2952de910e4d3a70579ea7c5b7d71dafd56c5c051d8473b45e

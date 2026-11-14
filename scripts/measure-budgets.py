@@ -10,9 +10,11 @@ Output: docs/project/evidence/m5/budget-runs.{jsonl,md}
 Run: uv run python scripts/measure-budgets.py
 """
 
+import calendar
 import importlib.util
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -27,7 +29,10 @@ _spec.loader.exec_module(fc)
 
 R1_NMIS = [f"420000{i + 1:04d}" for i in range(100)]  # 4200000001..4200000100
 B1_NMIS = set(R1_NMIS[::4])  # 25% carry an export channel
-R1_DAYS = [f"202604{d:02d}" for d in range(1, 31)]
+R1_MONTH = int(os.environ.get("R1_MONTH", "4"))  # bump per rerun for the fresh-create path
+R1_DAYS = [
+    f"2026{R1_MONTH:02d}{d:02d}" for d in range(1, calendar.monthrange(2026, R1_MONTH)[1] + 1)
+]
 R1_VALUE = os.environ.get("R1_VALUE", "0.5")  # vary per rerun — content-hash differs
 # Revisions must carry a LATER load/update stamp to out-rank the prior
 # records (equal precedence + different value is a real quarantine).
@@ -72,6 +77,16 @@ def probe(url):
         return time.perf_counter() - t0
     except Exception:
         return None
+
+
+def ingest_outcome(out):
+    """Parse `name: status (N intervals, M selected, K quarantined)`
+    from ingest stdout. Rejected/duplicate/unparseable = (status, 0, 0)."""
+    last = out.strip().splitlines()[-1] if out.strip() else ""
+    m = re.search(r": (\w+)(?: \((\d+) intervals, (\d+) selected, (\d+) quarantined\))?", last)
+    if not m:
+        return ("unparseable", 0, 0)
+    return (m.group(1), int(m.group(3) or 0), int(m.group(4) or 0))
 
 
 def pct(sorted_vals, q):
@@ -132,12 +147,16 @@ def phase_ingest():
         time.sleep(0.06)
     wall = time.perf_counter() - t0
     out = ing.stdout.read()
-    # Publication check: the full expected interval set must be current.
-    current = int(fc.psql("SELECT count(*) FROM metering_currentinterval") or 0)
+    # Publication check on THIS batch: published, every interval
+    # selected, none quarantined — a rejected/duplicate batch cannot
+    # hide behind an already-populated estate.
+    status, selected, quarantined = ingest_outcome(out)
     rec = {
         "scenario": "r1-ingest-api-p95",
         "intervals": intervals,
-        "current_intervals": current,
+        "batch_status": status,
+        "batch_selected": selected,
+        "batch_quarantined": quarantined,
         "ingest_seconds": round(wall, 1),
         "ingest_rc": ing.returncode,
         "ingest_tail": out.strip().splitlines()[-1][:200] if out.strip() else "",
@@ -157,8 +176,10 @@ def phase_ingest():
         }
     ok = (
         ing.returncode == 0
+        and status == "published"
+        and selected == intervals
+        and quarantined == 0
         and wall <= 90
-        and current >= intervals
         and not any(failures.values())
         and all(rec[n]["p95_ms"] is not None and rec[n]["p95_ms"] <= 500 for n in samples)
     )
@@ -173,7 +194,8 @@ def phase_ingest():
 
 def phase_kill_recovery():
     """SIGKILL at the pre-commit boundary; time kill -> recovered complete."""
-    op, day = "budget-kill", "26"
+    op = os.environ.get("KILL_OP") or f"budget-kill-{int(time.time())}"
+    day = "26"
     fc.provision_period(day, op)
     fc.arm_worker({"TARYX_BILLING_PRECOMMIT_SLEEP": "30"})
     fc.bill(day, op)
@@ -227,6 +249,11 @@ def main():
         ]
     (OUT / "budget-runs.md").write_text("\n".join(lines))
     print(f"\n-> {OUT}/budget-runs.md")
+    failed = [r["scenario"] for r in recs if r["result"] != "PASS"]
+    if failed:
+        print(f"FAILED: {failed}", flush=True)
+        return 1
+    return 0
 
 
 if __name__ == "__main__":

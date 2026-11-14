@@ -261,6 +261,9 @@ def s2_postcommit_kill():
             "from taryx.composition.tasks import process_billing_operation\n"
             f"process_billing_operation.delay('{op}')"
         )
+        # The op was already complete before the kill — only a drained
+        # queue proves the redelivery was actually consumed.
+        wait_queue_drained()
         wait_op(op, "complete", timeout=60)
         rec = {"mid": mid, "after": financials(day)}
         if mid["invoices"] != 1:
