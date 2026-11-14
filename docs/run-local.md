@@ -49,7 +49,7 @@ that's part of the isolation demo.
 | Service | Aurora Energy | Southgrid Retail |
 | --- | --- | --- |
 | Portal (React) | <http://localhost:5174> | <http://localhost:5175> |
-| API (`/healthz`, `/graphql`) | <http://localhost:8001> | <http://localhost:8002> |
+| API (`/healthz`, `/graphql`, `/metrics`) | <http://localhost:8001> | <http://localhost:8002> |
 | Legacy billing sim | <http://localhost:18090> | <http://localhost:18091> |
 | Market sim | <http://localhost:18092> | <http://localhost:18093> |
 
@@ -59,7 +59,15 @@ Shared infrastructure:
 | --- | --- |
 | PostgreSQL | `localhost:55432` (app connects as `taryx_app` / `taryx_sg`) |
 | RabbitMQ AMQP | `localhost:5673` |
-| RabbitMQ management | <http://localhost:15673> (`taryx` / `taryx`) |
+| RabbitMQ management | <http://localhost:15673> (`taryx_admin` / `taryx_admin`) |
+
+`/metrics` is an unauthenticated Prometheus-text endpoint with durable
+business counters (operations, market workflows, outbox depth).
+
+The `taryx_admin` broker login is the provisioning administrator,
+created by `broker-init` on every `up`. The `taryx`/`taryx_sg` users
+are non-administrator application accounts scoped to their own vhost —
+they cannot log in to the management UI.
 
 Host ports are offset from defaults so sibling project stacks can
 coexist; container-internal ports are standard.
@@ -169,6 +177,27 @@ curl -X POST localhost:18092/_admin/scenario -d '{"name": "lost-response"}'
 curl -X POST localhost:18092/_admin/scenario -d '{"name": "happy"}'
 ```
 
+## Automated journey and verification scripts
+
+`scripts/` contains the M5 evidence drivers — useful when you want the
+whole journey or a fault scenario without clicking:
+
+| Script | What it does |
+| --- | --- |
+| `demo-journey.sh` | Narrated end-to-end run: clean reset, metering, billing, correction, migration cutover, client isolation, market transfer, diagnostics. **It runs `docker compose down -v` itself — it wipes existing volumes.** Run with `DEMO_PAUSE=<seconds>` to slow it down. |
+| `fault-campaign.py` | Real-process fault scenarios (SIGKILL around commit, broker outage, duplicate delivery) against the running stack; arms worker fault env hooks. Writes evidence to `docs/project/evidence/m5/`. |
+| `measure-budgets.py` | Seeds the R1 measurement estate (100 accounts, April 2026, ~180k intervals). |
+| `portfolio-run.py` | Runs the measured portfolio workload against the seeded R1 estate; writes budget evidence to `docs/project/evidence/m5/`. |
+
+## Kubernetes (kind) delivery
+
+The stack also deploys to a local `kind` cluster — StatefulSet
+PostgreSQL/RabbitMQ, one shared app image, migration-gated pods,
+NetworkPolicy and per-client isolation. See
+[deploy/k8s/README.md](../deploy/k8s/README.md) for
+`install.sh`/`reset.sh`; `docker compose build api` produces the
+`taryx-app:latest` image the manifests expect.
+
 ## Stop / reset
 
 ```text
@@ -199,5 +228,11 @@ make check      # ruff lint+format, mypy, import contracts, pytest, web test/typ
   disabled by design — kombu pidbox queues are rejected by RabbitMQ 4.
 - **Portal 403 on first action**: the app bootstraps CSRF with a safe
   GET and retries once automatically; if it persists, hard-reload.
+- **`permission_denied` while a tab still shows your role**: cookies are
+  host-scoped, not port-scoped — :5174 and :5175 share the `sessionid` /
+  `csrftoken` jar. Signing into one client overwrites the other's
+  session; the stale tab keeps showing the old role but its calls are
+  anonymous. Hard-reload and sign in again. To keep both clients open,
+  use different hostnames (`localhost:5174` vs `127.0.0.1:5175`).
 - **Stale sims**: legacy/market sqlite files persist in their volumes —
   remove them (above) when changing seeded scenarios.

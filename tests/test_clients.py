@@ -58,8 +58,12 @@ def test_unknown_client_fails_at_startup(monkeypatch):
     monkeypatch.setenv("TARYX_CLIENT", "not_a_client")
     resolver.selected_client_id.cache_clear()
     resolver.policy.cache_clear()
-    with pytest.raises(RuntimeError, match="unknown TARYX_CLIENT"):
-        resolver.policy()
+    try:
+        with pytest.raises(RuntimeError, match="unknown TARYX_CLIENT"):
+            resolver.policy()
+    finally:
+        resolver.selected_client_id.cache_clear()
+        resolver.policy.cache_clear()
 
 
 def test_policies_price_identical_inputs_differently(db, aurora, southgrid, tmp_path):

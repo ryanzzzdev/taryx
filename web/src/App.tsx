@@ -181,6 +181,7 @@ const Chip = ({ status, label }: { status: string; label?: string }) => (
 
 export function App() {
   const [me, setMe] = useState<Me | null | undefined>(undefined);
+  const [clientName, setClientName] = useState<string | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [period, setPeriod] = useState<Period>({ s: "2026-03-02", e: "2026-03-03" });
@@ -213,9 +214,27 @@ export function App() {
     if (me) refreshAccounts();
   }, [me, refreshAccounts]);
 
+  // Client identity is unauthenticated deployment config — fetched before
+  // login so the login page and tab title can brand the instance.
+  useEffect(() => {
+    gql<{ clientName: string }>("{clientName}")
+      .then((d) => setClientName(d.clientName))
+      .catch(() => undefined);
+  }, []);
+  useEffect(() => {
+    if (clientName) document.title = `${clientName} — Taryx Operator Console`;
+  }, [clientName]);
+
   if (me === undefined) return <main className="wrap dim">…</main>;
   if (me === null)
-    return <Login onLogin={refreshMe} theme={theme} setTheme={setTheme} />;
+    return (
+      <Login
+        onLogin={refreshMe}
+        theme={theme}
+        setTheme={setTheme}
+        clientName={clientName}
+      />
+    );
   const account = accounts.find((a) => a.reference === selected) ?? null;
   return (
     <>
@@ -223,6 +242,7 @@ export function App() {
         <span className="logo">
           TARYX <em>Operator Console</em>
         </span>
+        {clientName && <span className="client">{clientName}</span>}
         <nav className="tabs">
           <a href="#accounts" className="on">
             Accounts &amp; Billing
@@ -323,10 +343,12 @@ function Login({
   onLogin,
   theme,
   setTheme,
+  clientName,
 }: {
   onLogin: () => void;
   theme: Theme;
   setTheme: (t: Theme) => void;
+  clientName: string | null;
 }) {
   const [username, setUsername] = useState("operator");
   const [password, setPassword] = useState("");
@@ -344,6 +366,7 @@ function Login({
           <div className="tag">
             Retail energy billing, financial ledger and safe migration platform.
           </div>
+          {clientName && <div className="login-client">{clientName}</div>}
           <ul>
             <li>Explainable itemised bills</li>
             <li>Balanced sealed journals</li>

@@ -547,6 +547,7 @@ class UserType(graphene.ObjectType):
 class Query(graphene.ObjectType):
     ping = graphene.String(required=True)
     version = graphene.String(required=True)
+    client_name = graphene.String(required=True)
     me = graphene.Field(UserType)
     accounts = graphene.List(AccountType, required=True, limit=graphene.Int(default_value=50))
     account = graphene.Field(AccountType, reference=graphene.String(required=True))
@@ -633,6 +634,9 @@ class Query(graphene.ObjectType):
 
     def resolve_version(root, info):
         return "0.1.0"
+
+    def resolve_client_name(root, info):
+        return _policy().CLIENT_NAME
 
     def resolve_me(root, info):
         user = _user(info)
