@@ -248,6 +248,165 @@ a:hover {
   color: #fff;
 }
 
+/* inline help: ? icon + popover */
+.helpwrap {
+  position: relative;
+  display: inline-block;
+}
+.helpbtn {
+  border: 0;
+  background: transparent;
+  color: var(--tx-faint);
+  font: inherit;
+  font-weight: 700;
+  font-size: var(--fs-xs);
+  padding: 0 3px;
+  cursor: pointer;
+  line-height: 1;
+  border-radius: 50%;
+}
+.helpbtn:hover {
+  color: var(--accent-2);
+}
+.helpbd {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  cursor: default;
+}
+.helppop {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: -4px;
+  z-index: 61;
+  width: 250px;
+  padding: 8px 10px;
+  background: var(--bg-panel);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r);
+  box-shadow: var(--shadow);
+  font-size: var(--fs-xs);
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--tx);
+  text-align: left;
+  text-transform: none;
+  letter-spacing: 0;
+  white-space: normal;
+}
+.helppop b {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--tx);
+}
+.helppop a {
+  display: inline-block;
+  margin-top: 5px;
+}
+
+/* ============ Manual page ============ */
+.manual {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 24px 18px 60px;
+  font-size: 13px;
+  display: grid;
+  grid-template-columns: 230px 1fr;
+  gap: 32px;
+  align-items: start;
+}
+.manual-nav {
+  position: sticky;
+  top: 58px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 10px 0;
+  border-right: 1px solid var(--line);
+  max-height: calc(100vh - 72px);
+  overflow-y: auto;
+}
+.manual-nav .mn-group {
+  display: flex;
+  flex-direction: column;
+}
+.manual-nav a {
+  display: block;
+  padding: 4px 10px;
+  color: var(--tx-dim);
+  font-size: var(--fs-s);
+  border-radius: var(--r);
+}
+.manual-nav a:hover {
+  text-decoration: none;
+  color: var(--tx);
+  background: var(--bg-hover);
+}
+.manual-nav a.on {
+  color: var(--accent-2);
+  font-weight: 600;
+  background: var(--bg-sel);
+  box-shadow: inset 3px 0 0 var(--accent-2);
+}
+.manual-nav a.sub {
+  padding-left: 22px;
+  font-size: var(--fs-xs);
+}
+.manual-body {
+  min-width: 0;
+}
+.manual h1 {
+  font-size: 20px;
+  margin: 0 0 4px;
+}
+.manual h2 {
+  font-size: 15px;
+  margin: 28px 0 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  scroll-margin-top: 60px;
+}
+.manual section {
+  scroll-margin-top: 60px;
+}
+.manual h3 {
+  font-size: 13px;
+  margin: 14px 0 4px;
+}
+.manual p,
+.manual li {
+  line-height: 1.65;
+  color: var(--tx);
+}
+.manual ul {
+  padding-left: 18px;
+}
+.manual table {
+  margin: 8px 0;
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+}
+.manual td {
+  font-size: var(--fs-s);
+}
+.manual code {
+  background: var(--bg-hover);
+  border-radius: 3px;
+  padding: 0 4px;
+}
+@media (max-width: 780px) {
+  .manual {
+    grid-template-columns: 1fr;
+  }
+  .manual-nav {
+    position: static;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+    max-height: none;
+    padding-bottom: 12px;
+  }
+}
+
 /* ============ Sub-header ============ */
 .subhead {
   background: var(--bg-panel);

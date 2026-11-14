@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { Help, ManualPage } from "./manual";
 import {
   clearPending,
   newOperationId,
@@ -188,6 +189,13 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [events, setEvents] = useState<Evt[]>([]);
   const [theme, setTheme] = useTheme();
+  const [hash, setHash] = useState(window.location.hash);
+
+  useEffect(() => {
+    const onHash = () => setHash(window.location.hash);
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
 
   const logEvent = useCallback((kind: Evt["kind"], msg: string) => {
     setEvents((prev) =>
@@ -225,6 +233,11 @@ export function App() {
     if (clientName) document.title = `${clientName} — Taryx Operator Console`;
   }, [clientName]);
 
+  // The manual renders for any visitor — it carries no account data, so it
+  // can be read before signing in (help links open it in a new tab).
+  if (hash.startsWith("#manual"))
+    return <ManualPage section={hash.slice(8)} clientName={clientName} />;
+
   if (me === undefined) return <main className="wrap dim">…</main>;
   if (me === null)
     return (
@@ -249,6 +262,7 @@ export function App() {
           </a>
           <a href="#quarantine">Quarantine</a>
           <a href="#migration">Migration</a>
+          <a href="#manual">Manual</a>
         </nav>
         <span className="env">dev</span>
         <div className="right">
@@ -277,7 +291,9 @@ export function App() {
             <b>{account?.reference ?? "select an account"}</b>
           </span>
           <div className="filters">
-            <label>Period</label>
+            <label>
+              Period <Help topic="period" />
+            </label>
             <input
               type="text"
               value={period.s}
@@ -468,15 +484,29 @@ function AccountsTable({
   return (
     <div className="card">
       <table>
-        <caption>Accounts — {accounts.length} records</caption>
+        <caption>
+          Accounts — {accounts.length} records <Help topic="accounts-table" />
+        </caption>
         <thead>
           <tr>
-            <th>Reference</th>
-            <th>Name</th>
-            <th>Channels</th>
-            <th className="r">Docs</th>
-            <th className="r">Last total</th>
-            <th>Source</th>
+            <th>
+              Reference <Help topic="col-reference" />
+            </th>
+            <th>
+              Name <Help topic="col-name" />
+            </th>
+            <th>
+              Channels <Help topic="col-channels" />
+            </th>
+            <th className="r">
+              Docs <Help topic="col-docs" />
+            </th>
+            <th className="r">
+              Last total <Help topic="col-last-total" />
+            </th>
+            <th>
+              Source <Help topic="col-source" />
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -700,7 +730,9 @@ function AccountPanel({
       </div>
       <div className="bd">
         <fieldset className="grp">
-          <legend>Account</legend>
+          <legend>
+            Account <Help topic="account-fields" />
+          </legend>
           <div className="props">
             <div className="p">
               <b>Channels</b>
@@ -733,6 +765,7 @@ function AccountPanel({
             <div className="step">
               <div className="sh">
                 <span className="n">1</span>Ingest NEM12
+                <Help topic="ingest" />
                 {batch && <Chip status={batch.status} />}
               </div>
               <div className="sb">
@@ -767,6 +800,7 @@ function AccountPanel({
             <div className="step">
               <div className="sh">
                 <span className="n">2</span>Rate
+                <Help topic="rate" />
                 {run && <Chip status="ok" label={`run #${run.id}`} />}
               </div>
               <div className="sb">
@@ -789,6 +823,7 @@ function AccountPanel({
             <div className="step">
               <div className="sh">
                 <span className="n">3</span>Bill / correct
+                <Help topic="bill" />
                 {op && <Chip status={op.status} />}
               </div>
               <div className="sb">
@@ -823,7 +858,9 @@ function AccountPanel({
         </fieldset>
 
         <fieldset className="grp" style={{ marginBottom: 0 }}>
-          <legend>Issued documents</legend>
+          <legend>
+            Issued documents <Help topic="documents" />
+          </legend>
           {doc ? (
             <div className="split">
               <div>
@@ -835,15 +872,31 @@ function AccountPanel({
                   <thead>
                     <tr>
                       <th>#</th>
-                      <th>Tariff</th>
-                      <th>Element</th>
-                      <th>Band</th>
-                      <th className="r">Qty</th>
+                      <th>
+                        Tariff <Help topic="col-tariff" />
+                      </th>
+                      <th>
+                        Element <Help topic="col-element" />
+                      </th>
+                      <th>
+                        Band <Help topic="col-band" />
+                      </th>
+                      <th className="r">
+                        Qty <Help topic="col-qty" />
+                      </th>
                       <th>Unit</th>
-                      <th className="r">Rate</th>
-                      <th className="r">Amount</th>
-                      <th className="r">GST</th>
-                      <th>Basis</th>
+                      <th className="r">
+                        Rate <Help topic="col-rate" />
+                      </th>
+                      <th className="r">
+                        Amount <Help topic="col-amount" />
+                      </th>
+                      <th className="r">
+                        GST <Help topic="col-gst" />
+                      </th>
+                      <th>
+                        Basis <Help topic="col-basis" />
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -884,8 +937,12 @@ function AccountPanel({
                     <table>
                       <thead>
                         <tr>
-                          <th>Acct</th>
-                          <th className="r">Dr</th>
+                          <th>
+                            Acct <Help topic="journal-acct" />
+                          </th>
+                          <th className="r">
+                            Dr <Help topic="journal-drcr" />
+                          </th>
                           <th className="r">Cr</th>
                         </tr>
                       </thead>
@@ -905,10 +962,16 @@ function AccountPanel({
                 <table>
                   <thead>
                     <tr>
-                      <th>Doc</th>
+                      <th>
+                        Doc <Help topic="reg-doc" />
+                      </th>
                       <th className="r">Total</th>
-                      <th>Source</th>
-                      <th>Adj.</th>
+                      <th>
+                        Source <Help topic="reg-source" />
+                      </th>
+                      <th>
+                        Adj. <Help topic="reg-adj" />
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -971,7 +1034,9 @@ function QuarantinePanel({
   return (
     <div className="card" id="quarantine">
       <div className="head">
-        <h2>Open quarantines</h2>
+        <h2>
+          Open quarantines <Help topic="quarantine" />
+        </h2>
         <div className="tools">
           <Chip status={items.length ? "warn" : "ok"} label={`${items.length} open`} />
         </div>
@@ -1143,7 +1208,9 @@ function MigrationPanel({
   return (
     <div className="card" id="migration">
       <div className="head">
-        <h2>Migration cohorts</h2>
+        <h2>
+          Migration cohorts <Help topic="migration" />
+        </h2>
         <div className="tools">
           {cohorts.map((c) => (
             <Chip
@@ -1311,7 +1378,9 @@ function AuditCard({ events }: { events: Evt[] }) {
   return (
     <div className="card">
       <div className="head">
-        <h2>Session events</h2>
+        <h2>
+          Session events <Help topic="events" />
+        </h2>
         <div className="tools">
           <span className="chip c-dim">{events.length}</span>
         </div>
