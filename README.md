@@ -4,7 +4,7 @@
 
 Taryx is a portfolio project exploring how an energy retailer can produce explainable bills, handle corrected meter data and safely replace a legacy billing system while continuing to serve customers. Its architecture follows publicly documented principles from Kraken Customer: a layered Django modular monolith, specialised asynchronous workers, client-specific configuration and carefully bounded external integrations.
 
-Taryx has an initial planning baseline; implementation has not started. This document describes the intended product and architectural direction. Canonical implementation plans and task status live in the documents below.
+Taryx is implemented end-to-end: metering ingestion, rating, billing and corrections, shadow-engine migration, two isolated client retailers, bounded market integration, correlated diagnostics, a real-process fault campaign, Kubernetes packaging and a measured portfolio release. Milestones M1–M4 passed independent review; the M5 implementation is complete and its independent review is pending. Canonical plans and task status live in the documents below.
 
 ## Project idea
 
@@ -52,7 +52,7 @@ flowchart TD
 
 The diagram shows the main interactions for one client instance. The API and specialised workers use the same core application image, deployed as separate workloads with their own queues and resource allocations. A second retailer uses the same code with separate configuration and database credentials.
 
-Inside the application, the intended dependency direction is:
+Inside the application, the dependency direction is:
 
 ```text
 clients → territories → core
@@ -80,20 +80,20 @@ Historical commitments in the demo are clearly labelled fictional client policie
 
 ## Technology direction
 
-| Area | Intended technology and role |
+| Area | Technology and role |
 | --- | --- |
 | Retail application | Python and Django for the domain model, persistence and application services |
 | API | GraphQL with Graphene for the operator portal |
 | Financial and operational data | PostgreSQL with explicit transactions, constraints and versioned records |
 | Background processing | Celery with RabbitMQ and specialised worker queues |
-| Operator experience | React and TypeScript |
+| Operator experience | React and TypeScript (Vite), enterprise-console design with light/dark/auto themes |
 | Architecture enforcement | Import Linter for layer and package boundaries |
 | Local environment | Docker Compose for repeatable development and integration scenarios |
-| Deployment | Kubernetes on kind or k3d, with separate API and worker Deployments and database migration Jobs |
-| Observability | Prometheus and Grafana for metrics; Sentry for application errors; OpenTelemetry for tracing |
+| Deployment | Kubernetes on kind via [deploy/k8s](deploy/k8s/README.md), with separate API and worker Deployments and database migration Jobs |
+| Observability | Structured JSON logs with correlation IDs and redaction, a Prometheus text-format `/metrics` endpoint, and an optional Sentry capture path (DSN-gated) |
 | Verification | Automated domain and integration tests, legacy comparison scenarios and controlled failure injection |
 
-Framework choices for the surrounding services, deployment tooling and detailed contracts remain open for bootstrap and design work. The architectural objective is a system whose bills can be explained, whose changes can be audited and whose recovery behaviour can be demonstrated.
+The architectural objective is a system whose bills can be explained, whose changes can be audited and whose recovery behaviour can be demonstrated — and all three have measured evidence under `docs/project/evidence/`.
 
 ## Development setup
 
@@ -107,17 +107,25 @@ make down       # stop the stack
 make reset      # stop and drop the taryx-pgdata / taryx-broker volumes
 ```
 
-Endpoints once running: API `http://localhost:8001` (`/healthz`, `/graphql`), portal `http://localhost:5174`, RabbitMQ management `http://localhost:15673`, PostgreSQL `localhost:55432`, AMQP `localhost:5673`. Host ports are offset from the defaults so sibling project stacks can coexist; container-internal ports are unchanged.
+Endpoints once running (Aurora Energy client): API `http://localhost:8001` (`/healthz`, `/graphql`, `/metrics`), portal `http://localhost:5174`, RabbitMQ management `http://localhost:15673`, PostgreSQL `localhost:55432`, AMQP `localhost:5673`. The second client (Southgrid Retail) serves API `http://localhost:8002` and portal `http://localhost:5175`. Host ports are offset from the defaults so sibling project stacks can coexist; container-internal ports are unchanged.
 
 Host-side commands (`uv run pytest`, `uv run python manage.py ...`) target these published ports by default. Celery worker remote control (inspect/revoke broadcasts) is disabled: kombu's pidbox mailbox declares transient non-exclusive queues that RabbitMQ 4 rejects.
 
-For the full two-client stack with seed data, demo logins, portal walkthrough and simulator fault injection, see [run-local.md](docs/run-local.md).
+For the full two-client stack with seed data, demo logins, portal walkthrough and simulator fault injection, see [run-local.md](docs/run-local.md). For a clean Kubernetes install/reset on kind, see [deploy/k8s/README.md](deploy/k8s/README.md).
 
 ## Project documentation
 
 - [Agent workflow](AGENTS.md) and [documentation guide](docs/project/documentation-guide.md)
 - [Architecture](docs/project/architecture.md), [roadmap](docs/project/roadmap.md) and [backlog](docs/project/backlog.md)
 - Feature contracts: [metering and rating](docs/project/features/metering-and-rating.md), [billing and ledger](docs/project/features/billing-and-ledger.md), [legacy migration](docs/project/features/legacy-migration.md), [operator and clients](docs/project/features/operator-and-clients.md), [market integration](docs/project/features/market-integration.md), [verification](docs/project/features/verification.md)
-- [Open questions](docs/project/blockers.md) and [work journal](docs/project/journal/2026-10.md)
+- [Open questions](docs/project/blockers.md) and work journals ([2026-10](docs/project/journal/2026-10.md), [2026-11](docs/project/journal/2026-11.md))
 
-M1 and M2 are complete and verified; both independent reviews are remediated (see the [M1 review](docs/project/evidence/m1-exit-review.md) and [M2 review](docs/project/evidence/m2-independent-review.md)). Next: M3 legacy characterisation; see the [backlog](docs/project/backlog.md).
+## Demos and evidence
+
+- **Portal design demos** (open in a browser): [index](docs/design/index.html), [design A — mission console](docs/design/design-a-console.html), [design B — enterprise suite](docs/design/design-b-suite.html) (applied to `web/`), [login](docs/design/login.html)
+- **Recorded operator journey**: [demo-journey.txt](docs/project/evidence/m5/demo-journey.txt) — clean setup through ingest, billing, correction, cohort cutover, client isolation and market transfer
+- **Walkthrough**: [walkthrough.md](docs/project/evidence/m5/walkthrough.md), and the [verification audit](docs/project/evidence/m5/verification-audit.md)
+- **Measured release**: [portfolio-run.md](docs/project/evidence/m5/portfolio-run.md) — 100-account × 30-day batch in 8.3 s, ingest repeats under 60 s, peak 5.76 GiB
+- **Fault and deployment evidence**: [fault-campaign.md](docs/project/evidence/m5/fault-campaign.md) (seven real-process scenarios), [kubernetes.md](docs/project/evidence/m5/kubernetes.md), [diagnostics.md](docs/project/evidence/m5/diagnostics.md)
+
+M1–M4 are complete and independently approved ([M1](docs/project/evidence/m1/m1-metering-independent-review.md), [M2](docs/project/evidence/m2/m2-independent-review.md), [M3](docs/project/evidence/m3/m3-independent-review.md), [M4](docs/project/evidence/m4/m4-review-r5.md)). M5 implementation is complete; its independent review is pending. See the [backlog](docs/project/backlog.md) and [roadmap](docs/project/roadmap.md).
