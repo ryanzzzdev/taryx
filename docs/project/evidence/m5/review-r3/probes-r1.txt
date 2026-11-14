@@ -1,0 +1,7 @@
+[batch] FAIL wall=1s whole_p95=0.15s invoices=0
+billing with zero invoices and unbalanced journal: FAIL
+duplicate campaign with two invoices/unbalanced journal: FAIL (correct)
+[ingest] seeding 100 R1 accounts
+[ingest] starting R1 ingest (180000 intervals)
+[ingest] FAIL wall=0.0s healthz_p95=1.0ms metrics_p95=1.0ms
+failed ingest: FAIL ingestion failed

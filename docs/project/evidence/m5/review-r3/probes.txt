@@ -1,0 +1,28 @@
+test_month_lengths (__main__.RemediationTests.test_month_lengths) ... ok
+test_october_requires_31_days (__main__.RemediationTests.test_october_requires_31_days) ... [ingest m10] FAIL 0.0s
+[ingest m10] PASS 0.0s
+ok
+test_partial_selection_fails (__main__.RemediationTests.test_partial_selection_fails) ... [ingest] seeding 100 R1 accounts
+[ingest] starting R1 ingest (180000 intervals)
+[ingest] FAIL wall=0.0s healthz_p95=1.0ms metrics_p95=1.0ms
+ok
+test_repeat_bad_outcomes_fail (__main__.RemediationTests.test_repeat_bad_outcomes_fail) ... [ingest m09] FAIL 0.0s
+[ingest m09] FAIL 0.0s
+[ingest m09] FAIL 0.0s
+[ingest m09] FAIL 0.0s
+ok
+test_repeat_positive_outcome_passes (__main__.RemediationTests.test_repeat_positive_outcome_passes) ... [ingest m09] PASS 0.0s
+ok
+test_successful_ingest_still_passes (__main__.RemediationTests.test_successful_ingest_still_passes) ... [ingest] seeding 100 R1 accounts
+[ingest] starting R1 ingest (180000 intervals)
+[ingest] PASS wall=0.0s healthz_p95=1.0ms metrics_p95=1.0ms
+ok
+test_unparseable_outcome_fails (__main__.RemediationTests.test_unparseable_outcome_fails) ... [ingest] seeding 100 R1 accounts
+[ingest] starting R1 ingest (180000 intervals)
+[ingest] FAIL wall=0.0s healthz_p95=1.0ms metrics_p95=1.0ms
+ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 0.043s
+
+OK

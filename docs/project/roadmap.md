@@ -12,7 +12,7 @@ This is the initial delivery sequence, not a calendar commitment. The earlier 6�
 | M2 — Explainable bills and corrections | End-to-end operator billing with financial integrity | Complete | M1 |
 | M3 — Safe legacy migration | Characterisation, shadow comparison and controlled cohort cutover | Complete | M2 |
 | M4 — Client variation and market boundary | Second isolated client and bounded integration | Complete | M3 |
-| M5 — Operational portfolio delivery | Recovery evidence, Kubernetes and reproducible demonstration | In progress | M4 |
+| M5 — Operational portfolio delivery | Recovery evidence, Kubernetes and reproducible demonstration | Complete | M4 |
 
 Setup and planning completion refer only to [TAR-001](backlog.md#tar-001) and [TAR-002](backlog.md#tar-002). Core product value is demonstrated at M3; M4 and M5 extend it. Changes to that scope require an explicit record, not silent omission of unfinished extensions.
 
@@ -125,6 +125,8 @@ Excludes full MSATS/aseXML conformance and live AEMO connectivity. Gate: [BLK-00
 Status note 2026-11-08: all three scoped tasks implemented and verified (TAR-013/014/015 — see backlog evidence). Milestone stays In progress pending the deferred independent review; M4 review loop was skipped this campaign on Codex quota and is owed before the milestone is claimed complete.
 
 ## M5 — Operational portfolio delivery
+
+2026-11-14 round-three independent review at `dee7a7e`: **APPROVED**. M5-F1–F4 closed; TAR-016–018 Done and M5 Complete for the declared local portfolio scope. [Review, checks and retained limitations](evidence/m5/review-r3/review.md). Earlier review/status statements below are historical; this does not imply hosted CI, cloud or live-market approval.
 
 2026-11-14 round-two review at `1c7e61d`: **CHANGES_REQUESTED**. M5-F3/F4 closed; TAR-017 Done after independent upgrade rerun. TAR-016/TAR-018 remain In progress for residual M5-F1/F2 (redelivery observation and batch-specific ingest/exit gates). [Round-two findings](evidence/m5/review-r2/review.md). Earlier status statements below are historical.
 

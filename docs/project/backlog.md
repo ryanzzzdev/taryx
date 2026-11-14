@@ -21,9 +21,9 @@ Task sections own status; index icons mirror them. See the [documentation guide]
 - ✅ [TAR-013 — Demonstrate two isolated client instances](#tar-013)
 - ✅ [TAR-014 — Freeze the bounded market workflow](#tar-014)
 - ✅ [TAR-015 — Implement market adapter and counterparty simulator](#tar-015)
-- 🚧 [TAR-016 — Verify recovery and correlated diagnostics](#tar-016)
+- ✅ [TAR-016 — Verify recovery and correlated diagnostics](#tar-016)
 - ✅ [TAR-017 — Package and verify Kubernetes delivery](#tar-017)
-- 🚧 [TAR-018 — Measure and present the portfolio release](#tar-018)
+- ✅ [TAR-018 — Measure and present the portfolio release](#tar-018)
 - 🚧 [TAR-019 — Evaluate the multi-agent implement/review orchestrator](#tar-019)
 - ✅ [TAR-020 — Design the operator portal UI](#tar-020)
 
@@ -658,7 +658,7 @@ The adapter's market outbox is separate from `billing.OutboxEvent` (operation-li
 - Area: verification
 - Milestone: M5
 - Priority: Normal
-- Status: In progress 🚧
+- Status: Done ✅
 - Depends on: TAR-015
 - References: [Contract](features/verification.md)
 
@@ -674,6 +674,8 @@ Complete real-process fault evidence and actionable operational visibility.
 - Frozen recovery and API-responsiveness budgets pass under the declared workload.
 
 ### Completion evidence
+
+2026-11-14 round-three independent review at `dee7a7e9d4db328773fb854d28bf08d06b27a8b3`: **APPROVED**. M5-F1–F4 closed; completion confirmed. Preserved R1/R2 probes and seven additional gate/month-length tests pass; regenerated campaign and measurement evidence reviewed with explicit independent-rerun limits. [Review](evidence/m5/review-r3/review.md). Earlier findings and pending-review statements below are historical.
 
 2026-11-14 round-two independent review at `1c7e61d308a6961d9107ca4ba099f15548188682`: **CHANGES_REQUESTED** overall. M5-F1/F2 remain partially open: post-commit redelivery observation and ingest publication/process-exit gates. M5-F3/F4 are closed. Fix remaining gates and rerun affected evidence before re-review. [Review and probes](evidence/m5/review-r2/review.md). Earlier review/remediation statements below are historical.
 
@@ -718,6 +720,8 @@ Reproduce the application on kind with controlled rollouts and worker lifecycle.
 
 ### Completion evidence
 
+2026-11-14 round-three independent review at `dee7a7e9d4db328773fb854d28bf08d06b27a8b3`: **APPROVED**. M5-F1–F4 closed; completion confirmed. Preserved R1/R2 probes and seven additional gate/month-length tests pass; regenerated campaign and measurement evidence reviewed with explicit independent-rerun limits. [Review](evidence/m5/review-r3/review.md). Earlier findings and pending-review statements below are historical.
+
 2026-11-14 round-two independent review at `1c7e61d308a6961d9107ca4ba099f15548188682`: **CHANGES_REQUESTED** overall. M5-F4 closed after independent live idempotent upgrade and migration-failure control-flow probe; delivery completion confirmed. [Review and probes](evidence/m5/review-r2/review.md). Earlier review/remediation statements below are historical.
 
 2026-11-14 independent M5 review at `9a2c5ba0237d2d5bce65a5bfdedf32ce0a384f41`: **CHANGES_REQUESTED**; reopened for verification gate/timing and Kubernetes upgrade gaps. [Findings and runnable probes](evidence/m5/review-r1/review.md). Historical implementation evidence below is retained; remediate and rerun affected checks before re-review.
@@ -738,7 +742,7 @@ Refine and mark Ready once dependencies pass; record relevant gate resolutions b
 - Area: verification
 - Milestone: M5
 - Priority: Normal
-- Status: In progress 🚧
+- Status: Done ✅
 - Depends on: TAR-017
 - References: [Contract](features/verification.md)
 
@@ -754,6 +758,8 @@ Deliver a reproducible complete demo with measured evidence and honest limitatio
 - README setup is verified; hosted CI/cloud/live-market claims are explicitly distinguished from local results.
 
 ### Completion evidence
+
+2026-11-14 round-three independent review at `dee7a7e9d4db328773fb854d28bf08d06b27a8b3`: **APPROVED**. M5-F1–F4 closed; completion confirmed. Preserved R1/R2 probes and seven additional gate/month-length tests pass; regenerated campaign and measurement evidence reviewed with explicit independent-rerun limits. [Review](evidence/m5/review-r3/review.md). Earlier findings and pending-review statements below are historical.
 
 2026-11-14 round-two independent review at `1c7e61d308a6961d9107ca4ba099f15548188682`: **CHANGES_REQUESTED** overall. M5-F1/F2 remain partially open: post-commit redelivery observation and ingest publication/process-exit gates. M5-F3/F4 are closed. Fix remaining gates and rerun affected evidence before re-review. [Review and probes](evidence/m5/review-r2/review.md). Earlier review/remediation statements below are historical.
 

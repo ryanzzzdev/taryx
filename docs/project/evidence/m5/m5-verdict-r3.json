@@ -1,0 +1,50 @@
+{
+  "reviewed_sha": "dee7a7e9d4db328773fb854d28bf08d06b27a8b3",
+  "verdict": "APPROVED",
+  "summary": "M5-F1–F4 closed. TAR-016–018 marked Done and M5 Complete for local portfolio delivery. Records updated; no commit made.",
+  "findings": [],
+  "checks": [
+    {
+      "command": "python3 docs/project/evidence/m5/review-r1/probes.py",
+      "outcome": "passed",
+      "evidence_path": "docs/project/evidence/m5/review-r3/probes-r1.txt"
+    },
+    {
+      "command": "python3 docs/project/evidence/m5/review-r2/probes.py",
+      "outcome": "passed",
+      "evidence_path": "docs/project/evidence/m5/review-r3/probes-r2.txt"
+    },
+    {
+      "command": "python3 docs/project/evidence/m5/review-r3/probes.py",
+      "outcome": "passed",
+      "evidence_path": "docs/project/evidence/m5/review-r3/probes.txt"
+    },
+    {
+      "command": "uv run --frozen pytest -q",
+      "outcome": "passed",
+      "evidence_path": "docs/project/evidence/m5/review-r3/pytest.txt"
+    },
+    {
+      "command": "Ruff lint/format, mypy and import-boundary checks",
+      "outcome": "passed",
+      "evidence_path": "docs/project/evidence/m5/review-r3/static-checks.txt"
+    }
+  ],
+  "verification_gaps": [
+    "Regenerated fault and performance evidence was inspected; full live campaigns were not independently rerun this round.",
+    "Fresh cluster/reset and browser journey were not rerun. Prior independent Kubernetes upgrade evidence is retained.",
+    "Approval excludes hosted CI, cloud delivery, live-market conformance and hosted Sentry export."
+  ],
+  "artifacts": [
+    "docs/project/evidence/m5/review-r3/review.md",
+    "docs/project/evidence/m5/review-r3/probes.py",
+    "docs/project/evidence/m5/review-r3/probes.txt",
+    "docs/project/evidence/m5/review-r3/probes-r1.txt",
+    "docs/project/evidence/m5/review-r3/probes-r2.txt",
+    "docs/project/evidence/m5/review-r3/pytest.txt",
+    "docs/project/evidence/m5/review-r3/static-checks.txt",
+    "docs/project/backlog.md",
+    "docs/project/roadmap.md",
+    "docs/project/journal/2026-11.md"
+  ]
+}
