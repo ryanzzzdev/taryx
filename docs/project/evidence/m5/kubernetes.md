@@ -101,3 +101,25 @@ Recovery path recorded: fix the failing migration/init (or
 `kubectl rollout undo` to the last good revision — note the restart
 annotation creates its own revision, so `--to-revision` or a direct
 patch is needed when multiple revisions carry the defect).
+
+## Schema upgrade via recreated Jobs (2026-11-14)
+
+M5-F4 remediation: `install.sh` now deletes and recreates the one-shot
+Jobs on every run and accepts `--rollout` to restart the four app
+Deployments (workloads pin `latest` + `IfNotPresent`, so plain apply
+never rolls them). Exercised live on the 12 h-old cluster:
+
+- rebuilt `taryx-app:latest` carrying a new pending migration
+  (`audit/0002_upgrade_boundary_probe` — a real schema-version step
+  that changes no schema) and `kind load`ed it;
+- `./install.sh --rollout` deleted + recreated all four Jobs; each
+  `migrate-*` Job ran fresh (`Complete` in ~10 s) and applied `0002` —
+  `showmigrations` inside the api pod shows `[X] 0002_upgrade_boundary_probe`;
+- `rollout restart` rolled all four Deployments (new ReplicaSets, pods
+  Ready in ~22 s) behind the `wait-migrated` gate; existing data intact;
+- second `--rollout` run idempotent: Jobs reran (`No migrations to
+  apply`), rollouts completed, clean exit.
+
+Fixed along the way: the readiness wait now targets Deployments
+(`rollout status`) — a pod-label wait could snapshot a terminating pod
+and die `NotFound` mid-rollout.

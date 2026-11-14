@@ -154,16 +154,53 @@ def wait_broker(timeout=90):
 
 
 def scenario(name, boundary, setup, fault, invariant, restart, observe):
+    """observe(observed) must assert the financial invariants itself —
+    a PASS string is only returned when they hold."""
     rec = {"scenario": name, "boundary": boundary, "invariant": invariant}
     try:
         rec["start_state"] = setup()
         fault()
         rec["observed"] = restart()
-        rec["result"] = observe()
+        rec["result"] = observe(rec["observed"])
     except (SystemExit, Exception) as exc:
         rec["result"] = f"FAIL: {exc}"
     print(f"[{name}] {rec['result']}", flush=True)
     records.append(rec)
+
+
+def require(cond, msg):
+    if not cond:
+        raise SystemExit(msg)
+
+
+def require_one_balanced_invoice(observed):
+    require(observed.get("invoices") == 1, f"FAIL: {observed.get('invoices')} invoices")
+    require(
+        observed.get("unbalanced_journals") == 0,
+        f"FAIL: {observed.get('unbalanced_journals')} unbalanced journals",
+    )
+
+
+def wait_queue_drained(timeout=60):
+    """Broker queues carry no unacked work — duplicate deliveries included."""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        out = compose(
+            "exec",
+            "-T",
+            "broker",
+            "rabbitmqctl",
+            "-q",
+            "list_queues",
+            "-p",
+            "taryx",
+            "messages",
+            check=False,
+        )
+        if out.returncode == 0 and sum(int(x) for x in out.stdout.split() if x.isdigit()) == 0:
+            return
+        time.sleep(1)
+    raise SystemExit("broker queues did not drain")
 
 
 def s1_precommit_kill():
@@ -187,11 +224,10 @@ def s1_precommit_kill():
         rec = {"mid": mid, "after": financials(day)}
         if mid["invoices"] != 0:
             raise SystemExit("FAIL: financial effect leaked before commit")
-        if rec["after"]["invoices"] != 1:
-            raise SystemExit(f"FAIL: {rec['after']['invoices']} invoices after recovery")
         return rec
 
-    def observe():
+    def observe(observed):
+        require_one_balanced_invoice(observed["after"])
         return "PASS: no invoice/journal leaked; drain produced exactly one balanced invoice"
 
     return scenario(
@@ -229,11 +265,10 @@ def s2_postcommit_kill():
         rec = {"mid": mid, "after": financials(day)}
         if mid["invoices"] != 1:
             raise SystemExit("FAIL: committed effect missing after kill")
-        if rec["after"]["invoices"] != 1:
-            raise SystemExit("FAIL: redelivery duplicated the effect")
         return rec
 
-    def observe():
+    def observe(observed):
+        require_one_balanced_invoice(observed["after"])
         return "PASS: committed invoice survived the kill; explicit redelivery added nothing"
 
     return scenario(
@@ -289,7 +324,9 @@ def s3_broker_outage():
         wait_op(op, "complete")
         return {"status": op_status(op), **financials(day)}
 
-    def observe():
+    def observe(observed):
+        require(observed["status"] == "complete", f"FAIL: op {observed['status']}")
+        require_one_balanced_invoice(observed)
         return (
             "PASS: admission was durable with broker down; API stayed responsive; drain recovered"
         )
@@ -322,10 +359,11 @@ def s4_duplicate_delivery():
 
     def restart():
         wait_op(op, "complete")
-        time.sleep(4)  # let the duplicate delivery settle
+        wait_queue_drained()  # both deliveries consumed, not just the first
         return financials(day)
 
-    def observe():
+    def observe(observed):
+        require_one_balanced_invoice(observed)
         return "PASS: duplicate deliveries produced exactly one invoice"
 
     return scenario(
@@ -356,7 +394,9 @@ def s5_abandoned_lease():
         wait_op(op, "complete")
         return {"status": op_status(op), **financials(day)}
 
-    def observe():
+    def observe(observed):
+        require(observed["status"] == "complete", f"FAIL: op {observed['status']}")
+        require_one_balanced_invoice(observed)
         return "PASS: queued intent survived the missing consumer; exactly once"
 
     return scenario(
@@ -413,7 +453,11 @@ def s6_adapter_restart():
             time.sleep(3)
         return {"mid_state": mid, "final_state": state}
 
-    def observe():
+    def observe(observed):
+        require(
+            observed["final_state"] == "completed",
+            f"FAIL: workflow ended {observed['final_state']!r} (mid {observed['mid_state']!r})",
+        )
         return (
             "PASS: crash left a durable draft; the restarted worker's "
             "sweep polled-then-resubmitted to terminal"
@@ -448,7 +492,12 @@ def s7_market_outage_billing():
         compose("start", "market")
         return {**billed, **financials(day)}
 
-    def observe():
+    def observe(observed):
+        require(
+            observed["status_while_market_down"] == "complete",
+            f"FAIL: op {observed['status_while_market_down']} with market down",
+        )
+        require_one_balanced_invoice(observed)
         return "PASS: billing issued while the market coordinator was down"
 
     return scenario(
@@ -499,7 +548,12 @@ def main():
             "",
         ]
     (OUT / "fault-campaign.md").write_text("\n".join(lines))
+    failed = [r["scenario"] for r in records if not r["result"].startswith("PASS")]
     print(f"\n{len(records)} scenarios -> {OUT}/fault-campaign.md")
+    if failed:
+        print(f"FAILED: {failed}", flush=True)
+        return 1
+    return 0
 
 
 if __name__ == "__main__":

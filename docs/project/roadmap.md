@@ -128,6 +128,8 @@ Status note 2026-11-08: all three scoped tasks implemented and verified (TAR-013
 
 2026-11-14 independent review at `9a2c5ba`: **CHANGES_REQUESTED**; TAR-016–018 reopened for false-positive verification gates, incomplete billing timing and repeatable schema-upgrade delivery. M5 remains In progress. [Review](evidence/m5/review-r1/review.md). Earlier Done statements describe implementation evidence and are superseded by this review.
 
+2026-11-14 R1 remediation applied: invariant-enforcing campaign/budget gates (7/7 + budgets rerun PASS), whole-run billing measurement (rate+issue p95 0.554 s, 100 invoices), repeatable k8s upgrade path demonstrated live (recreated Jobs applied a pending migration, `--rollout` rolled all Deployments). Awaiting re-review.
+
 Scope: TAR-016–018. Correlated diagnostics, process-fault campaign, kind deployment, migration/rollout safety, measured workloads and presentation.
 
 Exit criteria:

@@ -31,7 +31,9 @@ R1_DAYS = [f"202604{d:02d}" for d in range(1, 31)]
 R1_VALUE = os.environ.get("R1_VALUE", "0.5")  # vary per rerun — content-hash differs
 # Revisions must carry a LATER load/update stamp to out-rank the prior
 # records (equal precedence + different value is a real quarantine).
-R1_STAMP = os.environ.get("R1_STAMP", "20260331120000")
+# Default stamps the run itself: every rerun is a genuine later
+# revision, never a content-hash dedupe.
+R1_STAMP = os.environ.get("R1_STAMP") or time.strftime("%Y%m%d%H%M%S")
 
 
 def seed_r1_accounts():
@@ -119,19 +121,27 @@ def phase_ingest():
     )
     t0 = time.perf_counter()
     samples = {"healthz": [], "metrics": []}
+    failures = {"healthz": 0, "metrics": 0}
     while ing.poll() is None:
         for name in ("healthz", "metrics"):
             dt = probe(f"http://localhost:8001/{name}")
-            if dt is not None:
+            if dt is None:
+                failures[name] += 1  # dropped request = availability breach
+            else:
                 samples[name].append(dt)
         time.sleep(0.06)
     wall = time.perf_counter() - t0
     out = ing.stdout.read()
+    # Publication check: the full expected interval set must be current.
+    current = int(fc.psql("SELECT count(*) FROM metering_currentinterval") or 0)
     rec = {
         "scenario": "r1-ingest-api-p95",
         "intervals": intervals,
+        "current_intervals": current,
         "ingest_seconds": round(wall, 1),
+        "ingest_rc": ing.returncode,
         "ingest_tail": out.strip().splitlines()[-1][:200] if out.strip() else "",
+        "request_failures": failures,
         "budget": {"api_p95_ms": 500, "ingest_s": 90},
     }
     for name, vals in samples.items():
@@ -145,8 +155,12 @@ def phase_ingest():
                 sorted(v for v in base[f"http://localhost:8001/{name}"] if v), 0.95
             ),
         }
-    ok = wall <= 90 and all(
-        rec[n]["p95_ms"] is not None and rec[n]["p95_ms"] <= 500 for n in samples
+    ok = (
+        ing.returncode == 0
+        and wall <= 90
+        and current >= intervals
+        and not any(failures.values())
+        and all(rec[n]["p95_ms"] is not None and rec[n]["p95_ms"] <= 500 for n in samples)
     )
     rec["result"] = "PASS" if ok else "FAIL"
     print(

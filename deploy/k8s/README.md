@@ -23,6 +23,25 @@ purpose: each api/worker pod runs a `wait-migrated` initContainer
 the workload in `Init` — unsafe advancement is impossible by
 construction, and the gate is observable in `kubectl get pods`.
 
+## Upgrade
+
+```bash
+docker compose build api            # rebuild taryx-app:latest with new code
+kind load docker-image taryx-app:latest --name taryx
+bash deploy/k8s/install.sh --rollout
+```
+
+Every run deletes and recreates the one-shot Jobs (`db-init`,
+`broker-provision`, `migrate-*`): a completed Job's pod template is
+immutable, so re-apply alone can never run a new pending migration.
+`--rollout` additionally restarts the four app Deployments — workloads
+pin `latest` + `IfNotPresent`, so a reloaded image does not change pod
+templates and plain apply never rolls them. New pods pass through the
+same `wait-migrated` gate, so code cannot outrun schema on upgrades
+either. The procedure was exercised live: a pending migration shipped
+in a rebuilt image, the recreated Job applied it, and all four
+Deployments rolled (evidence: `docs/project/evidence/m5/kubernetes.md`).
+
 ## Topology
 
 - `db` StatefulSet (postgres:18.6, PVC): `taryx` + `taryx_southgrid`

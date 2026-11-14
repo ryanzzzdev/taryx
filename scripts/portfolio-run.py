@@ -13,6 +13,7 @@ docs/project/evidence/m5/portfolio-run.{jsonl,md}
 
 import importlib.util
 import json
+import os
 import re
 import subprocess
 import sys
@@ -29,6 +30,7 @@ _spec.loader.exec_module(fc)
 stats_samples: list[dict] = []
 queue_samples: list[int] = []
 sampling = threading.Event()
+phase = "startup"  # tag each resource sample with the running phase
 
 
 def sample_loop():
@@ -43,7 +45,9 @@ def sample_loop():
                 continue
             v, unit = float(m.group(1)), m.group(2)
             total += v * {"B": 1e-9, "KiB": 1 / 1048576, "MiB": 1 / 1024, "GiB": 1.0}.get(unit, 0)
-        stats_samples.append({"t": round(time.time() % 100000, 1), "stack_gib": round(total, 3)})
+        stats_samples.append(
+            {"t": round(time.time() % 100000, 1), "phase": phase, "stack_gib": round(total, 3)}
+        )
         q = fc.compose(
             "exec",
             "-T",
@@ -66,17 +70,22 @@ def pct(vals, q):
     return round(vals[min(len(vals) - 1, int(len(vals) * q))], 3) if vals else None
 
 
-def _batch_stats_from_db(wall_s):
+def _batch_stats_from_db(op_like, expect, period, wall_s, rate_s):
+    """Whole-run per-account latency = rating + issue (op created_at ->
+    completed_at). The gate requires the financial invariants too:
+    `expect` invoices and zero unbalanced journals — a fast batch that
+    billed nothing is a FAIL, not a PASS."""
     rows = fc.psql(
         "SELECT extract(epoch from completed_at - created_at) FROM"
-        " billing_billingoperation WHERE operation_id LIKE 'r1-bill-%'"
-        " AND status='complete'"
+        f" billing_billingoperation WHERE operation_id LIKE '{op_like}'"
+        " AND status='complete' ORDER BY operation_id"
     ).splitlines()
-    lat = [float(x) for x in rows if x.strip()]
+    op_lat = [float(x) for x in rows if x.strip()]
+    whole = sorted(r + o for r, o in zip(rate_s, op_lat, strict=False))
     invoices = int(
         fc.psql(
             "SELECT count(*) FROM billing_billingoperation WHERE"
-            " operation_id LIKE 'r1-bill-%' AND invoice_id IS NOT NULL"
+            f" operation_id LIKE '{op_like}' AND invoice_id IS NOT NULL"
         )
     )
     unbalanced = int(
@@ -88,51 +97,66 @@ def _batch_stats_from_db(wall_s):
     )
     rec = {
         "scenario": "r1-billing-batch",
-        "accounts": 100,
-        "period": "2026-04-01..2026-05-01 (30 days)",
+        "accounts": expect,
+        "period": period,
         "batch_wall_s": round(wall_s, 1),
-        "op_latency_s": {
-            "n": len(lat),
-            "p50": pct(lat, 0.5),
-            "p95": pct(lat, 0.95),
-            "max": round(max(lat), 3) if lat else None,
+        "whole_run_s": {
+            "n": len(whole),
+            "p50": pct(whole, 0.5),
+            "p95": pct(whole, 0.95),
+            "max": round(max(whole), 3) if whole else None,
+        },
+        "rate_seconds": {
+            "p50": pct(rate_s, 0.5),
+            "p95": pct(rate_s, 0.95),
+            "max": max(rate_s) if rate_s else None,
         },
         "invoices": invoices,
         "unbalanced_journals": unbalanced,
         "budget": {"per_account_p95_s": 2.0, "batch_s": 300},
         "result": "PASS"
-        if lat and pct(lat, 0.95) <= 2.0 and wall_s <= 300 and len(lat) == 100
+        if len(whole) == expect
+        and pct(whole, 0.95) <= 2.0
+        and wall_s <= 300
+        and invoices == expect
+        and unbalanced == 0
         else "FAIL",
     }
     print(
-        f"[batch] {rec['result']} wall={rec['batch_wall_s']}s op_p95={rec['op_latency_s']['p95']}s",
+        f"[batch] {rec['result']} wall={rec['batch_wall_s']}s "
+        f"whole_p95={rec['whole_run_s']['p95']}s invoices={invoices}",
         flush=True,
     )
     return rec
 
 
+BILL_MONTH = int(os.environ.get("BILL_MONTH", "4"))
+BILL_TAG = os.environ.get("BILL_TAG", "r1")
+
+
 def phase_bill_batch():
-    """Rate 30-day runs for 100 R1 accounts, then admit+enqueue all ops;
-    per-account latency = op created_at -> completed_at."""
+    """Fresh identified batch every run: rate + admit + process 100
+    accounts for BILL_MONTH. Re-running the same month/tag would only
+    re-observe a prior batch, so it refuses and asks for a fresh tag."""
+    op_like = f"{BILL_TAG}-bill-m{BILL_MONTH}-%"
     done = int(
         fc.psql(
             "SELECT count(*) FROM billing_billingoperation WHERE"
-            " operation_id LIKE 'r1-bill-%' AND status='complete'"
+            f" operation_id LIKE '{op_like}' AND status='complete'"
         )
     )
-    if done == 100:
-        # Already ran — reconstruct from op timestamps (rerun-safe).
-        wall = float(
-            fc.psql(
-                "SELECT extract(epoch from max(completed_at) -"
-                " min(created_at)) FROM billing_billingoperation WHERE"
-                " operation_id LIKE 'r1-bill-%'"
-            )
-        )
-        rec = _batch_stats_from_db(wall)
-        rec["note"] = "reconstructed from persisted op timestamps (prior run)"
-        return rec
-    code = """
+    if done:
+        return {
+            "scenario": "r1-billing-batch",
+            "result": "FAIL",
+            "reason": f"{done} ops already complete for {op_like!r} — "
+            "a rerun cannot measure a fresh batch; pick a new BILL_MONTH "
+            "or BILL_TAG (data must be ingested for the month first)",
+        }
+    period = f"2026-{BILL_MONTH:02d}"
+    n_y, n_m = (2027, 1) if BILL_MONTH == 12 else (2026, BILL_MONTH + 1)
+    p_end = f"date({n_y}, {n_m}, 1)"
+    code = f"""
 import json, time
 from datetime import date
 from taryx.composition.policy import policy
@@ -143,53 +167,63 @@ from taryx.core.migration.services import routing_for
 from taryx.composition.tasks import process_billing_operation
 p = policy()
 rate_s = []
-t_batch = time.perf_counter()
+t0 = time.time()
 for i in range(1, 101):
-    acc = Account.objects.get(reference=f'ACC-R1-{i:03d}')
-    t0 = time.perf_counter()
-    run = rate_account(acc, date(2026, 4, 1), date(2026, 5, 1),
+    acc = Account.objects.get(reference=f'ACC-R1-{{i:03d}}')
+    t = time.perf_counter()
+    run = rate_account(acc, date(2026, {BILL_MONTH}, 1), {p_end},
                        tariffs=p.TARIFFS, gst_rate=p.GST_RATE,
                        policy_identity=p.POLICY_IDENTITY)
-    rate_s.append(round(time.perf_counter() - t0, 3))
-    op = admit_issue(acc, date(2026, 4, 1), date(2026, 5, 1), run,
-                     f'r1-bill-{i:03d}', routing_resolver=routing_for)
+    rate_s.append(round(time.perf_counter() - t, 3))
+    op = admit_issue(acc, date(2026, {BILL_MONTH}, 1), {p_end}, run,
+                     f'{BILL_TAG}-bill-m{BILL_MONTH}-{{i:03d}}',
+                     routing_resolver=routing_for)
     process_billing_operation.delay(op.operation_id)
-print(json.dumps({"rate_s": rate_s, "batch_open_s": round(time.perf_counter() - t_batch, 1)}))
+print(json.dumps({{"rate_s": rate_s, "t0": t0}}))
 """
-    t0 = time.time()
     out = fc.shell(code).stdout
     payload = json.loads(out.strip().splitlines()[-1])
-    # Wait for all ops to complete.
     deadline = time.time() + 600
     while time.time() < deadline:
         pending = int(
             fc.psql(
                 "SELECT count(*) FROM billing_billingoperation WHERE"
-                " operation_id LIKE 'r1-bill-%' AND status='pending'"
+                f" operation_id LIKE '{op_like}' AND status='pending'"
             )
         )
         if pending == 0:
             break
         time.sleep(3)
-    wall = time.time() - t0
-    rec = _batch_stats_from_db(wall)
-    rec["rate_seconds"] = {
-        "p50": pct(payload["rate_s"], 0.5),
-        "p95": pct(payload["rate_s"], 0.95),
-        "max": max(payload["rate_s"]),
-    }
-    rec["admit_dispatch_s"] = payload["batch_open_s"]
-    return rec
+    else:
+        return {
+            "scenario": "r1-billing-batch",
+            "result": "FAIL",
+            "reason": "ops still pending after 600 s",
+        }
+    wall = (
+        float(
+            fc.psql(
+                "SELECT extract(epoch from max(completed_at)) FROM"
+                f" billing_billingoperation WHERE operation_id LIKE '{op_like}'"
+            )
+        )
+        - payload["t0"]
+    )
+    return _batch_stats_from_db(op_like, 100, f"{period}-01..{period}-30", wall, payload["rate_s"])
+
+
+REPEAT_MONTHS = os.environ.get("REPEAT_MONTHS", "5,6")  # fresh periods; bump on rerun
 
 
 def phase_ingest_repeats():
-    """Two more R1 ingests on FRESH periods (May, June) — same 180k
-    shape through the create path — for the repetition profile."""
+    """Two more R1 ingests on fresh periods (REPEAT_MONTHS, default
+    May/June) — same 180k shape. Reruns become revisions via a fresh
+    stamp, or pick new months for the fresh-create path."""
+    months = [int(m) for m in REPEAT_MONTHS.split(",")]
     recs = []
-    for label, month, value in (("may", 5, "0.55"), ("june", 6, "0.65")):
+    for label, month in ((f"m{m:02d}", m) for m in months):
+        value = f"0.{month}5"
         days = [f"2026{month:02d}{d:02d}" for d in range(1, 31)]
-        import os
-
         os.environ["R1_VALUE"] = value
         _s = importlib.util.spec_from_file_location("measure", ROOT / "scripts/measure-budgets.py")
         m = importlib.util.module_from_spec(_s)
@@ -210,7 +244,7 @@ def phase_ingest_repeats():
         recs.append(
             {
                 "scenario": f"r1-ingest-repeat-{label}",
-                "period": f"2026-{month:02d} (30 days, fresh)",
+                "period": f"2026-{month:02d} (30 days)",
                 "wall_s": round(wall, 1),
                 "tail": out.strip().splitlines()[-1][:160],
                 "result": "PASS" if wall <= 90 else "FAIL",
@@ -226,7 +260,12 @@ def main():
     sampling.set()
     sampler = threading.Thread(target=sample_loop, daemon=True)
     sampler.start()
-    recs = [phase_bill_batch(), *phase_ingest_repeats()]
+    global phase
+    phase = "bill"
+    bill = phase_bill_batch()
+    phase = "ingest"
+    recs = [bill, *phase_ingest_repeats()]
+    phase = "done"
     sampling.clear()
     sampler.join(timeout=5)
     summary = {
@@ -263,6 +302,11 @@ def main():
     (OUT / "portfolio-run.md").write_text("\n".join(lines))
     print(f"peak_mem={summary['peak_stack_gib']}GiB max_queue={summary['max_queue_depth']}")
     print(f"-> {OUT}/portfolio-run.md")
+    failed = [r["scenario"] for r in recs if r["result"] != "PASS"]
+    if failed:
+        print(f"FAILED: {failed}", flush=True)
+        return 1
+    return 0
 
 
 if __name__ == "__main__":
