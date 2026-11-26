@@ -33,7 +33,7 @@ The central capabilities are:
 - **Client variation:** run fictional Australian retailers from the same application image with isolated databases, configuration and client policies.
 - **Resilient market integration:** demonstrate a bounded asynchronous workflow against a simulated external counterparty, including delayed, duplicated and rejected messages.
 
-Alongside NEMLab's wholesale market analysis, Voltix's equipment control and Cateniq's spatial engineering tools, Taryx adds retail operations and transactional business software to the portfolio. It also provides a focused setting for the domain modelling, fault tolerance and client-specific engineering described in Kraken's Client Engineering role.
+Alongside NEMLab's wholesale market analysis, Voltix's equipment control and Cateniq's spatial engineering tools, Taryx adds retail operations and transactional business software to the portfolio. It also provides a focused setting for the domain modelling, fault tolerance and client-specific engineering described in [Kraken's Client Engineering role](https://jobs.ashbyhq.com/krakentech/0cb355f4-cf92-4810-8794-979bbe5c9a68) ([archived copy](docs/kraken-client-engineering-job-description.md)).
 
 ## Background: Kraken's published architecture
 
